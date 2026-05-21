@@ -77,7 +77,7 @@ private fun BoxScope.CinematicForeground(
             color = DwellColors.TextMid,
         )
     }
-    // WidgetDrawer wired in Task 4.5
+    WidgetDrawer(settingsViewModel, registry)
 }
 
 private fun formatMetaLine(now: LocalDateTime): String {
