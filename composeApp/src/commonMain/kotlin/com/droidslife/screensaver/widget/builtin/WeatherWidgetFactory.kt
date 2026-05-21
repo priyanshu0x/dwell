@@ -37,6 +37,8 @@ import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
+import com.droidslife.screensaver.widget.api.WidgetSize
+import com.droidslife.screensaver.widget.api.WidgetSummary
 import kotlinx.coroutines.delay
 
 class WeatherWidgetFactory(
@@ -47,6 +49,11 @@ class WeatherWidgetFactory(
     override val displayName: String = "Weather"
     override val description: String = "Current weather for a configured city"
     override val category: WidgetCategory = WidgetCategory.INFORMATION
+    override val preferredSize: WidgetSize = WidgetSize(
+        minCols = 3, minRows = 2,
+        defaultCols = 5, defaultRows = 2,
+        maxCols = 8, maxRows = 3,
+    )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.Text(
             key = "city",
@@ -66,6 +73,43 @@ private class WeatherWidget(
     private val settingsViewModel: SettingsViewModel,
 ) : Widget {
     override val preferredSpan: Int = 1
+
+    override fun summary(): WidgetSummary {
+        val state = weatherViewModel.state
+        return when (state) {
+            is WeatherState.Success -> {
+                val data = state.weatherData
+                WidgetSummary(
+                    primaryValue = "${data.current.tempC.toInt()}°",
+                    primaryLabel = "Weather",
+                    subtitle = "${data.current.condition.text} · ${data.location.name}",
+                )
+            }
+            is WeatherState.Loading -> WidgetSummary(
+                primaryValue = "—",
+                primaryLabel = "Weather",
+                subtitle = "Loading…",
+            )
+            is WeatherState.Error -> {
+                val apiKeyConfigured = settingsViewModel.isSecretSaved(
+                    settingsViewModel.settings.weatherApiKeySecretId
+                )
+                if (!apiKeyConfigured) {
+                    WidgetSummary(
+                        primaryValue = "—",
+                        primaryLabel = "Weather",
+                        subtitle = "API key needed",
+                    )
+                } else {
+                    WidgetSummary(
+                        primaryValue = "—",
+                        primaryLabel = "Weather",
+                        subtitle = "Couldn't load",
+                    )
+                }
+            }
+        }
+    }
 
     @Composable
     override fun Content(modifier: Modifier) {
