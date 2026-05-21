@@ -39,7 +39,14 @@ val appModule = module {
     single<StartupRegistration> { createStartupRegistration() }
 
     // Weather API
-    single { WeatherApi(get(), get()) }
+    single {
+        val settingsViewModel: SettingsViewModel = get()
+        WeatherApi(
+            client = get(),
+            secretStorage = get(),
+            weatherApiKeySecretIdProvider = { settingsViewModel.settings.weatherApiKeySecretId },
+        )
+    }
 
     // Weather Repository
     single { WeatherRepository(get(), get()) }
