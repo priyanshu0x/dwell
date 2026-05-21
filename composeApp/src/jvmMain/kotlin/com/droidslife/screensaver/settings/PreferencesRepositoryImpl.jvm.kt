@@ -4,6 +4,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 import io.github.xxfast.kstore.Codec
 import io.github.xxfast.kstore.storeOf
 import java.nio.file.Path
@@ -76,7 +81,39 @@ private class SettingsFileCodec(
     override suspend fun decode(): SettingsModel? {
         return runCatching {
             if (!settingsPath.exists()) return SettingsModel()
-            json.decodeFromString<SettingsModel>(settingsPath.readText())
+            val raw = json.parseToJsonElement(settingsPath.readText())
+            val migrated = migrateJson(raw)
+            json.decodeFromJsonElement<SettingsModel>(migrated)
         }.getOrDefault(SettingsModel())
     }
+}
+
+/**
+ * Migrate a raw settings JsonElement before deserialization.
+ *
+ * Currently rewrites legacy `currentCity` field into the Weather widget's
+ * own config under `widgetConfigs["com.droidslife.screensaver.weather"]["city"]`,
+ * then drops `currentCity` from the root. Deprecated fields (selectedDesignId,
+ * autoPlayEnabled, shuffleEnabled) are simply ignored at decode time because
+ * the Json decoder is configured with `ignoreUnknownKeys = true`.
+ */
+private fun migrateJson(raw: JsonElement): JsonElement {
+    if (raw !is JsonObject) return raw
+    val currentCity = (raw["currentCity"] as? JsonPrimitive)?.contentOrNull
+    if (currentCity.isNullOrBlank()) {
+        // Still strip the field so we don't keep rewriting it.
+        return if (raw.containsKey("currentCity")) JsonObject(raw - "currentCity") else raw
+    }
+    val weatherKey = "com.droidslife.screensaver.weather"
+    val widgetConfigs = (raw["widgetConfigs"] as? JsonObject) ?: JsonObject(emptyMap())
+    val existingWeatherCfg = (widgetConfigs[weatherKey] as? JsonObject) ?: JsonObject(emptyMap())
+    val merged = if (existingWeatherCfg["city"] != null) {
+        // Weather already has a city; just drop currentCity.
+        raw - "currentCity"
+    } else {
+        val newWeatherCfg = JsonObject(existingWeatherCfg + ("city" to JsonPrimitive(currentCity)))
+        val newWidgetConfigs = JsonObject(widgetConfigs + (weatherKey to newWeatherCfg))
+        (raw - "currentCity") + ("widgetConfigs" to newWidgetConfigs)
+    }
+    return JsonObject(merged)
 }
