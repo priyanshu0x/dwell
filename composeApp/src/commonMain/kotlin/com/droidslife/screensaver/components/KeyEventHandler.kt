@@ -106,24 +106,6 @@ class KeyEventHandler(
 
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
             when (event.key) {
-                Key.N -> {
-                    // Cycle through clock designs
-                    onAction(KeyEventAction.CycleClockDesign)
-                    onAction(KeyEventAction.ShowToast("Ctrl + N"))
-                    return true
-                }
-                Key.P -> {
-                    // Toggle auto-changing of clock design
-                    onAction(KeyEventAction.ToggleAutoChange)
-                    onAction(KeyEventAction.ShowToast("Ctrl + P"))
-                    return true
-                }
-                Key.S -> {
-                    // Show city selection dialog
-                    onAction(KeyEventAction.ShowCityDialog)
-                    onAction(KeyEventAction.ShowToast("Ctrl + S"))
-                    return true
-                }
                 Key.X -> {
                     // Exit the application if exit functionality is enabled
                     onAction(KeyEventAction.ShowToast("Ctrl + X"))

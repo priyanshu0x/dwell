@@ -38,9 +38,6 @@ fun main() = application {
         ShortcutToast(toastState = windowEvents.toastState)
 
         App(
-            showCitySelectionDialog = windowEvents.showCitySelectionDialog,
-            onCityDialogDismiss = windowEvents.onCityDialogDismiss,
-            onShowCityDialog = windowEvents.onShowCityDialog,
             exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
             onExitApplication = requestExit,
             exitRequested = exitRequested,

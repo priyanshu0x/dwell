@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
@@ -17,9 +16,6 @@ data class WindowEventHandlers(
     val keyEventHandler: KeyEventHandler,
     val mouseEventModifier: Modifier,
     val toastState: ToastState,
-    val showCitySelectionDialog: Boolean,
-    val onCityDialogDismiss: () -> Unit,
-    val onShowCityDialog: () -> Unit,
     val exitOnMouseMovementEnabled: Boolean,
     val showHelpDialog: Boolean,
     val onHelpDialogDismiss: () -> Unit,
@@ -31,11 +27,9 @@ fun rememberWindowEventHandlers(
     onExitApplication: () -> Unit,
     openSettingsOnStart: Boolean = false,
 ): WindowEventHandlers {
-    val clockViewModel = koinInject<ClockViewModel>()
     val settingsViewModel = koinInject<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
 
-    var showCitySelectionDialog by remember { mutableStateOf(false) }
     var exitOnMouseMovementEnabled by remember { mutableStateOf(true) }
     var showHelpDialog by remember { mutableStateOf(false) }
     val toastState = rememberToastState()
@@ -51,18 +45,6 @@ fun rememberWindowEventHandlers(
     )
     val onAction: (KeyEventAction) -> Unit = { action ->
         when (action) {
-            is KeyEventAction.CycleClockDesign -> {
-                clockViewModel.cycleClockDesign()
-            }
-            is KeyEventAction.ToggleAutoChange -> {
-                clockViewModel.toggleAutoChange()
-            }
-            is KeyEventAction.ToggleShuffle -> {
-                clockViewModel.toggleShuffleMode()
-            }
-            is KeyEventAction.ShowCityDialog -> {
-                showCitySelectionDialog = true
-            }
             is KeyEventAction.ExitApplication -> {
                 onExitApplication()
             }
@@ -124,9 +106,6 @@ fun rememberWindowEventHandlers(
         keyEventHandler = keyEventHandler,
         mouseEventModifier = Modifier,
         toastState = toastState,
-        showCitySelectionDialog = showCitySelectionDialog,
-        onCityDialogDismiss = { showCitySelectionDialog = false },
-        onShowCityDialog = { showCitySelectionDialog = true },
         exitOnMouseMovementEnabled = exitOnMouseMovementEnabled,
         showHelpDialog = showHelpDialog,
         onHelpDialogDismiss = { showHelpDialog = false },

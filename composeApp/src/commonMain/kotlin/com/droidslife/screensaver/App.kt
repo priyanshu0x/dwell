@@ -24,9 +24,6 @@ import org.koin.compose.koinInject
 
 @Composable
 internal fun App(
-    showCitySelectionDialog: Boolean = false,
-    onCityDialogDismiss: () -> Unit = {},
-    onShowCityDialog: () -> Unit = {},
     exitOnMouseMovementEnabled: Boolean = true,
     onExitApplication: () -> Unit = {},
     exitRequested: Boolean = false,

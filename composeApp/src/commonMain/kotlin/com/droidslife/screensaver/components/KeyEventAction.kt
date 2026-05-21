@@ -6,26 +6,6 @@ package com.droidslife.screensaver.components
  */
 sealed class KeyEventAction {
     /**
-     * Action to cycle through clock designs.
-     */
-    object CycleClockDesign : KeyEventAction()
-
-    /**
-     * Action to toggle auto-changing of clock design.
-     */
-    object ToggleAutoChange : KeyEventAction()
-
-    /**
-     * Action to toggle shuffle mode for clock design.
-     */
-    object ToggleShuffle : KeyEventAction()
-
-    /**
-     * Action to show city selection dialog.
-     */
-    object ShowCityDialog : KeyEventAction()
-
-    /**
      * Action to exit the application.
      */
     object ExitApplication : KeyEventAction()
