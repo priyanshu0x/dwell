@@ -1,8 +1,11 @@
 package com.droidslife.screensaver.modes.console
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -10,9 +13,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
 import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellRadius
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.api.WidgetRenderTarget
 import com.droidslife.screensaver.widget.api.WidgetSize
@@ -48,11 +54,25 @@ fun ConsoleMode(
         Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
             ConsoleGrid(placements = placements, modifier = Modifier.fillMaxSize()) { id ->
                 val instance = instances[id] ?: return@ConsoleGrid
-                instance.widget.Render(
-                    target = WidgetRenderTarget.Tile,
-                    scope = instance.scope,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                val borderColor = if (accent.tileBorderTint == androidx.compose.ui.graphics.Color.Transparent) {
+                    DwellColors.Stroke
+                } else {
+                    DwellColors.Stroke // tint is too faint to override stroke; keep base
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(DwellRadius.m))
+                        .background(DwellColors.Surface1)
+                        .border(1.dp, borderColor, RoundedCornerShape(DwellRadius.m))
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    instance.widget.Render(
+                        target = WidgetRenderTarget.Tile,
+                        scope = instance.scope,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
             if (settingsViewModel.consoleEditMode) {
                 val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
