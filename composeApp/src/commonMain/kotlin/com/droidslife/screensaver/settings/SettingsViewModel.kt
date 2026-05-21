@@ -218,6 +218,88 @@ class SettingsViewModel(
         return settings.enabledWidgetIds.ifEmpty { defaultIds }
     }
 
+    fun setMode(mode: Mode) {
+        updateSettings(settings.copy(mode = mode))
+    }
+
+    fun setCinematicVariant(variant: CinematicVariant) {
+        updateSettings(settings.copy(cinematicVariant = variant))
+    }
+
+    fun setAmbientVariant(variant: AmbientVariant) {
+        updateSettings(settings.copy(ambientVariant = variant))
+    }
+
+    fun setConsoleVariant(variant: ConsoleVariant) {
+        updateSettings(settings.copy(consoleVariant = variant))
+    }
+
+    fun setQuieterLumen(enabled: Boolean) {
+        updateSettings(settings.copy(quieterLumen = enabled))
+    }
+
+    fun setShowSeconds(enabled: Boolean) {
+        updateSettings(settings.copy(showSeconds = enabled))
+    }
+
+    fun setShowDate(enabled: Boolean) {
+        updateSettings(settings.copy(showDate = enabled))
+    }
+
+    fun setExitOnKeypress(enabled: Boolean) {
+        updateSettings(settings.copy(exitOnKeypress = enabled))
+    }
+
+    /**
+     * Sets the layout rectangle for a single widget.
+     *
+     * TODO(Phase 1 dependency): Re-enable the rect parameter once
+     *  com.droidslife.screensaver.widget.api.GridRect lands in widget-api (Task 1.2)
+     *  and the `widgetLayouts` field is added to [SettingsModel].
+     */
+    fun setWidgetLayout(widgetId: String) {
+        // No-op until GridRect / widgetLayouts is available.
+        // Signature will become setWidgetLayout(widgetId: String, rect: GridRect).
+        @Suppress("UNUSED_PARAMETER")
+        widgetId
+    }
+
+    /**
+     * Resets all per-widget layout rectangles.
+     *
+     * TODO(Phase 1 dependency): Implement once `widgetLayouts` exists on [SettingsModel].
+     */
+    fun resetWidgetLayouts() {
+        // No-op until widgetLayouts is available.
+    }
+
+    fun cycleMode() {
+        val modes = Mode.entries
+        val next = modes[(modes.indexOf(settings.mode) + 1) % modes.size]
+        setMode(next)
+    }
+
+    fun cycleVariant() {
+        val newSettings = when (settings.mode) {
+            Mode.Cinematic -> {
+                val variants = CinematicVariant.entries
+                val next = variants[(variants.indexOf(settings.cinematicVariant) + 1) % variants.size]
+                settings.copy(cinematicVariant = next)
+            }
+            Mode.Ambient -> {
+                val variants = AmbientVariant.entries
+                val next = variants[(variants.indexOf(settings.ambientVariant) + 1) % variants.size]
+                settings.copy(ambientVariant = next)
+            }
+            Mode.Console -> {
+                val variants = ConsoleVariant.entries
+                val next = variants[(variants.indexOf(settings.consoleVariant) + 1) % variants.size]
+                settings.copy(consoleVariant = next)
+            }
+        }
+        updateSettings(newSettings)
+    }
+
     /**
      * Updates the settings in the repository.
      * @param newSettings The new settings.
