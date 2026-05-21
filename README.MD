@@ -76,21 +76,23 @@ Requirements:
 - **JDK 21** (this is a hard requirement — the build fails on JDK 17 or earlier). On most Linux distros the default `java` is still JDK 8/11/17, so you will need to install JDK 21 separately. Recommended sources: [Eclipse Temurin](https://adoptium.net/temurin/releases/?version=21), or `sdk install java 21-tem` if you use [SDKMAN!](https://sdkman.io/).
 - Point Gradle at JDK 21 by setting `JAVA_HOME` (e.g. `export JAVA_HOME=/path/to/jdk-21`) before invoking the wrapper. The Gradle wrapper itself will then download the rest of the toolchain.
 
-Then run the app:
+Then run the dashboard once:
 
 Windows:
 
 ```powershell
-.\gradlew.bat :composeApp:run
+.\gradlew.bat :composeApp:run --args="--show"
 ```
 
 Unix shell:
 
 ```sh
-./gradlew :composeApp:run
+./gradlew :composeApp:run --args="--show"
 ```
 
 > The first build downloads roughly a few hundred MB of dependencies and takes about 1–2 minutes on a modern machine before the window appears. Gradle does not stream much output during this — it has not hung.
+>
+> Running `:composeApp:run` with no `--args` starts the default tray daemon. In daemon mode the dashboard intentionally stays hidden until the OS idle threshold is reached or the tray menu's **Show** action is used.
 
 Launch modes:
 
