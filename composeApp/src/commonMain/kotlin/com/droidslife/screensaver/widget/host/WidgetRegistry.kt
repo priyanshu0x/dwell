@@ -3,6 +3,7 @@ package com.droidslife.screensaver.widget.host
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WIDGET_API_VERSION
 import com.droidslife.screensaver.widget.api.WidgetConfig
+import com.droidslife.screensaver.settings.SettingsModel
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,6 @@ class WidgetRegistry(
         }
     private var descriptorById = emptyMap<String, WidgetDescriptor>()
 
-    private val configs = mutableMapOf<String, JsonObject>()
     private val _descriptors = MutableStateFlow(descriptorById.values.toList())
     private val _instances = MutableStateFlow<Map<String, WidgetInstance>>(emptyMap())
 
@@ -38,7 +38,6 @@ class WidgetRegistry(
 
     init {
         reload()
-        builtInDescriptors.forEach { enable(it.id) }
     }
 
     fun reload() {
@@ -51,9 +50,13 @@ class WidgetRegistry(
     }
 
     fun enable(id: String) {
+        enable(id, JsonObject(emptyMap()))
+    }
+
+    fun enable(id: String, configJson: JsonObject) {
         if (_instances.value.containsKey(id)) return
         val descriptor = descriptorById[id] ?: return
-        val config = WidgetConfig(configs[id] ?: JsonObject(emptyMap()))
+        val config = WidgetConfig(configJson)
         val scope = WidgetScopeImpl(
             widgetId = id,
             coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
@@ -70,11 +73,29 @@ class WidgetRegistry(
     }
 
     fun updateConfig(id: String, config: JsonObject) {
-        configs[id] = config
         val wasEnabled = _instances.value.containsKey(id)
         if (wasEnabled) {
             disable(id)
-            enable(id)
+            enable(id, config)
+        }
+    }
+
+    fun syncWithSettings(settings: SettingsModel) {
+        val defaultEnabledIds = builtInDescriptors.map { it.id }.toSet()
+        val enabledIds = settings.enabledWidgetIds.ifEmpty { defaultEnabledIds }
+
+        _instances.value.keys
+            .filterNot { it in enabledIds }
+            .forEach(::disable)
+
+        enabledIds.forEach { id ->
+            val config = settings.widgetConfigs[id] ?: JsonObject(emptyMap())
+            val existing = _instances.value[id]
+            if (existing == null) {
+                enable(id, config)
+            } else if (existing.config.rawJson != config) {
+                updateConfig(id, config)
+            }
         }
     }
 }

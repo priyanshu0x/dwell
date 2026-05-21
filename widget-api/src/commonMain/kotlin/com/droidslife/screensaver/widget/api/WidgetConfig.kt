@@ -7,6 +7,8 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 
 class WidgetConfig(private val values: JsonObject) {
+    val rawJson: JsonObject get() = values
+
     fun string(key: String, default: String = ""): String {
         return primitive(key)?.content ?: default
     }

@@ -2,6 +2,7 @@ package com.droidslife.screensaver.widget.host
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.droidslife.screensaver.settings.SettingsModel
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
@@ -17,16 +18,18 @@ import kotlin.test.assertTrue
 
 class WidgetRegistryTest {
     @Test
-    fun builtInFactoriesAreDiscoveredAndEnabledByDefault() {
+    fun builtInFactoriesAreDiscoveredAndEnabledAfterSettingsSync() {
         val registry = WidgetRegistry(listOf(FakeWidgetFactory()), HttpClient(OkHttp))
 
         assertEquals(listOf("test.widget"), registry.descriptors.value.map { it.id })
+        registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
         assertTrue(registry.instances.value.containsKey("test.widget"))
     }
 
     @Test
     fun disableAndEnableToggleInstance() {
         val registry = WidgetRegistry(listOf(FakeWidgetFactory()), HttpClient(OkHttp))
+        registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
 
         registry.disable("test.widget")
         assertFalse(registry.instances.value.containsKey("test.widget"))
@@ -39,6 +42,7 @@ class WidgetRegistryTest {
     fun updateConfigRecreatesEnabledWidget() {
         val factory = FakeWidgetFactory()
         val registry = WidgetRegistry(listOf(factory), HttpClient(OkHttp))
+        registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
 
         registry.updateConfig("test.widget", JsonObject(mapOf("label" to JsonPrimitive("updated"))))
 

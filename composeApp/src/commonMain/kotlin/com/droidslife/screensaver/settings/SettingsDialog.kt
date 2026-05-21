@@ -11,15 +11,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
@@ -31,8 +33,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.droidslife.screensaver.clock.ClockViewModel
+import com.droidslife.screensaver.widget.api.ConfigField
+import com.droidslife.screensaver.widget.host.WidgetDescriptor
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Dialog for application settings.
@@ -49,13 +61,18 @@ import androidx.compose.ui.window.Dialog
 fun SettingsDialog(
     onDismiss: () -> Unit,
     settings: SettingsModel,
+    widgetDescriptors: List<WidgetDescriptor> = emptyList(),
     onThemeToggle: () -> Unit,
     onClockFormatToggle: () -> Unit,
     onAutoPlayToggle: () -> Unit,
     onShuffleToggle: () -> Unit,
-    onDesignSelected: (Int) -> Unit
+    onDesignSelected: (Int) -> Unit,
+    onWidgetEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    onWidgetConfigChange: (String, JsonObject) -> Unit = { _, _ -> },
+    onWidgetReload: () -> Unit = {},
 ) {
     var showShortcutsDialog by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf("Display") }
 
     if (showShortcutsDialog) {
         ShortcutsHelpDialog(onDismiss = { showShortcutsDialog = false })
@@ -68,7 +85,9 @@ fun SettingsDialog(
                 .padding(16.dp)
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header
@@ -79,211 +98,39 @@ fun SettingsDialog(
                 )
 
 
-                // Theme section
-                Text(
-                    text = "Theme",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Dark Theme",
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = settings.isDarkTheme,
-                        onCheckedChange = { onThemeToggle() }
-                    )
+                    listOf("Display", "Widgets", "About").forEach { tab ->
+                        Button(
+                            onClick = { selectedTab = tab },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(tab)
+                        }
+                    }
                 }
 
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // Clock format section
-                Text(
-                    text = "Clock Format",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = !settings.is24HourFormat,
-                        onClick = { if (settings.is24HourFormat) onClockFormatToggle() }
+                when (selectedTab) {
+                    "Display" -> DisplaySettings(
+                        settings = settings,
+                        onThemeToggle = onThemeToggle,
+                        onClockFormatToggle = onClockFormatToggle,
+                        onAutoPlayToggle = onAutoPlayToggle,
+                        onShuffleToggle = onShuffleToggle,
+                        onDesignSelected = onDesignSelected,
                     )
-                    Text(
-                        text = "12-hour (AM/PM)",
-                        modifier = Modifier.padding(start = 8.dp)
+                    "Widgets" -> WidgetSettings(
+                        settings = settings,
+                        widgetDescriptors = widgetDescriptors,
+                        onWidgetEnabledChange = onWidgetEnabledChange,
+                        onWidgetConfigChange = onWidgetConfigChange,
+                        onWidgetReload = onWidgetReload,
                     )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = settings.is24HourFormat,
-                        onClick = { if (!settings.is24HourFormat) onClockFormatToggle() }
-                    )
-                    Text(
-                        text = "24-hour",
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // Weather section
-                Text(
-                    text = "Weather",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-
-                // Current city (read-only)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Current City",
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = settings.currentCity ?: "Auto (Timezone)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // Playback section
-                Text(
-                    text = "Playback",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-
-                // Auto play toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Auto Play",
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = settings.autoPlayEnabled,
-                        onCheckedChange = { onAutoPlayToggle() }
-                    )
-                }
-
-                // Shuffle toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Shuffle",
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = settings.shuffleEnabled,
-                        onCheckedChange = { onShuffleToggle() }
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // Design section
-                Text(
-                    text = "Design",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-
-                // Design selection
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = settings.selectedDesignId == 0,
-                        onClick = { onDesignSelected(0) }
-                    )
-                    Text(
-                        text = "Classic",
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = settings.selectedDesignId == 1,
-                        onClick = { onDesignSelected(1) }
-                    )
-                    Text(
-                        text = "Modern",
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = settings.selectedDesignId == 2,
-                        onClick = { onDesignSelected(2) }
-                    )
-                    Text(
-                        text = "Minimalist",
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
+                    "About" -> AboutSettings()
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -297,6 +144,236 @@ fun SettingsDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DisplaySettings(
+    settings: SettingsModel,
+    onThemeToggle: () -> Unit,
+    onClockFormatToggle: () -> Unit,
+    onAutoPlayToggle: () -> Unit,
+    onShuffleToggle: () -> Unit,
+    onDesignSelected: (Int) -> Unit,
+) {
+    SectionTitle("Theme")
+    SettingSwitch("Dark Theme", settings.isDarkTheme, onThemeToggle)
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    SectionTitle("Clock Format")
+    SettingRadio("12-hour (AM/PM)", !settings.is24HourFormat) {
+        if (settings.is24HourFormat) onClockFormatToggle()
+    }
+    SettingRadio("24-hour", settings.is24HourFormat) {
+        if (!settings.is24HourFormat) onClockFormatToggle()
+    }
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    SectionTitle("Weather")
+    SettingValue("Current City", settings.currentCity ?: "Auto (Timezone)")
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    SectionTitle("Playback")
+    SettingSwitch("Auto Play", settings.autoPlayEnabled, onAutoPlayToggle)
+    SettingSwitch("Shuffle", settings.shuffleEnabled, onShuffleToggle)
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    SectionTitle("Design")
+    (1..ClockViewModel.DESIGN_COUNT).forEach { design ->
+        val label = "Design $design"
+        SettingRadio(label, settings.selectedDesignId == design) { onDesignSelected(design) }
+    }
+}
+
+@Composable
+private fun WidgetSettings(
+    settings: SettingsModel,
+    widgetDescriptors: List<WidgetDescriptor>,
+    onWidgetEnabledChange: (String, Boolean) -> Unit,
+    onWidgetConfigChange: (String, JsonObject) -> Unit,
+    onWidgetReload: () -> Unit,
+) {
+    val defaultEnabled = setOf("com.droidslife.screensaver.clock", "com.droidslife.screensaver.weather")
+    val enabledIds = settings.enabledWidgetIds.ifEmpty { defaultEnabled }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Widget Registry", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+        Button(onClick = onWidgetReload) {
+            Text("Reload")
+        }
+    }
+
+    if (widgetDescriptors.isEmpty()) {
+        Text(
+            "No widgets found",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        )
+    }
+
+    widgetDescriptors.sortedBy { it.displayName }.forEach { descriptor ->
+        val enabled = descriptor.id in enabledIds
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(descriptor.displayName, fontWeight = FontWeight.Bold)
+                if (descriptor.factory.description.isNotBlank()) {
+                    Text(
+                        descriptor.factory.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Switch(checked = enabled, onCheckedChange = { onWidgetEnabledChange(descriptor.id, it) })
+        }
+
+        if (enabled && descriptor.factory.configSchema.isNotEmpty()) {
+            val currentConfig = settings.widgetConfigs[descriptor.id] ?: JsonObject(emptyMap())
+            Column(modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)) {
+                descriptor.factory.configSchema.forEach { field ->
+                    ConfigFieldRenderer(
+                        field = field,
+                        config = currentConfig,
+                        onConfigChange = { onWidgetConfigChange(descriptor.id, it) },
+                    )
+                }
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+    }
+}
+
+@Composable
+private fun ConfigFieldRenderer(
+    field: ConfigField,
+    config: JsonObject,
+    onConfigChange: (JsonObject) -> Unit,
+) {
+    fun update(value: JsonPrimitive) {
+        onConfigChange(JsonObject(config + (field.key to value)))
+    }
+
+    when (field) {
+        is ConfigField.Bool -> SettingSwitch(
+            label = field.label,
+            checked = config[field.key]?.jsonPrimitive?.booleanOrNull ?: field.default,
+            onToggle = { update(JsonPrimitive(!(config[field.key]?.jsonPrimitive?.booleanOrNull ?: field.default))) },
+        )
+        is ConfigField.Enum -> {
+            SectionTitle(field.label)
+            val selected = config[field.key]?.jsonPrimitive?.content ?: field.default
+            field.options.forEach { option ->
+                SettingRadio(option.label, selected == option.value) { update(JsonPrimitive(option.value)) }
+            }
+        }
+        is ConfigField.IntField -> {
+            val value = config[field.key]?.jsonPrimitive?.intOrNull?.toString() ?: field.default.toString()
+            OutlinedTextField(
+                value = value,
+                onValueChange = { input ->
+                    update(JsonPrimitive((input.toIntOrNull() ?: field.default).coerceToField(field)))
+                },
+                label = { Text(field.label) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            )
+        }
+        is ConfigField.Duration -> TextConfigField(field.label, config[field.key]?.jsonPrimitive?.content ?: field.default, ::update)
+        is ConfigField.Secret -> TextConfigField(
+            label = field.label,
+            value = config[field.key]?.jsonPrimitive?.content ?: "",
+            onValueChange = ::update,
+            visualTransformation = PasswordVisualTransformation(),
+        )
+        is ConfigField.Text -> TextConfigField(field.label, config[field.key]?.jsonPrimitive?.content ?: field.default, ::update)
+    }
+}
+
+@Composable
+private fun TextConfigField(
+    label: String,
+    value: String,
+    onValueChange: (JsonPrimitive) -> Unit,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onValueChange(JsonPrimitive(it)) },
+        label = { Text(label) },
+        visualTransformation = visualTransformation,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    )
+}
+
+private fun Int.coerceToField(field: ConfigField.IntField): Int {
+    val min = field.min ?: Int.MIN_VALUE
+    val max = field.max ?: Int.MAX_VALUE
+    return coerceIn(min, max)
+}
+
+@Composable
+private fun AboutSettings() {
+    SectionTitle("Screen Saver App")
+    Text("Desktop dashboard")
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun SettingSwitch(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = { onToggle() })
+    }
+}
+
+@Composable
+private fun SettingRadio(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(text = label, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+@Composable
+private fun SettingValue(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -1,0 +1,16 @@
+id: sample.declarative.metrics
+title: Sample Metrics
+description: File-backed declarative widget sample
+category: information
+apiVersion: 1
+template: list
+preferredSpan: 1
+refresh: 30s
+source:
+  type: file
+  path: data.json
+bindings:
+  items: $.metrics[*]
+  item.label: $.label
+  item.value: $.value
+  item.trend: $.trend

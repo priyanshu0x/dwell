@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +37,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -72,9 +74,11 @@ import com.droidslife.screensaver.clockdigits.DigitalClockDigit11
 import com.droidslife.screensaver.settings.SettingsDialog
 import com.droidslife.screensaver.settings.ShortcutsHelpDialog
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.dashboard.WidgetGrid
 import com.droidslife.screensaver.weather.CitySearchState
 import com.droidslife.screensaver.weather.WeatherState
 import com.droidslife.screensaver.weather.WeatherViewModel
+import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -114,6 +118,12 @@ fun DigitalClockApp(
 
     // Use the SettingsViewModel to manage settings
     val settingsViewModel = koinInject<SettingsViewModel>()
+    val widgetRegistry = koinInject<WidgetRegistry>()
+    val widgetDescriptors by widgetRegistry.descriptors.collectAsState()
+
+    LaunchedEffect(settingsViewModel.settings) {
+        widgetRegistry.syncWithSettings(settingsViewModel.settings)
+    }
 
     // Help dialog state is now passed as a parameter
 
@@ -142,7 +152,17 @@ fun DigitalClockApp(
             onClockFormatToggle = { settingsViewModel.toggleClockFormat() },
             onAutoPlayToggle = { settingsViewModel.toggleAutoPlay() },
             onShuffleToggle = { settingsViewModel.toggleShuffle() },
-            onDesignSelected = { settingsViewModel.setSelectedDesign(it) }
+            onDesignSelected = {
+                settingsViewModel.setSelectedDesign(it)
+                clockViewModel.updateClockDesign(it)
+            },
+            widgetDescriptors = widgetDescriptors,
+            onWidgetEnabledChange = settingsViewModel::setWidgetEnabled,
+            onWidgetConfigChange = settingsViewModel::updateWidgetConfig,
+            onWidgetReload = {
+                widgetRegistry.reload()
+                widgetRegistry.syncWithSettings(settingsViewModel.settings)
+            },
         )
     }
 
@@ -417,140 +437,13 @@ fun DigitalClockApp(
                 contentAlignment = Alignment.Center
             ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Time display with AM/PM in superscript
-                val is24Hour = settingsViewModel.settings.is24HourFormat
-                val hour = if (is24Hour) localDateTime.hour else localDateTime.hour % 12
-                val hourDisplay = if (!is24Hour && hour == 0) 12 else hour
-                val minute = localDateTime.minute
-                val isAm = localDateTime.hour < 12
-
-                // Display the appropriate clock design based on the clockViewModel.clockDesign state
-                when (clockViewModel.clockDesign) {
-                    1 -> {
-                        // Original flip clock design
-                        DigitalClock(hourDisplay, minute)
-                    }
-                    2 -> {
-                        // Second flip clock design (using DigitalClockDigit2)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            DigitalClockDigit2((hourDisplay / 10) % 10)
-                            DigitalClockDigit2(hourDisplay % 10)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            DigitalClockDigit2((minute / 10) % 10)
-                            DigitalClockDigit2(minute % 10)
-                        }
-                    }
-                    3 -> {
-                        // Third flip clock design
-                        DigitalClock3(hourDisplay, minute)
-                    }
-                    4 -> {
-                        // Fourth flip clock design
-                        DigitalClock4(hourDisplay, minute)
-                    }
-                    5 -> {
-                        // Retro LCD digital watch design
-                        DigitalClock5(hourDisplay, minute)
-                    }
-                    6 -> {
-                        // Seven Segment digital clock design
-                        DigitalClock6(hourDisplay, minute)
-                    }
-                    7 -> {
-                        // Futuristic Orbitron-inspired clock design
-                        DigitalClock7(hourDisplay, minute)
-                    }
-                    8 -> {
-                        // Handwritten IndieFlower-inspired clock design
-                        DigitalClock8(hourDisplay, minute)
-                    }
-                    9 -> {
-                        // Seven Segment design with background-colored box and onBackground border
-                        DigitalClock9(hourDisplay, minute)
-                    }
-                    10 -> {
-                        // Orbitron design with background-colored box and onBackground border
-                        DigitalClock10(hourDisplay, minute)
-                    }
-                    11 -> {
-                        // Technology design with background-colored box and onBackground border
-                        DigitalClock11(hourDisplay, minute)
-                    }
-                }
-
-                // AM/PM indicator (only show for 12-hour format)
-                if (!settingsViewModel.settings.is24HourFormat) {
-                    Text(
-                        text = if (isAm) "AM" else "PM",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        ),
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                // Add spacer between clock design and weather component
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Location and weather info
-                when (weatherState) {
-                    is WeatherState.Loading -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    is WeatherState.Success -> {
-                        val data = weatherState.weatherData
-                        val location = weatherState.location
-
-                        // City name in uppercase
-                        Text(
-                            text = data.location.name.uppercase(),
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Weather info
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            // Weather icon would go here in a real implementation
-                            // For now, just show the temperature
-                            Text(
-                                text = "${data.current.tempC.toInt()}°C",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Weather description
-                            Text(
-                                text = data.current.condition.text,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                                )
-                            )
-                        }
-                    }
-                    is WeatherState.Error -> {
-                        Text(
-                            text = "Error loading weather data",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        )
-                    }
-                }
+                WidgetGrid(
+                    modifier = Modifier
+                        .widthIn(max = 1100.dp)
+                        .fillMaxWidth()
+                        .height(520.dp),
+                    showChrome = true,
+                )
             }
         }
 

@@ -17,7 +17,7 @@ private class WidgetLoaderImpl(
     private val widgetsDir: Path,
 ) : WidgetLoader {
     override fun discoverAll(): List<WidgetDescriptor> {
-        return JarWidgetLoader(widgetsDir).load()
+        return JarWidgetLoader(widgetsDir).load() + DeclarativeWidgetLoader(widgetsDir).load()
     }
 }
 

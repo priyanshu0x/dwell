@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -11,8 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.droidslife.screensaver.widget.host.WidgetInstance
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
@@ -25,6 +29,17 @@ fun WidgetGrid(
 ) {
     val instances by registry.instances.collectAsState()
     val orderedInstances = instances.values.sortedBy { it.descriptor.displayName }
+
+    if (orderedInstances.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                text = "No widgets enabled",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        return
+    }
 
     if (!showChrome) {
         Column(

@@ -38,6 +38,7 @@ import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.random.Random
 
 class ClockWidgetFactory(
     private val clockViewModel: ClockViewModel,
@@ -76,10 +77,29 @@ private class ClockWidget(
     @Composable
     override fun Content(modifier: Modifier) {
         val configuredDesign = config.enum("design", clockViewModel.clockDesign.toString()).toIntOrNull()
+        val autoCycle = config.bool("autoCycle")
+        val shuffle = config.bool("shuffle")
+        val cycleInterval = config.durationMillis("cycleInterval", 10_000L).coerceAtLeast(1_000L)
 
         LaunchedEffect(configuredDesign) {
             if (configuredDesign != null) {
                 clockViewModel.updateClockDesign(configuredDesign)
+            }
+        }
+
+        LaunchedEffect(autoCycle, shuffle, cycleInterval) {
+            if (!autoCycle) return@LaunchedEffect
+
+            while (true) {
+                delay(cycleInterval)
+                if (shuffle) {
+                    val next = (1..ClockViewModel.DESIGN_COUNT)
+                        .filterNot { it == clockViewModel.clockDesign }
+                        .random(Random)
+                    clockViewModel.updateClockDesign(next)
+                } else {
+                    clockViewModel.cycleClockDesign()
+                }
             }
         }
 

@@ -1,0 +1,19 @@
+{
+  "metrics": [
+    {
+      "label": "Focus",
+      "value": "83%",
+      "trend": "+4"
+    },
+    {
+      "label": "Tasks",
+      "value": "12",
+      "trend": "done"
+    },
+    {
+      "label": "Burn",
+      "value": "2.4k",
+      "trend": "cal"
+    }
+  ]
+}

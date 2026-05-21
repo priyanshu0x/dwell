@@ -3,12 +3,14 @@ package com.droidslife.screensaver.settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.droidslife.screensaver.clock.ClockViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 
 /**
  * ViewModel for managing application settings.
@@ -123,7 +125,27 @@ class SettingsViewModel(
      * @param designId The design ID.
      */
     fun setSelectedDesign(designId: Int) {
-        updateSettings(settings.copy(selectedDesignId = designId))
+        if (designId in 1..ClockViewModel.DESIGN_COUNT) {
+            updateSettings(settings.copy(selectedDesignId = designId))
+        }
+    }
+
+    fun setWidgetEnabled(widgetId: String, enabled: Boolean) {
+        val current = effectiveEnabledWidgetIds().toMutableSet()
+        if (enabled) {
+            current += widgetId
+        } else {
+            current -= widgetId
+        }
+        updateSettings(settings.copy(enabledWidgetIds = current))
+    }
+
+    fun updateWidgetConfig(widgetId: String, config: JsonObject) {
+        updateSettings(settings.copy(widgetConfigs = settings.widgetConfigs + (widgetId to config)))
+    }
+
+    fun effectiveEnabledWidgetIds(defaultIds: Set<String> = defaultWidgetIds): Set<String> {
+        return settings.enabledWidgetIds.ifEmpty { defaultIds }
     }
 
     /**
@@ -148,5 +170,12 @@ class SettingsViewModel(
      */
     fun closeSettingsDialog() {
         isSettingsDialogOpen = false
+    }
+
+    private companion object {
+        val defaultWidgetIds = setOf(
+            "com.droidslife.screensaver.clock",
+            "com.droidslife.screensaver.weather",
+        )
     }
 }

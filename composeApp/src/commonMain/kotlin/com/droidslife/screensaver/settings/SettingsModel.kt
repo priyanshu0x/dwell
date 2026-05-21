@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.settings
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Model class for application settings.
@@ -37,5 +38,15 @@ data class SettingsModel(
     /**
      * The ID of the currently selected design.
      */
-    val selectedDesignId: Int = 0
+    val selectedDesignId: Int = 1,
+
+    /**
+     * Enabled widget IDs. Empty means use the built-in default set.
+     */
+    val enabledWidgetIds: Set<String> = emptySet(),
+
+    /**
+     * Per-widget JSON configuration keyed by widget ID.
+     */
+    val widgetConfigs: Map<String, JsonObject> = emptyMap()
 )
