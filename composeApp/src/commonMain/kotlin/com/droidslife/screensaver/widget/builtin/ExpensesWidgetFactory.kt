@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -58,21 +59,16 @@ class ExpensesWidgetFactory(
     override val description: String = "Current-month expense tracking with local storage"
     override val category: WidgetCategory = WidgetCategory.FINANCE
     override val configSchema: List<ConfigField> = listOf(
-        ConfigField.Enum(
+        ConfigField.Currency(
             key = "currency",
             label = "Currency",
-            options = listOf(
-                ConfigField.EnumOption("USD", "USD"),
-                ConfigField.EnumOption("EUR", "EUR"),
-                ConfigField.EnumOption("GBP", "GBP"),
-                ConfigField.EnumOption("INR", "INR"),
-            ),
             default = "USD",
+            popular = listOf("USD", "EUR", "GBP", "INR"),
         ),
-        ConfigField.Text(
+        ConfigField.StringList(
             key = "categories",
             label = "Categories",
-            default = "food,transport,entertainment,bills",
+            default = listOf("food", "transport", "entertainment", "bills"),
         ),
     )
 
@@ -93,6 +89,7 @@ private class ExpensesWidget(
     private var categoryInput by mutableStateOf("")
     private var noteInput by mutableStateOf("")
     private var unsyncedCount by mutableStateOf(0)
+    private var inputVisible by mutableStateOf(false)
 
     override fun onResume() {
         scope.coroutineScope.launch {
@@ -107,39 +104,14 @@ private class ExpensesWidget(
     @Composable
     override fun Content(modifier: Modifier) {
         val currency = config.enum("currency", "USD")
-        val currentCategories = config.string("categories")
-            .split(',')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
+        val currentCategories = config.stringList(
+            "categories",
+            default = listOf("food", "transport", "entertainment", "bills"),
+        )
         val total = expenses.sumOf { it.amount }
 
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = amountInput,
-                    onValueChange = { amountInput = it.filter { char -> char.isDigit() || char == '.' } },
-                    label = { Text("Amount") },
-                    modifier = Modifier.weight(0.8f),
-                    singleLine = true,
-                )
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = categoryInput,
-                    onValueChange = { categoryInput = it },
-                    label = { Text("Category") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                )
-            }
-
-            OutlinedTextField(
-                value = noteInput,
-                onValueChange = { noteInput = it },
-                label = { Text("Note") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-
+            // Total + toggle add form
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "$currency ${"%.2f".format(total)}",
@@ -147,8 +119,46 @@ private class ExpensesWidget(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
-                Button(onClick = { addExpense(currentCategories) }, enabled = amountInput.toDoubleOrNull() != null) {
-                    Text("Add")
+                IconButton(onClick = { inputVisible = !inputVisible }) {
+                    Icon(
+                        imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
+                        contentDescription = if (inputVisible) "Hide add form" else "Add expense",
+                    )
+                }
+            }
+
+            if (inputVisible) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = amountInput,
+                        onValueChange = { amountInput = it.filter { char -> char.isDigit() || char == '.' } },
+                        label = { Text("Amount") },
+                        modifier = Modifier.weight(0.8f),
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = categoryInput,
+                        onValueChange = { categoryInput = it },
+                        label = { Text("Category") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                }
+
+                OutlinedTextField(
+                    value = noteInput,
+                    onValueChange = { noteInput = it },
+                    label = { Text("Note") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Button(onClick = { addExpense(currentCategories) }, enabled = amountInput.toDoubleOrNull() != null) {
+                        Text("Add")
+                    }
                 }
             }
 
@@ -170,8 +180,10 @@ private class ExpensesWidget(
                         }
                     }
                     Text("$currency ${"%.2f".format(expense.amount)}")
-                    IconButton(onClick = { deleteExpense(expense.id) }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Delete expense")
+                    if (inputVisible) {
+                        IconButton(onClick = { deleteExpense(expense.id) }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Delete expense")
+                        }
                     }
                 }
             }

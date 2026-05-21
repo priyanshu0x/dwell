@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.widget.api
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,6 +60,27 @@ class WidgetConfig(
      */
     fun enum(key: String, default: String): String {
         return string(key, default)
+    }
+
+    /**
+     * Reads a list of strings.
+     *
+     * Accepts either a JSON array of strings, or a legacy comma-separated string
+     * primitive (for backward compatibility with values saved before the chip
+     * editor was introduced). Returns [default] when missing.
+     */
+    fun stringList(key: String, default: List<String> = emptyList()): List<String> {
+        val element = values[key] ?: return default
+        return when (element) {
+            is JsonArray -> element.mapNotNull { (it as? JsonPrimitive)?.content }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+            is JsonPrimitive -> element.content
+                .split(',')
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+            else -> default
+        }
     }
 
     /**

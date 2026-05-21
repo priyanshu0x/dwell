@@ -35,6 +35,8 @@ import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
 import kotlinx.coroutines.delay
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.random.Random
@@ -49,17 +51,27 @@ class ClockWidgetFactory(
     override val description: String = "Digital clock display"
     override val category: WidgetCategory = WidgetCategory.CLOCK
     override val configSchema: List<ConfigField> = listOf(
-        ConfigField.Enum(
+        ConfigField.DesignPicker(
             key = "design",
             label = "Clock design",
-            options = (1..ClockViewModel.DESIGN_COUNT).map {
-                ConfigField.EnumOption(it.toString(), "Design $it")
-            },
-            default = "1",
+            designIds = (1..ClockViewModel.DESIGN_COUNT).toList(),
+            default = 1,
         ),
         ConfigField.Bool("autoCycle", "Auto-cycle designs"),
         ConfigField.Bool("shuffle", "Shuffle designs"),
-        ConfigField.Duration("cycleInterval", "Cycle interval", default = "10s"),
+        ConfigField.DurationChoice(
+            key = "cycleInterval",
+            label = "Cycle interval",
+            options = listOf(
+                ConfigField.DurationOption("5s", "5 seconds"),
+                ConfigField.DurationOption("10s", "10 seconds"),
+                ConfigField.DurationOption("30s", "30 seconds"),
+                ConfigField.DurationOption("1m", "1 minute"),
+                ConfigField.DurationOption("5m", "5 minutes"),
+                ConfigField.DurationOption("15m", "15 minutes"),
+            ),
+            default = "10s",
+        ),
     )
 
     override fun create(config: WidgetConfig, scope: WidgetScope): Widget {
@@ -143,8 +155,44 @@ private class ClockWidget(
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+
+            // Date + weekday line, e.g. "Tue · May 21"
+            Text(
+                text = formatDateLine(localDateTime.dayOfWeek, localDateTime.month, localDateTime.day),
+                style = MaterialTheme.typography.titleSmall.copy(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                ),
+                modifier = Modifier.padding(top = 10.dp),
+            )
         }
     }
+}
+
+private fun formatDateLine(dayOfWeek: DayOfWeek, month: Month, day: Int): String {
+    val weekday = when (dayOfWeek) {
+        DayOfWeek.MONDAY -> "Mon"
+        DayOfWeek.TUESDAY -> "Tue"
+        DayOfWeek.WEDNESDAY -> "Wed"
+        DayOfWeek.THURSDAY -> "Thu"
+        DayOfWeek.FRIDAY -> "Fri"
+        DayOfWeek.SATURDAY -> "Sat"
+        DayOfWeek.SUNDAY -> "Sun"
+    }
+    val monthName = when (month) {
+        Month.JANUARY -> "Jan"
+        Month.FEBRUARY -> "Feb"
+        Month.MARCH -> "Mar"
+        Month.APRIL -> "Apr"
+        Month.MAY -> "May"
+        Month.JUNE -> "Jun"
+        Month.JULY -> "Jul"
+        Month.AUGUST -> "Aug"
+        Month.SEPTEMBER -> "Sep"
+        Month.OCTOBER -> "Oct"
+        Month.NOVEMBER -> "Nov"
+        Month.DECEMBER -> "Dec"
+    }
+    return "$weekday · $monthName $day"
 }
 
 @Composable

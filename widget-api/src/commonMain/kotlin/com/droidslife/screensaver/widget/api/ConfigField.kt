@@ -136,4 +136,88 @@ sealed interface ConfigField {
      * Option for an [Enum] field.
      */
     data class EnumOption(val value: String, val label: String)
+
+    /**
+     * List-of-strings input rendered as a chip editor.
+     *
+     * Stored as a JSON array of strings in the persisted widget configuration.
+     * For backward compatibility the host may also read a single comma-separated
+     * string and migrate it to a JSON array on next save.
+     */
+    data class StringList(
+        /** Stable machine key used in persisted configuration. */
+        override val key: String,
+        /** Human-readable label displayed in Settings. */
+        override val label: String,
+        /** Default list of values used when no setting has been saved. */
+        val default: List<String> = emptyList(),
+        /** Whether the host should require at least one entry. */
+        override val required: Boolean = false,
+        /** Optional short helper text displayed with the field. */
+        override val help: String? = null,
+    ) : ConfigField
+
+    /**
+     * Duration selected from a fixed list of options. Stored as the canonical
+     * string form (e.g. "5s", "1m") so it can be parsed by
+     * [WidgetConfig.durationMillis].
+     */
+    data class DurationChoice(
+        /** Stable machine key used in persisted configuration. */
+        override val key: String,
+        /** Human-readable label displayed in Settings. */
+        override val label: String,
+        /** Available choices (value strings parseable by durationMillis). */
+        val options: List<DurationOption>,
+        /** Selected value used when no setting has been saved. */
+        val default: String,
+        /** Whether the host should require a selected value. */
+        override val required: Boolean = false,
+        /** Optional short helper text displayed with the field. */
+        override val help: String? = null,
+    ) : ConfigField
+
+    /**
+     * Option for a [DurationChoice] field.
+     */
+    data class DurationOption(val value: String, val label: String)
+
+    /**
+     * Currency selected from a searchable list of ISO 4217 currencies. The host
+     * may pin a "popular" subset at the top of the list.
+     */
+    data class Currency(
+        /** Stable machine key used in persisted configuration. */
+        override val key: String,
+        /** Human-readable label displayed in Settings. */
+        override val label: String,
+        /** Selected currency code used when no setting has been saved. */
+        val default: String,
+        /** Currency codes shown at the top of the list as "Popular". */
+        val popular: List<String> = emptyList(),
+        /** Whether the host should require a selected value. */
+        override val required: Boolean = false,
+        /** Optional short helper text displayed with the field. */
+        override val help: String? = null,
+    ) : ConfigField
+
+    /**
+     * Marker for a special preview-driven design picker (used by the built-in
+     * Clock widget). Each option is a digit-style design id; the host renders a
+     * small preview alongside the radio.
+     */
+    data class DesignPicker(
+        /** Stable machine key used in persisted configuration. */
+        override val key: String,
+        /** Human-readable label displayed in Settings. */
+        override val label: String,
+        /** Available design ids (rendered with previews by the host). */
+        val designIds: List<Int>,
+        /** Default design id used when no setting has been saved. */
+        val default: Int,
+        /** Whether the host should require a selected value. */
+        override val required: Boolean = false,
+        /** Optional short helper text displayed with the field. */
+        override val help: String? = null,
+    ) : ConfigField
 }

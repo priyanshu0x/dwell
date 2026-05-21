@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -77,6 +78,7 @@ private class TodosWidget(
     private var todos by mutableStateOf<List<Todo>>(emptyList())
     private var input by mutableStateOf("")
     private var unsyncedCount by mutableStateOf(0)
+    private var inputVisible by mutableStateOf(false)
 
     override fun onResume() {
         scope.coroutineScope.launch {
@@ -91,29 +93,54 @@ private class TodosWidget(
     @Composable
     override fun Content(modifier: Modifier) {
         val visibleTodos = sortedTodos()
+        val openTodos = visibleTodos.filterNot { it.done }
+        val displayed = openTodos.take(5)
         Column(modifier = modifier) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    label = { Text("Task") },
+            // Header row: title + add toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Todos",
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = ::addTodo, enabled = input.isNotBlank()) {
-                    Text("Add")
+                IconButton(onClick = { inputVisible = !inputVisible }) {
+                    Icon(
+                        imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
+                        contentDescription = if (inputVisible) "Hide add form" else "Add task",
+                    )
                 }
             }
 
-            if (visibleTodos.isEmpty()) {
+            if (inputVisible) {
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = input,
+                        onValueChange = { input = it },
+                        label = { Text("Task") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = ::addTodo, enabled = input.isNotBlank()) {
+                        Text("Add")
+                    }
+                }
+            }
+
+            if (displayed.isEmpty()) {
                 Text(
-                    text = "No tasks",
+                    text = "Nothing to do",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp),
                 )
             } else {
-                visibleTodos.forEach { todo ->
+                displayed.forEach { todo ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -124,10 +151,20 @@ private class TodosWidget(
                             modifier = Modifier.weight(1f),
                             textDecoration = if (todo.done) TextDecoration.LineThrough else TextDecoration.None,
                         )
-                        IconButton(onClick = { delete(todo.id) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Delete task")
+                        if (inputVisible) {
+                            IconButton(onClick = { delete(todo.id) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Delete task")
+                            }
                         }
                     }
+                }
+                if (openTodos.size > displayed.size) {
+                    Text(
+                        text = "+${openTodos.size - displayed.size} more",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
             }
 
