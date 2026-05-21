@@ -1,6 +1,5 @@
 package com.droidslife.screensaver.di
 
-import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.network.KtorClient
 import com.droidslife.screensaver.network.BackendClient
@@ -56,9 +55,6 @@ val appModule = module {
 
     // Weather ViewModel
     single { WeatherViewModel(get(), get(), get()) }
-
-    // Clock ViewModel (legacy — used by WindowEventHandlers until Task 13.2)
-    single { ClockViewModel() }
 
     // Settings ViewModel
     single { SettingsViewModel(get(), get(), get()) }
