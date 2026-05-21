@@ -32,27 +32,6 @@ data class SettingsModel(
     val is24HourFormat: Boolean = true,
 
     /**
-     * The current city for weather display.
-     * If null, the app will try to determine the city based on the timezone.
-     */
-    val currentCity: String? = null,
-
-    /**
-     * Whether auto play is enabled.
-     */
-    val autoPlayEnabled: Boolean = false,
-
-    /**
-     * Whether shuffle is enabled.
-     */
-    val shuffleEnabled: Boolean = false,
-
-    /**
-     * The ID of the currently selected design.
-     */
-    val selectedDesignId: Int = 1,
-
-    /**
      * Enabled widget IDs. Empty means use the built-in default set.
      */
     val enabledWidgetIds: Set<String> = emptySet(),
