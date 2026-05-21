@@ -1025,6 +1025,34 @@ fun ShortcutsHelpDialog(
                         .padding(bottom = 8.dp)
                 )
 
+                // Alt shortcut
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp)
+                ) {
+                    Text(
+                        text = "Alt",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(80.dp)
+                    )
+                    Text(text = "Hide Screen Saver")
+                }
+
+                // Escape shortcut
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp)
+                ) {
+                    Text(
+                        text = "Esc",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(80.dp)
+                    )
+                    Text(text = "Hide Screen Saver")
+                }
+
                 // Ctrl + C shortcut
                 Row(
                     modifier = Modifier

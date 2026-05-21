@@ -17,6 +17,11 @@ class KeyEventHandler(
      */
     @OptIn(ExperimentalComposeUiApi::class)
     fun handleWindowKeyEvent(event: KeyEvent): Boolean {
+        if (event.type == KeyEventType.KeyDown && (event.key == Key.AltLeft || event.key == Key.AltRight)) {
+            onAction(KeyEventAction.RequestExit)
+            return true
+        }
+
         if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
             onAction(KeyEventAction.RequestExit)
             return true
