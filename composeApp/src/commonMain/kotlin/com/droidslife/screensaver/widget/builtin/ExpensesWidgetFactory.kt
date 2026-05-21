@@ -27,6 +27,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.droidslife.screensaver.network.BackendGateway
+import com.droidslife.screensaver.network.BackendResult
+import com.droidslife.screensaver.storage.SyncRepository
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
@@ -41,10 +44,15 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.math.max
 import kotlin.time.Clock
 
-class ExpensesWidgetFactory : WidgetFactory {
+class ExpensesWidgetFactory(
+    private val backendGateway: BackendGateway,
+) : WidgetFactory {
     override val id: String = "com.droidslife.screensaver.expenses"
     override val displayName: String = "Expenses"
     override val description: String = "Current-month expense tracking with local storage"
@@ -68,26 +76,31 @@ class ExpensesWidgetFactory : WidgetFactory {
         ),
     )
 
-    override fun create(config: WidgetConfig, scope: WidgetScope): Widget = ExpensesWidget(config, scope)
+    override fun create(config: WidgetConfig, scope: WidgetScope): Widget = ExpensesWidget(config, scope, backendGateway)
 }
 
 private class ExpensesWidget(
     private val config: WidgetConfig,
     private val scope: WidgetScope,
+    backendGateway: BackendGateway,
 ) : Widget {
     override val preferredSpan: Int = 1
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val serializer = ListSerializer(Expense.serializer())
+    private val syncRepository = SyncRepository("expenses", scope.storage, backendGateway)
     private var expenses by mutableStateOf<List<Expense>>(emptyList())
     private var amountInput by mutableStateOf("")
     private var categoryInput by mutableStateOf("")
     private var noteInput by mutableStateOf("")
+    private var unsyncedCount by mutableStateOf(0)
 
     override fun onResume() {
         scope.coroutineScope.launch {
             expenses = scope.storage.read(storageKey(), String::class.java)
                 ?.let { json.decodeFromString(serializer, it) }
                 ?: emptyList()
+            mergeRemoteExpenses()
+            pushPending()
         }
     }
 
@@ -162,6 +175,14 @@ private class ExpensesWidget(
                     }
                 }
             }
+
+            if (unsyncedCount > 0) {
+                Text(
+                    text = "$unsyncedCount unsynced",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 
@@ -182,11 +203,16 @@ private class ExpensesWidget(
         categoryInput = ""
         noteInput = ""
         persist()
+        queueUpsert(expenses.last())
     }
 
     private fun deleteExpense(id: String) {
         expenses = expenses.filterNot { it.id == id }
         persist()
+        scope.coroutineScope.launch {
+            syncRepository.enqueueDelete(id)
+            pushPending()
+        }
     }
 
     private fun persist() {
@@ -196,10 +222,60 @@ private class ExpensesWidget(
         }
     }
 
+    private fun queueUpsert(expense: Expense) {
+        scope.coroutineScope.launch {
+            syncRepository.enqueueUpsert(expense.id, expense.toJsonObject(), expense.updatedAt)
+            pushPending()
+        }
+    }
+
+    private suspend fun mergeRemoteExpenses() {
+        when (val result = syncRepository.pullRemote()) {
+            BackendResult.Disabled -> Unit
+            is BackendResult.Failure -> {
+                scope.log.warn("Expense sync pull failed", result.cause)
+                unsyncedCount = syncRepository.pendingCount()
+            }
+            is BackendResult.Success -> {
+                val remote = result.value.mapNotNull { runCatching { it.toExpense() }.getOrNull() }
+                val currentMonthKey = storageKey()
+                val remoteForMonth = remote.filter { storageKeyFor(it.occurredAt) == currentMonthKey }
+                if (remoteForMonth.isNotEmpty()) {
+                    expenses = (expenses + remoteForMonth)
+                        .groupBy { it.id }
+                        .map { (_, values) -> values.maxBy { it.updatedAt } }
+                    persist()
+                }
+            }
+        }
+    }
+
+    private suspend fun pushPending() {
+        val result = syncRepository.pushPending()
+        if (result.lastError != null) {
+            scope.log.warn("Expense sync push failed: ${result.lastError}")
+        }
+        unsyncedCount = result.remaining
+    }
+
     private fun storageKey(): String {
-        val date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        return storageKeyFor(Clock.System.now().toEpochMilliseconds())
+    }
+
+    private fun storageKeyFor(epochMillis: Long): String {
+        val date = kotlin.time.Instant.fromEpochMilliseconds(epochMillis)
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
         val month = (date.month.ordinal + 1).toString().padStart(2, '0')
         return "expenses-${date.year}-$month.json"
+    }
+
+    private fun Expense.toJsonObject(): JsonObject {
+        return json.encodeToJsonElement(Expense.serializer(), this) as JsonObject
+    }
+
+    private fun JsonObject.toExpense(): Expense {
+        return json.decodeFromJsonElement(Expense.serializer(), this)
     }
 }
 

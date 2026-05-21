@@ -24,6 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.widget.api.ConfigField
+import com.droidslife.screensaver.network.BackendGateway
+import com.droidslife.screensaver.network.BackendResult
+import com.droidslife.screensaver.storage.SyncRepository
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
@@ -33,9 +36,14 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.time.Clock
 
-class TodosWidgetFactory : WidgetFactory {
+class TodosWidgetFactory(
+    private val backendGateway: BackendGateway,
+) : WidgetFactory {
     override val id: String = "com.droidslife.screensaver.todos"
     override val displayName: String = "Todos"
     override val description: String = "Quick task capture with persistent local storage"
@@ -54,24 +62,29 @@ class TodosWidgetFactory : WidgetFactory {
         ),
     )
 
-    override fun create(config: WidgetConfig, scope: WidgetScope): Widget = TodosWidget(config, scope)
+    override fun create(config: WidgetConfig, scope: WidgetScope): Widget = TodosWidget(config, scope, backendGateway)
 }
 
 private class TodosWidget(
     private val config: WidgetConfig,
     private val scope: WidgetScope,
+    backendGateway: BackendGateway,
 ) : Widget {
     override val preferredSpan: Int = 1
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val serializer = ListSerializer(Todo.serializer())
+    private val syncRepository = SyncRepository("todos", scope.storage, backendGateway)
     private var todos by mutableStateOf<List<Todo>>(emptyList())
     private var input by mutableStateOf("")
+    private var unsyncedCount by mutableStateOf(0)
 
     override fun onResume() {
         scope.coroutineScope.launch {
             todos = scope.storage.read("todos.json", String::class.java)
                 ?.let { json.decodeFromString(serializer, it) }
                 ?: emptyList()
+            mergeRemoteTodos()
+            pushPending()
         }
     }
 
@@ -117,6 +130,15 @@ private class TodosWidget(
                     }
                 }
             }
+
+            if (unsyncedCount > 0) {
+                Text(
+                    text = "$unsyncedCount unsynced",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
 
@@ -142,17 +164,30 @@ private class TodosWidget(
             updatedAt = now,
         )
         persist()
+        queueUpsert(todos.last())
     }
 
     private fun toggle(id: String) {
         val now = Clock.System.now().toEpochMilliseconds()
-        todos = todos.map { if (it.id == id) it.copy(done = !it.done, updatedAt = now) else it }
+        var changed: Todo? = null
+        todos = todos.map {
+            if (it.id == id) {
+                it.copy(done = !it.done, updatedAt = now).also { updated -> changed = updated }
+            } else {
+                it
+            }
+        }
         persist()
+        changed?.let(::queueUpsert)
     }
 
     private fun delete(id: String) {
         todos = todos.filterNot { it.id == id }
         persist()
+        scope.coroutineScope.launch {
+            syncRepository.enqueueDelete(id)
+            pushPending()
+        }
     }
 
     private fun persist() {
@@ -160,6 +195,48 @@ private class TodosWidget(
         scope.coroutineScope.launch {
             scope.storage.write("todos.json", snapshot)
         }
+    }
+
+    private fun queueUpsert(todo: Todo) {
+        scope.coroutineScope.launch {
+            syncRepository.enqueueUpsert(todo.id, todo.toJsonObject(), todo.updatedAt)
+            pushPending()
+        }
+    }
+
+    private suspend fun mergeRemoteTodos() {
+        when (val result = syncRepository.pullRemote()) {
+            BackendResult.Disabled -> Unit
+            is BackendResult.Failure -> {
+                scope.log.warn("Todo sync pull failed", result.cause)
+                unsyncedCount = syncRepository.pendingCount()
+            }
+            is BackendResult.Success -> {
+                val remote = result.value.mapNotNull { runCatching { it.toTodo() }.getOrNull() }
+                if (remote.isNotEmpty()) {
+                    todos = (todos + remote)
+                        .groupBy { it.id }
+                        .map { (_, values) -> values.maxBy { it.updatedAt } }
+                    persist()
+                }
+            }
+        }
+    }
+
+    private suspend fun pushPending() {
+        val result = syncRepository.pushPending()
+        if (result.lastError != null) {
+            scope.log.warn("Todo sync push failed: ${result.lastError}")
+        }
+        unsyncedCount = result.remaining
+    }
+
+    private fun Todo.toJsonObject(): JsonObject {
+        return json.encodeToJsonElement(Todo.serializer(), this) as JsonObject
+    }
+
+    private fun JsonObject.toTodo(): Todo {
+        return json.decodeFromJsonElement(Todo.serializer(), this)
     }
 }
 

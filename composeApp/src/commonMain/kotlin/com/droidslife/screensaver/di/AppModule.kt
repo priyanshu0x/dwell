@@ -3,6 +3,8 @@ package com.droidslife.screensaver.di
 import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.network.KtorClient
+import com.droidslife.screensaver.network.BackendClient
+import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.settings.PreferencesRepository
 import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -51,11 +53,22 @@ val appModule = module {
     // Settings ViewModel
     single { SettingsViewModel(get(), get(), get()) }
 
+    // Backend sync
+    single<BackendGateway> {
+        val settingsViewModel: SettingsViewModel = get()
+        val secretStorage: SecretStorage = get()
+        BackendClient(
+            httpClient = get(),
+            settingsProvider = { settingsViewModel.settings },
+            tokenProvider = { secretStorage.read(settingsViewModel.settings.backendApiKeySecretId) },
+        )
+    }
+
     // Built-in widgets
     single { ClockWidgetFactory(get(), get()) }
     single { WeatherWidgetFactory(get()) }
-    single { TodosWidgetFactory() }
-    single { ExpensesWidgetFactory() }
+    single { TodosWidgetFactory(get()) }
+    single { ExpensesWidgetFactory(get()) }
 
     // Widget registry
     single { WidgetRegistry(listOf(get<ClockWidgetFactory>(), get<WeatherWidgetFactory>(), get<TodosWidgetFactory>(), get<ExpensesWidgetFactory>()), get(), get()) }
