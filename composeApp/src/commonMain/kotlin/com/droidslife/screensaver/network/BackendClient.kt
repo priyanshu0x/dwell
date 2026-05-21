@@ -7,9 +7,12 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.request.url
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.appendPathSegments
 import io.ktor.http.contentType
+import io.ktor.http.takeFrom
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -26,7 +29,11 @@ class BackendClient(
     override suspend fun pull(collection: String): BackendResult<List<JsonObject>> {
         val baseUrl = baseUrlOrNull() ?: return BackendResult.Disabled
         return call {
-            val response = httpClient.get("$baseUrl/api/$collection") {
+            val response = httpClient.get {
+                url {
+                    takeFrom(baseUrl)
+                    appendPathSegments("api", collection)
+                }
                 authorize()
             }
             parseItems(response.bodyAsText())
@@ -36,7 +43,11 @@ class BackendClient(
     override suspend fun upsert(collection: String, id: String, payload: JsonObject): BackendResult<Unit> {
         val baseUrl = baseUrlOrNull() ?: return BackendResult.Disabled
         return call {
-            httpClient.put("$baseUrl/api/$collection/$id") {
+            httpClient.put {
+                url {
+                    takeFrom(baseUrl)
+                    appendPathSegments("api", collection, id)
+                }
                 authorize()
                 contentType(ContentType.Application.Json)
                 setBody(json.encodeToString(payload))
@@ -48,7 +59,11 @@ class BackendClient(
     override suspend fun delete(collection: String, id: String): BackendResult<Unit> {
         val baseUrl = baseUrlOrNull() ?: return BackendResult.Disabled
         return call {
-            httpClient.delete("$baseUrl/api/$collection/$id") {
+            httpClient.delete {
+                url {
+                    takeFrom(baseUrl)
+                    appendPathSegments("api", collection, id)
+                }
                 authorize()
             }
             Unit
