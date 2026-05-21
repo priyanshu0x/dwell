@@ -9,14 +9,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.droidslife.screensaver.modes.ModeHost
-import com.droidslife.screensaver.settings.SettingsDialog
+import com.droidslife.screensaver.settings.SettingsSheet
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.settings.ShortcutsHelpDialog
 import com.droidslife.screensaver.theme.AppTheme
@@ -39,7 +38,6 @@ internal fun App(
 ) {
     val settingsViewModel = koinInject<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
-    val widgetDescriptors by widgetRegistry.descriptors.collectAsState()
 
     LaunchedEffect(settingsViewModel.settings) {
         widgetRegistry.syncWithSettings(settingsViewModel.settings)
@@ -83,32 +81,13 @@ internal fun App(
             }
         }
 
-        // Settings dialog overlay
+        // Settings side-sheet overlay (replaces the legacy SettingsDialog;
+        // the old file is kept on disk until Phase 13 cleanup).
         if (settingsViewModel.isSettingsDialogOpen) {
-            SettingsDialog(
+            SettingsSheet(
+                settingsViewModel = settingsViewModel,
+                widgetRegistry = widgetRegistry,
                 onDismiss = { settingsViewModel.closeSettingsDialog() },
-                settings = settingsViewModel.settings,
-                onThemeToggle = { settingsViewModel.toggleTheme() },
-                onClockFormatToggle = { settingsViewModel.toggleClockFormat() },
-                onAutoPlayToggle = { settingsViewModel.toggleAutoPlay() },
-                onShuffleToggle = { settingsViewModel.toggleShuffle() },
-                widgetDescriptors = widgetDescriptors,
-                onWidgetEnabledChange = settingsViewModel::setWidgetEnabled,
-                onWidgetConfigChange = settingsViewModel::updateWidgetConfig,
-                onWidgetSecretChange = settingsViewModel::updateWidgetSecret,
-                onWidgetReload = {
-                    widgetRegistry.reload()
-                    widgetRegistry.syncWithSettings(settingsViewModel.settings)
-                },
-                onIdleTimeoutChange = settingsViewModel::setIdleTimeoutMinutes,
-                onTrayIconToggle = settingsViewModel::setTrayIconEnabled,
-                onStartWithSystemToggle = settingsViewModel::setStartWithSystem,
-                onBackendBaseUrlChange = settingsViewModel::setBackendBaseUrl,
-                onBackendApiKeyChange = settingsViewModel::updateBackendApiKey,
-                onWeatherApiKeyChange = settingsViewModel::updateWeatherApiKey,
-                backendApiKeySaved = settingsViewModel.isSecretSaved(settingsViewModel.settings.backendApiKeySecretId),
-                weatherApiKeySaved = settingsViewModel.isSecretSaved(settingsViewModel.settings.weatherApiKeySecretId),
-                savedSecretIds = settingsViewModel.savedSecretIds,
             )
         }
 
