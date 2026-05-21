@@ -79,9 +79,9 @@ import com.droidslife.screensaver.weather.CitySearchState
 import com.droidslife.screensaver.weather.WeatherState
 import com.droidslife.screensaver.weather.WeatherViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import org.koin.compose.koinInject
 
 @OptIn(ExperimentalComposeUiApi::class)

@@ -5,12 +5,14 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(21)
+
     jvm()
 
     sourceSets {
         commonMain.dependencies {
-            api(compose.runtime)
-            api(compose.ui)
+            api(libs.compose.runtime)
+            api(libs.compose.ui)
             api(libs.ktor.client.core)
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.serialization.json)

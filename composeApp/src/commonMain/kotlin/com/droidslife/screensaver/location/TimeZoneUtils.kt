@@ -3,7 +3,6 @@ package com.droidslife.screensaver.location
 import com.droidslife.screensaver.weather.WeatherApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 
 /**

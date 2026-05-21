@@ -5,12 +5,14 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(21)
+
     jvm()
 
     sourceSets {
         jvmMain.dependencies {
             implementation(project(":widget-api"))
-            compileOnly(compose.material3)
+            compileOnly(libs.compose.material3)
         }
     }
 }

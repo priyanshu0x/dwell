@@ -1,7 +1,4 @@
-import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.compose.reload.ComposeHotRun
-import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -10,21 +7,20 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.hot.reload)
 }
-composeCompiler {
-    featureFlags.add(ComposeFeatureFlag.OptimizeNonSkippingGroups)
-}
-
 kotlin {
+    jvmToolchain(21)
+
     jvm()
 
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.animation)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.material.icons.core)
+            implementation(libs.compose.animation)
+            implementation(libs.compose.components.resources)
+            implementation(libs.compose.components.ui.tooling.preview)
             implementation(libs.kermit)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)
@@ -33,8 +29,6 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.coil)
-            implementation(libs.coil.network.ktor)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kstore)
             implementation(libs.charleskorn.kaml)
@@ -46,20 +40,17 @@ kotlin {
 
         commonTest.dependencies {
             implementation(kotlin("test"))
-            @OptIn(ExperimentalComposeLibrary::class)
-            implementation(compose.uiTest)
             implementation(libs.kotlinx.coroutines.test)
         }
 
         jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
+            implementation(libs.compose.desktop.current.os)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.okhttp)
         }
 
     }
 }
-
 compose.desktop {
     application {
         mainClass = "MainKt"
@@ -108,6 +99,8 @@ compose.desktop {
     }
 }
 
-tasks.register<ComposeHotRun>("runHot") {
-    mainClass.set("DevMainKt")
+tasks.register("runHot") {
+    group = "compose hot reload"
+    description = "Runs the Compose Hot Reload dev entry point."
+    dependsOn("hotDevJvm")
 }

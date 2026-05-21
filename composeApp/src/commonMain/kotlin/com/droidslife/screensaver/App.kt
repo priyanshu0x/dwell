@@ -22,12 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.theme.AppTheme
-import kotlinx.datetime.Instant
-import kotlinx.datetime.format
-import kotlinx.datetime.format.DateTimeComponents
-import kotlinx.datetime.format.FormatStringsInDatetimeFormats
-import kotlinx.datetime.format.byUnicodePattern
-import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
 @Composable
@@ -42,7 +36,7 @@ internal fun App(
     showHelpDialog: Boolean = false,
     onHelpDialogDismiss: () -> Unit = {},
     modifier: Modifier = Modifier
-) = KoinContext {
+) {
         // Get the settings view model to access the theme preference
         val settingsViewModel = koinInject<SettingsViewModel>()
         var visible by remember { mutableStateOf(false) }
@@ -94,10 +88,3 @@ internal fun App(
             }
         }
     }
-
-@OptIn(FormatStringsInDatetimeFormats::class)
-private fun Instant.dateFormat(format:String? =null): String {
-    return format(DateTimeComponents.Format {
-        byUnicodePattern(format?:"dd/MM/yyyy")
-    })
-}

@@ -9,7 +9,6 @@ import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberWindowEventHandlers
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
-import org.jetbrains.compose.reload.DevelopmentEntryPoint
 
 fun main() = application {
     initKoin {
@@ -33,21 +32,19 @@ fun main() = application {
         transparent = true,
         onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
     ) {
-        DevelopmentEntryPoint {
-            ShortcutToast(toastState = windowEvents.toastState)
+        ShortcutToast(toastState = windowEvents.toastState)
 
-            App(
-                showCitySelectionDialog = windowEvents.showCitySelectionDialog,
-                onCityDialogDismiss = windowEvents.onCityDialogDismiss,
-                onShowCityDialog = windowEvents.onShowCityDialog,
-                exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
-                onExitApplication = requestExit,
-                exitRequested = exitRequested,
-                onExited = { exitApplication() },
-                showHelpDialog = windowEvents.showHelpDialog,
-                onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
-                modifier = windowEvents.mouseEventModifier
-            )
-        }
+        App(
+            showCitySelectionDialog = windowEvents.showCitySelectionDialog,
+            onCityDialogDismiss = windowEvents.onCityDialogDismiss,
+            onShowCityDialog = windowEvents.onShowCityDialog,
+            exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
+            onExitApplication = requestExit,
+            exitRequested = exitRequested,
+            onExited = { exitApplication() },
+            showHelpDialog = windowEvents.showHelpDialog,
+            onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
+            modifier = windowEvents.mouseEventModifier
+        )
     }
 }
