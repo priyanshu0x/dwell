@@ -60,6 +60,30 @@ sealed class KeyEventAction {
      * @param message The message to show in the toast.
      */
     data class ShowToast(val message: String) : KeyEventAction()
+
+    /** Cycle through display modes (Cinematic → Ambient → Console → Cinematic). */
+    object CycleMode : KeyEventAction()
+
+    /** Jump directly to Cinematic mode. */
+    object JumpCinematic : KeyEventAction()
+
+    /** Jump directly to Ambient mode. */
+    object JumpAmbient : KeyEventAction()
+
+    /** Jump directly to Console mode. */
+    object JumpConsole : KeyEventAction()
+
+    /** Cycle to the next variant within the current mode. */
+    object CycleVariant : KeyEventAction()
+
+    /** Toggle the Cinematic widget drawer. */
+    object ToggleDrawer : KeyEventAction()
+
+    /** Toggle Console layout edit mode. */
+    object ToggleConsoleEdit : KeyEventAction()
+
+    /** Reload widgets (factories + instances) from disk. */
+    object ReloadWidgets : KeyEventAction()
 }
 
 /**

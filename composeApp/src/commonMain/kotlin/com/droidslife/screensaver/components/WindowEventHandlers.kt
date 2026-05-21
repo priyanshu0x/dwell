@@ -8,7 +8,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.droidslife.screensaver.clock.ClockViewModel
+import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
 
 data class WindowEventHandlers(
@@ -31,6 +33,7 @@ fun rememberWindowEventHandlers(
 ): WindowEventHandlers {
     val clockViewModel = koinInject<ClockViewModel>()
     val settingsViewModel = koinInject<SettingsViewModel>()
+    val widgetRegistry = koinInject<WidgetRegistry>()
 
     var showCitySelectionDialog by remember { mutableStateOf(false) }
     var exitOnMouseMovementEnabled by remember { mutableStateOf(true) }
@@ -80,6 +83,35 @@ fun rememberWindowEventHandlers(
             }
             is KeyEventAction.ShowToast -> {
                 toastState.show(action.message)
+            }
+            is KeyEventAction.CycleMode -> {
+                settingsViewModel.cycleMode()
+            }
+            is KeyEventAction.JumpCinematic -> {
+                settingsViewModel.setMode(Mode.Cinematic)
+            }
+            is KeyEventAction.JumpAmbient -> {
+                settingsViewModel.setMode(Mode.Ambient)
+            }
+            is KeyEventAction.JumpConsole -> {
+                settingsViewModel.setMode(Mode.Console)
+            }
+            is KeyEventAction.CycleVariant -> {
+                settingsViewModel.cycleVariant()
+            }
+            is KeyEventAction.ToggleDrawer -> {
+                if (settingsViewModel.settings.mode == Mode.Cinematic) {
+                    settingsViewModel.toggleDrawer()
+                }
+            }
+            is KeyEventAction.ToggleConsoleEdit -> {
+                if (settingsViewModel.settings.mode == Mode.Console) {
+                    settingsViewModel.toggleConsoleEditMode()
+                }
+            }
+            is KeyEventAction.ReloadWidgets -> {
+                widgetRegistry.reload()
+                widgetRegistry.syncWithSettings(settingsViewModel.settings)
             }
         }
     }
