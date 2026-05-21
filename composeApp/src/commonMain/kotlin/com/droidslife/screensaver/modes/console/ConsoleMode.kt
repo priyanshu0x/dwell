@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
@@ -57,7 +58,9 @@ fun ConsoleMode(
                 val borderColor = if (accent.tileBorderTint == androidx.compose.ui.graphics.Color.Transparent) {
                     DwellColors.Stroke
                 } else {
-                    DwellColors.Stroke // tint is too faint to override stroke; keep base
+                    // Composite the accent tint over the base stroke so Amber gets a
+                    // barely-perceptible warm cast on borders.
+                    accent.tileBorderTint.compositeOver(DwellColors.Stroke)
                 }
                 Box(
                     modifier = Modifier
