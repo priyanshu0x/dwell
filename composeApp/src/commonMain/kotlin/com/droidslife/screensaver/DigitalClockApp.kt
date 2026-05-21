@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import com.droidslife.screensaver.clock.ClockViewModel
@@ -306,6 +307,7 @@ fun DigitalClockApp(
                     delay(100)
                     focusRequester.requestFocus()
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     // Focus can fail transiently while the dialog is closing.
                 }
             }
