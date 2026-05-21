@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
@@ -131,7 +132,7 @@ private class WeatherForecastWidget(
 
     @Composable
     private fun ForecastTile(state: ForecastState, modifier: Modifier) {
-        Box(modifier = modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Box(modifier = modifier) {
             when (state) {
                 ForecastState.Loading -> ForecastSkeletons()
                 ForecastState.Failed -> ForecastFailed(onRetry = {
@@ -149,8 +150,9 @@ private class WeatherForecastWidget(
     private fun ForecastLoadedRow(days: List<DayForecast>) {
         Column {
             Text(
-                text = "FORECAST",
+                text = "FORECAST · 5 DAYS",
                 fontSize = 9.sp,
+                letterSpacing = 2.25.sp,
                 color = DwellColors.TextLow,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.SemiBold,
@@ -169,7 +171,8 @@ private class WeatherForecastWidget(
 
     @Composable
     private fun DayCard(day: DayForecast, isToday: Boolean) {
-        val borderColor = if (isToday) DwellColors.ConsoleGreen else DwellColors.Stroke
+        val accent = LocalConsoleAccent.current.primary
+        val borderColor = if (isToday) accent else DwellColors.Stroke
         Column(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
@@ -180,7 +183,7 @@ private class WeatherForecastWidget(
             Text(
                 text = weekdayShort(day.date.dayOfWeek),
                 fontSize = 10.sp,
-                color = if (isToday) DwellColors.ConsoleGreen else DwellColors.TextMid,
+                color = if (isToday) accent else DwellColors.TextMid,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.SemiBold,
             )
