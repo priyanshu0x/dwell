@@ -3,6 +3,18 @@ package com.droidslife.screensaver.settings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+@Serializable
+enum class Mode { Cinematic, Ambient, Console }
+
+@Serializable
+enum class CinematicVariant { Dusk, Noir }
+
+@Serializable
+enum class AmbientVariant { Lumen, Borealis }
+
+@Serializable
+enum class ConsoleVariant { Standard, Amber }
+
 /**
  * Model class for application settings.
  */
@@ -79,4 +91,16 @@ data class SettingsModel(
      * Secret id for the WeatherAPI.com key stored outside settings JSON.
      */
     val weatherApiKeySecretId: String = WEATHER_API_KEY_SECRET_ID,
+
+    val mode: Mode = Mode.Cinematic,
+    val cinematicVariant: CinematicVariant = CinematicVariant.Dusk,
+    val ambientVariant: AmbientVariant = AmbientVariant.Lumen,
+    val consoleVariant: ConsoleVariant = ConsoleVariant.Standard,
+    val quieterLumen: Boolean = false,
+    val showSeconds: Boolean = false,
+    val showDate: Boolean = true,
+    // TODO(Phase 1 dependency): Add widgetLayouts: Map<String, GridRect> once
+    //  com.droidslife.screensaver.widget.api.GridRect lands in widget-api (Task 1.2).
+    val widgetOrder: List<String> = emptyList(),
+    val exitOnKeypress: Boolean = true,
 )
