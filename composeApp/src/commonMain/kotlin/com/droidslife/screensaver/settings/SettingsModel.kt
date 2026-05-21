@@ -74,4 +74,9 @@ data class SettingsModel(
      * Secret id for the backend API token stored outside settings JSON.
      */
     val backendApiKeySecretId: String = "backend.apiKey",
+
+    /**
+     * Secret id for the WeatherAPI.com key stored outside settings JSON.
+     */
+    val weatherApiKeySecretId: String = WEATHER_API_KEY_SECRET_ID,
 )

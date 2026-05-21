@@ -189,6 +189,16 @@ class SettingsViewModel(
         }
     }
 
+    fun updateWeatherApiKey(value: String) {
+        viewModelScope.launch {
+            if (value.isBlank()) {
+                secretStorage.delete(settings.weatherApiKeySecretId)
+            } else {
+                secretStorage.write(settings.weatherApiKeySecretId, value)
+            }
+        }
+    }
+
     fun effectiveEnabledWidgetIds(defaultIds: Set<String> = defaultWidgetIds): Set<String> {
         return settings.enabledWidgetIds.ifEmpty { defaultIds }
     }

@@ -1,6 +1,8 @@
 package com.droidslife.screensaver.weather
 
 import com.droidslife.screensaver.config.Constants
+import com.droidslife.screensaver.settings.SecretStorage
+import com.droidslife.screensaver.settings.WEATHER_API_KEY_SECRET_ID
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -18,7 +20,8 @@ import kotlinx.serialization.json.jsonPrimitive
  * Documentation: https://app.swaggerhub.com/apis-docs/WeatherAPI.com/WeatherAPI/1.0.2
  */
 class WeatherApi(
-    private val client: HttpClient
+    private val client: HttpClient,
+    private val secretStorage: SecretStorage,
 ) {
 
     /**
@@ -85,9 +88,10 @@ class WeatherApi(
         }
     }
 
-    private fun apiKey(): String {
-        return System.getenv("WEATHERAPI")?.trim()?.takeIf { it.isNotBlank() }
-            ?: throw WeatherApiException("WEATHERAPI environment variable is not set")
+    private suspend fun apiKey(): String {
+        return secretStorage.read(WEATHER_API_KEY_SECRET_ID)?.trim()?.takeIf { it.isNotBlank() }
+            ?: System.getenv("WEATHERAPI")?.trim()?.takeIf { it.isNotBlank() }
+            ?: throw WeatherApiException("WeatherAPI key is not configured")
     }
 }
 

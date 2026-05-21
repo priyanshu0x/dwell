@@ -165,6 +165,7 @@ fun DigitalClockApp(
             onStartWithSystemToggle = settingsViewModel::setStartWithSystem,
             onBackendBaseUrlChange = settingsViewModel::setBackendBaseUrl,
             onBackendApiKeyChange = settingsViewModel::updateBackendApiKey,
+            onWeatherApiKeyChange = settingsViewModel::updateWeatherApiKey,
         )
     }
 

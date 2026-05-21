@@ -30,9 +30,6 @@ val appModule = module {
     // HTTP Client
     single<HttpClient> { KtorClient.createWithRetry() }
 
-    // Weather API
-    single { WeatherApi(get()) }
-
     // Location Service
     single { LocationService() }
 
@@ -40,6 +37,9 @@ val appModule = module {
     single<PreferencesRepository> { createPreferencesRepository() }
     single<SecretStorage> { createSecretStorage() }
     single<StartupRegistration> { createStartupRegistration() }
+
+    // Weather API
+    single { WeatherApi(get(), get()) }
 
     // Weather Repository
     single { WeatherRepository(get(), get()) }

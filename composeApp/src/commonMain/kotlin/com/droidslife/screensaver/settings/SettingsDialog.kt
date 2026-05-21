@@ -75,6 +75,7 @@ fun SettingsDialog(
     onStartWithSystemToggle: (Boolean) -> Unit = {},
     onBackendBaseUrlChange: (String) -> Unit = {},
     onBackendApiKeyChange: (String) -> Unit = {},
+    onWeatherApiKeyChange: (String) -> Unit = {},
 ) {
     var showShortcutsDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf("Display") }
@@ -126,6 +127,7 @@ fun SettingsDialog(
                         onClockFormatToggle = onClockFormatToggle,
                         onAutoPlayToggle = onAutoPlayToggle,
                         onShuffleToggle = onShuffleToggle,
+                        onWeatherApiKeyChange = onWeatherApiKeyChange,
                     )
                     "Widgets" -> WidgetSettings(
                         settings = settings,
@@ -170,7 +172,10 @@ private fun DisplaySettings(
     onClockFormatToggle: () -> Unit,
     onAutoPlayToggle: () -> Unit,
     onShuffleToggle: () -> Unit,
+    onWeatherApiKeyChange: (String) -> Unit,
 ) {
+    var weatherApiKey by remember(settings.weatherApiKeySecretId) { mutableStateOf("") }
+
     SectionTitle("Theme")
     SettingSwitch("Dark Theme", settings.isDarkTheme, onThemeToggle)
     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -186,6 +191,17 @@ private fun DisplaySettings(
 
     SectionTitle("Weather")
     SettingValue("Current City", settings.currentCity ?: "Auto (Timezone)")
+    OutlinedTextField(
+        value = weatherApiKey,
+        onValueChange = {
+            weatherApiKey = it
+            onWeatherApiKeyChange(it)
+        },
+        label = { Text("WeatherAPI Key") },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        singleLine = true,
+    )
     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
     SectionTitle("Playback")
