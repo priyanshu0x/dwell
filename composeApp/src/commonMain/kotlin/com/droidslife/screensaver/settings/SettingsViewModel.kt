@@ -3,7 +3,6 @@ package com.droidslife.screensaver.settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.droidslife.screensaver.clock.ClockViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -113,60 +112,6 @@ class SettingsViewModel(
      */
     fun setClockFormat(is24Hour: Boolean) {
         updateSettings(settings.copy(is24HourFormat = is24Hour))
-    }
-
-    /**
-     * Sets the current city for weather display.
-     * @param city The city name.
-     */
-    fun setCurrentCity(city: String) {
-        updateSettings(settings.copy(currentCity = city))
-    }
-
-    /**
-     * Toggles the auto play status.
-     * @return The new auto play status.
-     */
-    fun toggleAutoPlay(): Boolean {
-        val newSettings = settings.copy(autoPlayEnabled = !settings.autoPlayEnabled)
-        updateSettings(newSettings)
-        return newSettings.autoPlayEnabled
-    }
-
-    /**
-     * Sets the auto play status.
-     * @param enabled Whether auto play should be enabled.
-     */
-    fun setAutoPlay(enabled: Boolean) {
-        updateSettings(settings.copy(autoPlayEnabled = enabled))
-    }
-
-    /**
-     * Toggles the shuffle status.
-     * @return The new shuffle status.
-     */
-    fun toggleShuffle(): Boolean {
-        val newSettings = settings.copy(shuffleEnabled = !settings.shuffleEnabled)
-        updateSettings(newSettings)
-        return newSettings.shuffleEnabled
-    }
-
-    /**
-     * Sets the shuffle status.
-     * @param enabled Whether shuffle should be enabled.
-     */
-    fun setShuffle(enabled: Boolean) {
-        updateSettings(settings.copy(shuffleEnabled = enabled))
-    }
-
-    /**
-     * Sets the currently selected design.
-     * @param designId The design ID.
-     */
-    fun setSelectedDesign(designId: Int) {
-        if (designId in 1..ClockViewModel.DESIGN_COUNT) {
-            updateSettings(settings.copy(selectedDesignId = designId))
-        }
     }
 
     fun setWidgetEnabled(widgetId: String, enabled: Boolean) {

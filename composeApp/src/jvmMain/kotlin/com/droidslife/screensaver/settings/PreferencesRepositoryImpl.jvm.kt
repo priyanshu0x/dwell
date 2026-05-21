@@ -41,32 +41,24 @@ private class PreferencesRepositoryImpl : PreferencesRepository {
         store.set(settings)
     }
 
-    override suspend fun getCurrentCity(): String? = currentSettings().currentCity
+    override suspend fun getCurrentCity(): String? {
+        val cfg = currentSettings().widgetConfigs[WEATHER_WIDGET_ID] ?: return null
+        return (cfg["city"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+    }
 
     override suspend fun setCurrentCity(city: String) {
-        store.update { (it ?: SettingsModel()).copy(currentCity = city) }
-    }
-
-    override suspend fun getAutoPlayStatus(): Boolean = currentSettings().autoPlayEnabled
-
-    override suspend fun setAutoPlayStatus(enabled: Boolean) {
-        store.update { (it ?: SettingsModel()).copy(autoPlayEnabled = enabled) }
-    }
-
-    override suspend fun getShuffleStatus(): Boolean = currentSettings().shuffleEnabled
-
-    override suspend fun setShuffleStatus(enabled: Boolean) {
-        store.update { (it ?: SettingsModel()).copy(shuffleEnabled = enabled) }
-    }
-
-    override suspend fun getSelectedDesign(): Int = currentSettings().selectedDesignId
-
-    override suspend fun setSelectedDesign(designId: Int) {
-        store.update { (it ?: SettingsModel()).copy(selectedDesignId = designId) }
+        store.update { existing ->
+            val current = existing ?: SettingsModel()
+            val cfg = current.widgetConfigs[WEATHER_WIDGET_ID] ?: JsonObject(emptyMap())
+            val newCfg = JsonObject(cfg + ("city" to JsonPrimitive(city)))
+            current.copy(widgetConfigs = current.widgetConfigs + (WEATHER_WIDGET_ID to newCfg))
+        }
     }
 
     private suspend fun currentSettings(): SettingsModel = store.get() ?: SettingsModel()
 }
+
+private const val WEATHER_WIDGET_ID = "com.droidslife.screensaver.weather"
 
 private class SettingsFileCodec(
     private val settingsPath: Path,
