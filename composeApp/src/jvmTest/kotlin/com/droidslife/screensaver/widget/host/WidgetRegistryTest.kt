@@ -27,6 +27,21 @@ class WidgetRegistryTest {
     }
 
     @Test
+    fun emptyEnabledWidgetSetEnablesAllBuiltInsByDefault() {
+        val registry = WidgetRegistry(
+            listOf(
+                FakeWidgetFactory(id = "test.clock"),
+                FakeWidgetFactory(id = "test.todos"),
+            ),
+            HttpClient(OkHttp),
+        )
+
+        registry.syncWithSettings(SettingsModel())
+
+        assertEquals(setOf("test.clock", "test.todos"), registry.instances.value.keys)
+    }
+
+    @Test
     fun disableAndEnableToggleInstance() {
         val registry = WidgetRegistry(listOf(FakeWidgetFactory()), HttpClient(OkHttp))
         registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
@@ -50,10 +65,11 @@ class WidgetRegistryTest {
     }
 }
 
-private class FakeWidgetFactory : WidgetFactory {
+private class FakeWidgetFactory(
+    override val id: String = "test.widget",
+) : WidgetFactory {
     var createCount = 0
 
-    override val id: String = "test.widget"
     override val displayName: String = "Test Widget"
 
     override fun create(config: WidgetConfig, scope: WidgetScope): Widget {

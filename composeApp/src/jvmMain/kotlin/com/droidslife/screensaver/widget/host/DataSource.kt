@@ -43,7 +43,7 @@ private class CommandDataSource(
             .directory(folder.toFile())
             .apply {
                 config.rawJson.keys.forEach { key ->
-                    environment()["WIDGET_${key.uppercase()}"] = config.string(key)
+                    environment()["WIDGET_${key.uppercase()}"] = config.secret(key) ?: config.string(key)
                 }
             }
             .redirectErrorStream(true)
@@ -82,7 +82,7 @@ private class HttpDataSource(
 
     private fun template(value: String): String {
         return config.rawJson.keys.fold(value) { acc, key ->
-            acc.replace("$" + key, config.string(key))
+            acc.replace("$" + key, config.secret(key) ?: config.string(key))
         }
     }
 }

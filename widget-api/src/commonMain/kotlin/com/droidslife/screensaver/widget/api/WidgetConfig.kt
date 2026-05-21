@@ -34,7 +34,7 @@ class WidgetConfig(
     }
 
     fun secret(key: String): String? {
-        return secretResolver(key) ?: primitive(key)?.content
+        return secretResolver(key)
     }
 
     fun raw(key: String): JsonElement? = values[key]

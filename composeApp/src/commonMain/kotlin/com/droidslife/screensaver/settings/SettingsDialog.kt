@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.host.WidgetDescriptor
+import com.droidslife.screensaver.widget.host.WidgetSource
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -201,7 +202,10 @@ private fun WidgetSettings(
     onWidgetSecretChange: (String, String, String) -> Unit,
     onWidgetReload: () -> Unit,
 ) {
-    val defaultEnabled = setOf("com.droidslife.screensaver.clock", "com.droidslife.screensaver.weather")
+    val defaultEnabled = widgetDescriptors
+        .filter { it.source is WidgetSource.BuiltIn }
+        .map { it.id }
+        .toSet()
     val enabledIds = settings.enabledWidgetIds.ifEmpty { defaultEnabled }
 
     Row(

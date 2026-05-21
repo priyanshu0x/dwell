@@ -221,6 +221,8 @@ class SettingsViewModel(
         val defaultWidgetIds = setOf(
             "com.droidslife.screensaver.clock",
             "com.droidslife.screensaver.weather",
+            "com.droidslife.screensaver.todos",
+            "com.droidslife.screensaver.expenses",
         )
     }
 }
