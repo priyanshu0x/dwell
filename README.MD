@@ -1,87 +1,131 @@
 # Screen Saver App
 
-A modern digital clock screen saver built with Compose Multiplatform for desktop platforms.
+Idle-triggered desktop dashboard and screen saver built with Kotlin, Compose Multiplatform, and a public widget API.
 
-## Introduction
-Screen Saver App is a Compose Multiplatform application that provides a digital clock screen saver for desktop platforms. The application is built using Kotlin and Jetpack Compose, allowing for a modern, declarative UI approach. This app was created with JetBrains Junie.
+The app runs as a tray daemon on Windows/Linux, opens a fullscreen dashboard after OS idle time, and renders built-in or user-installed widgets from `~/.screensaver/widgets`.
 
 ## Features
-- Animated digital clock display
-- Modern UI using Material Design
-- Cross-platform support through Compose Multiplatform
-- MVVM + clean architecture
-- Pure Kotlin libraries only
 
-## Project Structure
-The project follows a standard Compose Multiplatform structure:
+- Idle-triggered fullscreen dashboard with fade in/out.
+- Tray daemon with show, settings, widget reload, and quit actions.
+- Windows `.scr`/screensaver launch support.
+- Built-in widgets implemented through the same API as third-party widgets:
+  - Clock
+  - Weather
+  - Todos
+  - Expenses
+- Tier 1 widgets: JVM JARs loaded with `ServiceLoader`.
+- Tier 2 widgets: `widget.yaml` + file/http/command data source.
+- Persistent settings at `~/.screensaver/settings.json`.
+- Scoped widget storage at `~/.screensaver/widget-data/<widget-id>/`.
+- Secret storage through Windows Credential Manager, Linux `secret-tool`/libsecret, or obfuscated fallback file.
+- Optional backend sync foundation for todos and expenses with local outbox retry.
+- Native packaging for MSI/EXE, Debian packages, and a Windows `.scr` bundle.
 
-- **composeApp/** - Main application module
-  - **src/commonMain/** - Shared code for all platforms
-    - **kotlin/com/droidslife/screensaver/** - Main package containing application code
-      - **App.kt** - Main application entry point
-      - **DigitalClockApp.kt** - Implementation of the digital clock screen saver
-      - **digitalClock/** - Original digital clock implementation
-      - **digitalClock2/** - Alternative digital clock implementation
-      - **theme/** - UI theming and styling
-  - **src/jvmMain/** - JVM-specific code for desktop platforms
-  - **desktopAppIcons/** - Icons for the desktop application
+## Requirements
 
-## Development
-### Running the Application
+- JDK 21.
+- Windows or Linux.
+- Weather widget: set the WeatherAPI.com key in Settings -> Display -> Weather, or provide `WEATHERAPI` in the process environment.
+- Linux idle detection works best with `gdbus` on GNOME Wayland, XScreenSaver/libXss on X11, or `xprintidle` as a fallback.
+- Linux secret storage uses `secret-tool` when available and falls back to a local obfuscated file when no OS keychain is reachable.
 
-To run the desktop application:
+## Run
+
+Windows:
+
+```powershell
+.\gradlew.bat :composeApp:run
 ```
+
+Unix shell syntax:
+
+```sh
 ./gradlew :composeApp:run
 ```
 
-For hot reload:
+Launch modes:
+
+```text
+--daemon   default; tray daemon, no dashboard until idle/show
+--show     open dashboard once
+/s         Windows screen saver show
+/p         Windows screen saver preview no-op
+/c         open dashboard with settings
 ```
-./gradlew composeApp:runHot
+
+Hot reload:
+
+```powershell
+.\gradlew.bat :composeApp:runHot
 ```
 
-### Testing
-To run desktop UI tests:
+## Test
+
+```powershell
+.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:jvmTest
 ```
-./gradlew :composeApp:jvmTest
+
+Build sample widget:
+
+```powershell
+.\gradlew.bat --no-daemon --no-configuration-cache :samples:sample-kotlin-widget:jvmJar
 ```
 
-## Technology Stack
-- **Kotlin** - Primary programming language
-- **Compose Multiplatform** - UI framework
-- **kotlinx.datetime** - Date and time handling
-- **Gradle** - Build system
+## Package
 
-## Architecture
-The application follows a simple architecture:
-1. The main `App` composable sets up the UI container and theme
-2. The `DigitalClockApp` composable manages the state and updates of the clock
-3. The `DigitalClock` and `DigitalDigit` composables handle the rendering of individual clock components
+Windows `.scr` bundle:
 
-## Future Enhancements
-Potential areas for enhancement include:
-- Additional screen saver styles beyond the digital clock
-- Customization options for colors and animations
-- Support for additional platforms (iOS, Web, etc.)
+```powershell
+.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:packageScrZip
+```
 
-## Screenshots
+Native package for the current OS:
 
-### Main Clock Display
-![Main Clock Display](screenshots/Screenshot%202025-03-31%20163012.png)
+```powershell
+.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:packageDistributionForCurrentOS
+```
 
-### Alternative Clock Style
-![Alternative Clock Style](screenshots/Screenshot%202025-03-31%20163210.png)
+See [docs/packaging.md](docs/packaging.md) for install details.
 
-### Clock with Dark Theme
-![Clock with Dark Theme](screenshots/Screenshot%202025-03-31%20163321.png)
+Release outputs are written under:
 
-### Clock Animation Frame
-![Clock Animation Frame](screenshots/Screenshot%202025-03-31%20163347.png)
+```text
+composeApp/build/compose/binaries/main/ScreenSaverApp-scr-<version>.zip
+composeApp/build/compose/binaries/main/msi/
+composeApp/build/compose/binaries/main/exe/
+composeApp/build/compose/binaries/main/deb/
+```
 
-### Clock with Settings Panel
-![Clock with Settings Panel](screenshots/Screenshot%202025-03-31%20163530.png)
+## Widgets
 
-### Full Screen Mode
-![Full Screen Mode](screenshots/Screenshot%202025-03-31%20163721.png)
+Widget authoring starts in [docs/widget-authors.md](docs/widget-authors.md).
 
-### Application Overview
-![Application Overview](screenshots/Screenshot%202025-03-31%20164121.png)
+Filesystem discovery location:
+
+```text
+~/.screensaver/widgets/
+```
+
+Supported widget types:
+
+- JAR widget implementing `com.droidslife.screensaver.widget.api.WidgetFactory`.
+- Declarative folder widget containing `widget.yaml`.
+
+Installed widgets can be reloaded from the tray menu or Settings -> Widgets.
+
+## Project Structure
+
+```text
+composeApp/                  host app
+widget-api/                  public widget API
+samples/sample-kotlin-widget Tier 1 sample
+samples/sample-declarative-widget Tier 2 sample
+docs/                        packaging and widget author docs
+```
+
+## Current Limits
+
+- v1 targets Windows and Linux.
+- Third-party JAR widgets are not sandboxed; only run code you trust.
+- Backend sync uses a generic JSON/bearer-token client until a concrete backend contract is supplied.
