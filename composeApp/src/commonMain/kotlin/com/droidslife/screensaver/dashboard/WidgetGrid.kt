@@ -83,7 +83,7 @@ private fun ResumedWidgetCard(
     showChrome: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    DisposableEffect(instance.descriptor.id) {
+    DisposableEffect(instance) {
         instance.widget.onResume()
         onDispose { instance.widget.onSuspend() }
     }

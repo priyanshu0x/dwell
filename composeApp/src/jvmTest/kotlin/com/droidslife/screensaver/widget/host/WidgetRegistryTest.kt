@@ -9,6 +9,7 @@ import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -45,9 +46,11 @@ class WidgetRegistryTest {
     fun disableAndEnableToggleInstance() {
         val registry = WidgetRegistry(listOf(FakeWidgetFactory()), HttpClient(OkHttp))
         registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
+        val oldInstance = registry.instances.value.getValue("test.widget")
 
         registry.disable("test.widget")
         assertFalse(registry.instances.value.containsKey("test.widget"))
+        assertFalse(oldInstance.scope.coroutineScope.isActive)
 
         registry.enable("test.widget")
         assertTrue(registry.instances.value.containsKey("test.widget"))

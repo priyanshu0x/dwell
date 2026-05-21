@@ -10,6 +10,7 @@ import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
@@ -77,6 +78,7 @@ class WidgetRegistry(
     fun disable(id: String) {
         val instance = _instances.value[id] ?: return
         instance.widget.onDispose()
+        instance.scope.coroutineScope.cancel()
         _instances.value = _instances.value - id
     }
 
