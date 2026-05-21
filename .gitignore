@@ -39,5 +39,8 @@ out/
 *.class
 .output.txt
 
+# Claude Code local overrides (per-developer permissions, etc.)
+.claude/settings.local.json
+
 # Local Codex session notes and changelogs
 .sessions/
