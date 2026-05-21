@@ -7,6 +7,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -42,6 +43,7 @@ class WeatherApi(
                 parameter("key", apiKey)
             }.body<WeatherData>()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw WeatherApiException("Failed to load weather for coordinates $latitude,$longitude", e)
         }
     }
@@ -59,6 +61,7 @@ class WeatherApi(
                 parameter("key", apiKey)
             }.body<WeatherData>()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw WeatherApiException("Failed to load weather for $cityName", e)
         }
     }
@@ -91,6 +94,7 @@ class WeatherApi(
                 )
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw WeatherApiException("Failed to search cities for '$query'", e)
         }
     }

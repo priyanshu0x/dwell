@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.weather
 
 import com.droidslife.screensaver.location.LocationService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -24,6 +25,7 @@ class WeatherRepository(
             val weatherData = weatherApi.getWeatherData(location.latitude, location.longitude)
             emit(WeatherState.Success(weatherData, location))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             emit(WeatherState.Error(e.message ?: "Unknown error"))
         }
     }

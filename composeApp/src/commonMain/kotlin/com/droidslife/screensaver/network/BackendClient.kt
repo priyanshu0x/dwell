@@ -13,6 +13,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.appendPathSegments
 import io.ktor.http.contentType
 import io.ktor.http.takeFrom
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -95,6 +96,7 @@ class BackendClient(
         return try {
             BackendResult.Success(block())
         } catch (error: Throwable) {
+            if (error is CancellationException) throw error
             BackendResult.Failure(error.message ?: "Backend request failed", error)
         }
     }

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.droidslife.screensaver.location.TimeZoneUtils
 import com.droidslife.screensaver.settings.PreferencesRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,6 +97,7 @@ class WeatherViewModel(
                 )
                 selectedCity = cityName
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 state = WeatherState.Error(e.message ?: "Unknown error")
             }
         }
@@ -121,6 +123,7 @@ class WeatherViewModel(
                     CitySearchState.Success(cities)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 citySearchState = CitySearchState.Error(e.message ?: "Unknown error")
             }
         }
