@@ -2,6 +2,7 @@ package com.droidslife.screensaver.modes.cinematic
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -61,23 +63,40 @@ private fun BoxScope.CinematicForeground(
     val mm = now.minute.toString().padStart(2, '0')
     val time = "$hh:$mm"
 
-    Column(modifier = Modifier.fillMaxSize().padding(start = 80.dp, top = 200.dp)) {
-        Text(
-            text = time,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.Bold,
-            fontSize = 240.sp,
-            color = DwellColors.TextHigh,
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = formatMetaLine(now),
-            fontFamily = DwellFonts.interTight(),
-            fontSize = 16.sp,
-            color = DwellColors.TextMid,
-        )
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val startPad = maxWidth * 0.08f
+        val topPad = maxHeight * 0.26f
+        Column(modifier = Modifier.padding(start = startPad, top = topPad)) {
+            Text(
+                text = time,
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 280.sp,
+                color = DwellColors.TextHigh,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = formatMetaLine(now),
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.Normal,
+                fontSize = 18.sp,
+                color = DwellColors.TextHigh.copy(alpha = 0.75f),
+            )
+        }
     }
     WidgetDrawer(settingsViewModel, registry)
+    val instances by registry.instances.collectAsState()
+    if (instances.isNotEmpty()) {
+        Text(
+            text = "↓ WIDGETS",
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.Normal,
+            fontSize = 9.sp,
+            letterSpacing = 2.7.sp,
+            color = DwellColors.TextHigh.copy(alpha = 0.32f),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+        )
+    }
 }
 
 private fun formatMetaLine(now: LocalDateTime): String {
