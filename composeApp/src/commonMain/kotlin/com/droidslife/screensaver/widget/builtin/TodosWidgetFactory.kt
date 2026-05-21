@@ -33,6 +33,8 @@ import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
+import com.droidslife.screensaver.widget.api.WidgetSize
+import com.droidslife.screensaver.widget.api.WidgetSummary
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -49,6 +51,11 @@ class TodosWidgetFactory(
     override val displayName: String = "Todos"
     override val description: String = "Quick task capture with persistent local storage"
     override val category: WidgetCategory = WidgetCategory.PRODUCTIVITY
+    override val preferredSize: WidgetSize = WidgetSize(
+        minCols = 3, minRows = 2,
+        defaultCols = 5, defaultRows = 2,
+        maxCols = 8, maxRows = 4,
+    )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.Bool("hideDone", "Hide completed"),
         ConfigField.Enum(
@@ -79,6 +86,15 @@ private class TodosWidget(
     private var input by mutableStateOf("")
     private var unsyncedCount by mutableStateOf(0)
     private var inputVisible by mutableStateOf(false)
+
+    override fun summary(): WidgetSummary {
+        val open = todos.count { !it.done }
+        return WidgetSummary(
+            primaryValue = open.toString(),
+            primaryLabel = "Todos",
+            subtitle = if (open == 0) "Nothing to do" else "$open open",
+        )
+    }
 
     override fun onResume() {
         scope.coroutineScope.launch {
