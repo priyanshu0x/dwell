@@ -59,17 +59,25 @@ fun Lumen(
             CornerBracket(top = true, start = false, modifier = Modifier.align(Alignment.TopEnd))
             CornerBracket(top = false, start = true, modifier = Modifier.align(Alignment.BottomStart))
             CornerBracket(top = false, start = false, modifier = Modifier.align(Alignment.BottomEnd))
-
-            // Top telemetry
-            Text(
-                text = "DWELL · ${fmtTelemetry(now)} · ${weatherStrip()}",
-                fontFamily = DwellFonts.jetBrainsMono(),
-                fontSize = 10.sp,
-                letterSpacing = 0.4.sp,
-                color = DwellColors.LumenCyan.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
-            )
         }
+
+        // Top telemetry. Spec § 6.2.1: in quieter mode, reduce to "{time} · {temp}°{city}" —
+        // drop the "DWELL · " prefix and the weather/sync status fragments. Temp/city wiring
+        // is deferred (no real weather feed yet), so quieter renders just the time for now.
+        // Side telemetry and bottom-left telemetry are not yet rendered by this variant;
+        // nothing to gate there.
+        Text(
+            text = if (quieter) {
+                fmtTelemetry(now)
+            } else {
+                "DWELL · ${fmtTelemetry(now)} · ${weatherStrip()}"
+            },
+            fontFamily = DwellFonts.jetBrainsMono(),
+            fontSize = 10.sp,
+            letterSpacing = 0.4.sp,
+            color = DwellColors.LumenCyan.copy(alpha = 0.6f),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
+        )
 
         // Orbital dial behind clock
         Box(modifier = Modifier.align(Alignment.Center).size(460.dp)) {
