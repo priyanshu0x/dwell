@@ -10,6 +10,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -45,6 +48,15 @@ class WeatherViewModel(
      */
     var selectedCity by mutableStateOf<String?>(null)
         private set
+
+    private val _forecast = MutableStateFlow<ForecastState>(ForecastState.Loading)
+
+    /**
+     * 5-day forecast state. Tied to whichever city is currently selected by
+     * the user; [refreshForecast] is invoked whenever the current weather is
+     * (re)loaded.
+     */
+    val forecast: StateFlow<ForecastState> = _forecast.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -100,6 +112,30 @@ class WeatherViewModel(
                 if (e is CancellationException) throw e
                 state = WeatherState.Error(e.message ?: "Unknown error")
             }
+        }
+        refreshForecast(cityName)
+    }
+
+    /**
+     * Refreshes the multi-day forecast for the given city. Marks state
+     * [ForecastState.Unconfigured] when the WeatherAPI key cannot be resolved.
+     */
+    fun refreshForecast(cityName: String) {
+        if (cityName.isBlank()) return
+        viewModelScope.launch {
+            _forecast.value = ForecastState.Loading
+            val result = weatherRepository.forecast(cityName, days = 5)
+            _forecast.value = result.fold(
+                onSuccess = { ForecastState.Loaded(it) },
+                onFailure = { err ->
+                    val msg = err.message.orEmpty()
+                    if (msg.contains("key is not configured", ignoreCase = true)) {
+                        ForecastState.Unconfigured
+                    } else {
+                        ForecastState.Failed
+                    }
+                },
+            )
         }
     }
 
@@ -158,6 +194,16 @@ class WeatherViewModel(
             else -> null
         }
     }
+}
+
+/**
+ * State of the multi-day forecast fetch.
+ */
+sealed interface ForecastState {
+    object Loading : ForecastState
+    data class Loaded(val days: List<DayForecast>) : ForecastState
+    object Failed : ForecastState
+    object Unconfigured : ForecastState
 }
 
 /**

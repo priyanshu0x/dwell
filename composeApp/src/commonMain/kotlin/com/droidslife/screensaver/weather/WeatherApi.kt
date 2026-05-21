@@ -68,6 +68,28 @@ class WeatherApi(
     }
 
     /**
+     * Fetches a multi-day forecast for the given city.
+     * @param cityName The city to forecast.
+     * @param days Number of forecast days (1..10 per WeatherAPI).
+     */
+    suspend fun fetchForecast(cityName: String, days: Int = 5): ForecastResponse =
+        withContext(Dispatchers.Default) {
+            try {
+                val apiKey = apiKey()
+                client.get("${Constants.WeatherApi.BASE_URL}/forecast.json") {
+                    parameter("q", cityName)
+                    parameter("days", days)
+                    parameter("aqi", "no")
+                    parameter("alerts", "no")
+                    parameter("key", apiKey)
+                }.body<ForecastResponse>()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                throw WeatherApiException("Failed to load forecast for $cityName", e)
+            }
+        }
+
+    /**
      * Searches for cities matching the given query.
      * @param query The search query.
      * @return A list of city search results.
@@ -162,6 +184,37 @@ data class Condition(
     val text: String,
     val icon: String,
     val code: Int
+)
+
+/**
+ * Forecast response from WeatherAPI.com `forecast.json`.
+ */
+@Serializable
+data class ForecastResponse(
+    val location: Location,
+    val current: Current,
+    val forecast: Forecast,
+)
+
+@Serializable
+data class Forecast(
+    @SerialName("forecastday") val forecastDay: List<ForecastDay>,
+)
+
+@Serializable
+data class ForecastDay(
+    val date: String,
+    @SerialName("date_epoch") val dateEpoch: Long,
+    val day: ForecastDayData,
+)
+
+@Serializable
+data class ForecastDayData(
+    @SerialName("maxtemp_c") val maxTempC: Double,
+    @SerialName("mintemp_c") val minTempC: Double,
+    @SerialName("maxtemp_f") val maxTempF: Double? = null,
+    @SerialName("mintemp_f") val minTempF: Double? = null,
+    val condition: Condition,
 )
 
 /**
