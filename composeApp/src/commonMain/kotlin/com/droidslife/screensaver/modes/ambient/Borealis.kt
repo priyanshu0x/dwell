@@ -125,7 +125,10 @@ fun Borealis(modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Light,
                 fontSize = 12.sp,
                 letterSpacing = 0.2.sp,
-                color = Color(0x52FFFFFF),
+                // Spec asked for rgba(255,255,255,0.32) but at 12sp against the deep-night
+                // backdrop the place line vanished. Lift to ~50% so it reads as quiet but
+                // present, matching the visual weight in the mockup.
+                color = Color(0x80FFFFFF),
             )
         }
     }
