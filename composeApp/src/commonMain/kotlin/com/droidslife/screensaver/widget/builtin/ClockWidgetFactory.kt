@@ -34,6 +34,8 @@ import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
+import com.droidslife.screensaver.widget.api.WidgetSize
+import com.droidslife.screensaver.widget.api.WidgetSummary
 import kotlinx.coroutines.delay
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Month
@@ -50,6 +52,11 @@ class ClockWidgetFactory(
     override val displayName: String = "Clock"
     override val description: String = "Digital clock display"
     override val category: WidgetCategory = WidgetCategory.CLOCK
+    override val preferredSize: WidgetSize = WidgetSize(
+        minCols = 4, minRows = 3,
+        defaultCols = 7, defaultRows = 4,
+        maxCols = 12, maxRows = 6,
+    )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.DesignPicker(
             key = "design",
@@ -85,6 +92,17 @@ private class ClockWidget(
     private val settingsViewModel: SettingsViewModel,
 ) : Widget {
     override val preferredSpan: Int = 2
+
+    override fun summary(): WidgetSummary {
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val hh = now.hour.toString().padStart(2, '0')
+        val mm = now.minute.toString().padStart(2, '0')
+        return WidgetSummary(
+            primaryValue = "$hh:$mm",
+            primaryLabel = "Time",
+            subtitle = formatDateLine(now.dayOfWeek, now.month, now.day),
+        )
+    }
 
     @Composable
     override fun Content(modifier: Modifier) {
