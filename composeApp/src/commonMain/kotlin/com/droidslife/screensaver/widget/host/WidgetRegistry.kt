@@ -14,11 +14,12 @@ import kotlinx.serialization.json.JsonObject
 class WidgetRegistry(
     builtInFactories: List<WidgetFactory>,
     private val httpClient: HttpClient,
+    private val widgetLoader: WidgetLoader = createWidgetLoader(),
 ) {
-    private val descriptorById = builtInFactories
+    private val builtInDescriptors = builtInFactories
         .filter { it.apiVersion <= WIDGET_API_VERSION }
-        .associate { factory ->
-            factory.id to WidgetDescriptor(
+        .map { factory ->
+            WidgetDescriptor(
                 id = factory.id,
                 displayName = factory.displayName,
                 category = factory.category,
@@ -26,6 +27,7 @@ class WidgetRegistry(
                 source = WidgetSource.BuiltIn,
             )
         }
+    private var descriptorById = emptyMap<String, WidgetDescriptor>()
 
     private val configs = mutableMapOf<String, JsonObject>()
     private val _descriptors = MutableStateFlow(descriptorById.values.toList())
@@ -35,7 +37,17 @@ class WidgetRegistry(
     val instances: StateFlow<Map<String, WidgetInstance>> = _instances
 
     init {
-        descriptorById.keys.forEach(::enable)
+        reload()
+        builtInDescriptors.forEach { enable(it.id) }
+    }
+
+    fun reload() {
+        val discovered = widgetLoader.discoverAll()
+            .filter { it.factory.apiVersion <= WIDGET_API_VERSION }
+        descriptorById = (builtInDescriptors + discovered)
+            .distinctBy { it.id }
+            .associateBy { it.id }
+        _descriptors.value = descriptorById.values.toList()
     }
 
     fun enable(id: String) {
