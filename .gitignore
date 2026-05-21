@@ -38,3 +38,6 @@ docs
 out/
 *.class
 .output.txt
+
+# Local Codex session notes and changelogs
+.sessions/

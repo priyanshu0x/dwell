@@ -37,6 +37,7 @@ kotlin {
             implementation(libs.coil.network.ktor)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kstore)
+            implementation(project(":widget-api"))
             // Koin for dependency injection
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.bundles.koin)

@@ -4,8 +4,8 @@ import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.network.KtorClient
 import com.droidslife.screensaver.settings.PreferencesRepository
-import com.droidslife.screensaver.settings.PreferencesRepositoryImpl
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.settings.createPreferencesRepository
 import com.droidslife.screensaver.weather.WeatherApi
 import com.droidslife.screensaver.weather.WeatherRepository
 import com.droidslife.screensaver.weather.WeatherViewModel
@@ -28,7 +28,7 @@ val appModule = module {
     single { LocationService() }
 
     // Preferences Repository
-    single<PreferencesRepository> { PreferencesRepositoryImpl() }
+    single<PreferencesRepository> { createPreferencesRepository() }
 
     // Weather Repository
     single { WeatherRepository(get(), get()) }
