@@ -117,13 +117,6 @@ private class WeatherForecastWidget(
     }
 
     @Composable
-    override fun Content(modifier: Modifier) {
-        EnsureForecastLoaded()
-        val state by weatherViewModel.forecast.collectAsState()
-        ForecastTile(state, modifier)
-    }
-
-    @Composable
     private fun EnsureForecastLoaded() {
         // On widget mount, if no forecast has been loaded yet, kick a refresh.
         val selectedCity = weatherViewModel.selectedCity

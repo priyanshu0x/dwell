@@ -60,12 +60,6 @@ private class IdleCounterWidget(private val mountTime: Instant) : Widget {
             WidgetRenderTarget.Chip, WidgetRenderTarget.Minimal -> Box(modifier) // no-op
         }
     }
-
-    @Composable
-    override fun Content(modifier: Modifier) {
-        // Legacy path: render same as Tile.
-        IdleTile(mountTime, modifier)
-    }
 }
 
 @Composable
