@@ -57,7 +57,7 @@ val appModule = module {
     // Weather ViewModel
     single { WeatherViewModel(get(), get(), get()) }
 
-    // Clock ViewModel
+    // Clock ViewModel (legacy — used by WindowEventHandlers until Task 13.2)
     single { ClockViewModel() }
 
     // Settings ViewModel
@@ -75,7 +75,7 @@ val appModule = module {
     }
 
     // Built-in widgets
-    single { ClockWidgetFactory(get(), get()) }
+    single { ClockWidgetFactory(get()) }
     single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
     single { ExpensesWidgetFactory(get()) }
