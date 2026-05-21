@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -42,31 +43,34 @@ fun ConsoleMode(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
-        ConsoleGrid(placements = placements, modifier = Modifier.fillMaxSize()) { id ->
-            val instance = instances[id] ?: return@ConsoleGrid
-            instance.widget.Render(
-                target = WidgetRenderTarget.Tile,
-                scope = instance.scope,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        if (settingsViewModel.consoleEditMode) {
-            val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
-                instances.mapValues { it.value.descriptor.factory.preferredSize }
+    val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
+    CompositionLocalProvider(LocalConsoleAccent provides accent) {
+        Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
+            ConsoleGrid(placements = placements, modifier = Modifier.fillMaxSize()) { id ->
+                val instance = instances[id] ?: return@ConsoleGrid
+                instance.widget.Render(
+                    target = WidgetRenderTarget.Tile,
+                    scope = instance.scope,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
-            ConsoleEditOverlay(
-                placements = placements,
-                sizeConstraints = sizeConstraints,
-                onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
-                onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
-                modifier = Modifier.fillMaxSize(),
+            if (settingsViewModel.consoleEditMode) {
+                val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
+                    instances.mapValues { it.value.descriptor.factory.preferredSize }
+                }
+                ConsoleEditOverlay(
+                    placements = placements,
+                    sizeConstraints = sizeConstraints,
+                    onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
+                    onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            CornerButtons(
+                onSettings = onOpenSettings,
+                onHelp = onOpenHelp,
+                modifier = Modifier.align(Alignment.BottomEnd),
             )
         }
-        CornerButtons(
-            onSettings = onOpenSettings,
-            onHelp = onOpenHelp,
-            modifier = Modifier.align(Alignment.BottomEnd),
-        )
     }
 }

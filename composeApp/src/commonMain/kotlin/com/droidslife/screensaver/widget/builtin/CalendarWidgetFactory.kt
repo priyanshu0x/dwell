@@ -13,9 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.widget.api.ConfigField
@@ -129,8 +131,9 @@ private fun CalendarMonth(modifier: Modifier) {
 
 @Composable
 private fun DayCell(day: Int, isToday: Boolean) {
-    val bg = if (isToday) DwellColors.ConsoleGreen.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent
-    val textColor = if (isToday) DwellColors.ConsoleGreen else DwellColors.TextFaint
+    val accent = LocalConsoleAccent.current.primary
+    val bg = if (isToday) accent.copy(alpha = 0.08f) else Color.Transparent
+    val textColor = if (isToday) accent else DwellColors.TextFaint
     Box(
         modifier = Modifier
             .padding(horizontal = 2.dp, vertical = 2.dp)
