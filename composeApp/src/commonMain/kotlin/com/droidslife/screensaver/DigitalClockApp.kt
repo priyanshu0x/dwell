@@ -302,8 +302,7 @@ fun DigitalClockApp(
                     delay(100)
                     focusRequester.requestFocus()
                 } catch (e: Exception) {
-                    // Log the exception but don't crash the app
-                    println("Error requesting focus: ${e.message}")
+                    // Focus can fail transiently while the dialog is closing.
                 }
             }
         }

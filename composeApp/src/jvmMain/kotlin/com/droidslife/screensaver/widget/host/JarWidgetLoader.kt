@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.widget.host
 
+import co.touchlab.kermit.Logger
 import com.droidslife.screensaver.widget.api.WIDGET_API_VERSION
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import java.net.URLClassLoader
@@ -24,6 +25,8 @@ private class WidgetLoaderImpl(
 class JarWidgetLoader(
     private val widgetsDir: Path,
 ) {
+    private val logger = Logger.withTag("JarWidgetLoader")
+
     fun load(): List<WidgetDescriptor> {
         if (!Files.exists(widgetsDir)) return emptyList()
 
@@ -44,7 +47,7 @@ class JarWidgetLoader(
             ServiceLoader.load(WidgetFactory::class.java, loader)
                 .mapNotNull { factory ->
                     if (factory.apiVersion > WIDGET_API_VERSION) {
-                        println("Skipping widget ${factory.id}: API ${factory.apiVersion} > host API $WIDGET_API_VERSION")
+                        logger.w { "Skipping widget ${factory.id}: API ${factory.apiVersion} > host API $WIDGET_API_VERSION" }
                         null
                     } else {
                         WidgetDescriptor(
@@ -58,7 +61,7 @@ class JarWidgetLoader(
                 }
                 .toList()
         }.getOrElse { error ->
-            println("Failed to load widgets from $jarPath: ${error.message}")
+            logger.e(error) { "Failed to load widgets from $jarPath" }
             emptyList()
         }
     }

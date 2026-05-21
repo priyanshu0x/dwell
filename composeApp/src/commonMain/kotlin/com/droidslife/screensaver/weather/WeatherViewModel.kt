@@ -51,23 +51,15 @@ class WeatherViewModel(
             val storedCity = preferencesRepository.getCurrentCity()
 
             if (storedCity != null) {
-                // If there's a stored city, load weather data for that city
-                println("[DEBUG] Using stored city: $storedCity") // Debug log
                 loadWeatherDataForCity(storedCity)
             } else {
                 // If there's no stored city, try to get a city based on the timezone
                 val timeZoneCity = TimeZoneUtils.getCityFromTimeZone(weatherApi)
 
                 if (timeZoneCity != null) {
-                    // If a city was found based on the timezone, load weather data for that city
-                    // and store it as the current city
-                    println("[DEBUG] Using timezone-based city: $timeZoneCity") // Debug log
                     loadWeatherDataForCity(timeZoneCity)
                     preferencesRepository.setCurrentCity(timeZoneCity)
                 } else {
-                    // If no city could be determined from the timezone, use a default city
-                    // based on the user's region (using Mumbai as a default for India)
-                    println("[DEBUG] No timezone-based city found, using default city: Mumbai") // Debug log
                     loadWeatherDataForCity("Mumbai")
                     preferencesRepository.setCurrentCity("Mumbai")
                 }

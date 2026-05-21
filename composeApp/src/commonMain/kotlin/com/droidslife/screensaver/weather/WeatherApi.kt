@@ -9,9 +9,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -35,24 +32,11 @@ class WeatherApi(
         longitude: Double
     ): WeatherData = withContext(Dispatchers.Default) {
         try {
-            // Get API key from environment variable
-            val apiKey = System.getenv("WEATHERAPI") ?: "YOUR_API_KEY_HERE" // Replace with your actual API key
-            println("API KEY: $apiKey")
-
-            // Build the URL with the location and API key
+            val apiKey = apiKey()
             val url = "${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}?q=$latitude,$longitude&key=$apiKey"
-
-            // Make the request and parse the response
-            val response = client.get(url).body<String>()
-            println(response)
-
-            // Configure JSON parser to ignore unknown keys
-            val json = Json { ignoreUnknownKeys = true }
-            json.decodeFromString<WeatherData>(response)
+            client.get(url).body<WeatherData>()
         } catch (e: Exception) {
-            e.printStackTrace()
-            // If there's an error (like missing API key or network issue), return mock data
-            createMockWeatherData(latitude, longitude)
+            throw WeatherApiException("Failed to load weather for coordinates $latitude,$longitude", e)
         }
     }
 
@@ -63,33 +47,11 @@ class WeatherApi(
      */
     suspend fun getWeatherDataByCity(cityName: String): WeatherData = withContext(Dispatchers.Default) {
         try {
-            // Get API key from environment variable
-            val apiKey = System.getenv("WEATHERAPI") ?: "YOUR_API_KEY_HERE" // Replace with your actual API key
-
-            // Build the URL with the city name and API key
+            val apiKey = apiKey()
             val url = "${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}?q=$cityName&key=$apiKey"
-
-            // Make the request and parse the response
-            val response = client.get(url).body<String>()
-
-            // Configure JSON parser to ignore unknown keys
-            val json = Json { ignoreUnknownKeys = true }
-            json.decodeFromString<WeatherData>(response)
+            client.get(url).body<WeatherData>()
         } catch (e: Exception) {
-            e.printStackTrace()
-            // If there's an error, return mock data
-            createMockWeatherData(0.0, 0.0).copy(
-                location = Location(
-                    name = cityName,
-                    region = "",
-                    country = "",
-                    lat = 0.0,
-                    lon = 0.0,
-                    tzId = "",
-                    localtimeEpoch = System.currentTimeMillis() / 1000,
-                    localtime = ""
-                )
-            )
+            throw WeatherApiException("Failed to load weather for $cityName", e)
         }
     }
 
@@ -100,20 +62,13 @@ class WeatherApi(
      */
     suspend fun searchCity(query: String): List<CitySearchResult> = withContext(Dispatchers.Default) {
         try {
-            // Get API key from environment variable
-            val apiKey = System.getenv("WEATHERAPI") ?: "YOUR_API_KEY_HERE" // Replace with your actual API key
-
-            // Build the URL with the query and API key
+            val apiKey = apiKey()
             val url = "${Constants.WeatherApi.BASE_URL}/search.json?q=$query&key=$apiKey"
-
-            // Make the request and parse the response
             val response = client.get(url).body<String>()
 
-            // Configure JSON parser to ignore unknown keys
             val json = Json { ignoreUnknownKeys = true }
             val jsonArray = json.parseToJsonElement(response).jsonArray
 
-            // Parse the JSON array into a list of CitySearchResult objects
             jsonArray.map { jsonElement ->
                 val jsonObject = jsonElement.jsonObject
                 CitySearchResult(
@@ -126,62 +81,17 @@ class WeatherApi(
                 )
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            // If there's an error, return an empty list
-            emptyList()
+            throw WeatherApiException("Failed to search cities for '$query'", e)
         }
     }
 
-    /**
-     * Creates mock weather data for testing or when the API is unavailable.
-     * @param latitude The latitude of the location.
-     * @param longitude The longitude of the location.
-     * @return Mock weather data.
-     */
-    private fun createMockWeatherData(latitude: Double, longitude: Double): WeatherData {
-        return WeatherData(
-            location = Location(
-                name = "New York Mock",
-                region = "New York",
-                country = "United States of America",
-                lat = latitude,
-                lon = longitude,
-                tzId = "America/New_York",
-                localtimeEpoch = System.currentTimeMillis() / 1000,
-                localtime = "2023-01-01 12:00"
-            ),
-            current = Current(
-                lastUpdatedEpoch = System.currentTimeMillis() / 1000,
-                lastUpdated = "2023-01-01 12:00",
-                tempC = 22.0,
-                tempF = 71.6,
-                isDay = 1,
-                condition = Condition(
-                    text = "Sunny",
-                    icon = "//cdn.weatherapi.com/weather/64x64/day/113.png",
-                    code = 1000
-                ),
-                windMph = 5.6,
-                windKph = 9.0,
-                windDegree = 270,
-                windDir = "W",
-                pressureMb = 1012.0,
-                pressureIn = 29.88,
-                precipMm = 0.0,
-                precipIn = 0.0,
-                humidity = 65,
-                cloud = 0,
-                feelslikeC = 22.0,
-                feelslikeF = 71.6,
-                visKm = 10.0,
-                visMiles = 6.2,
-                uv = 5.0,
-                gustMph = 7.2,
-                gustKph = 11.5
-            )
-        )
+    private fun apiKey(): String {
+        return System.getenv("WEATHERAPI")?.trim()?.takeIf { it.isNotBlank() }
+            ?: throw WeatherApiException("WEATHERAPI environment variable is not set")
     }
 }
+
+class WeatherApiException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * Data class representing the weather data returned by the WeatherAPI.com API.

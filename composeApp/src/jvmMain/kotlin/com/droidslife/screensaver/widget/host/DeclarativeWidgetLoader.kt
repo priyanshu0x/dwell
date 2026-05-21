@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.widget.host
 
+import co.touchlab.kermit.Logger
 import com.droidslife.screensaver.widget.api.WidgetCategory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,6 +12,8 @@ class DeclarativeWidgetLoader(
     private val widgetsDir: Path,
     private val parser: ManifestParser = ManifestParser(),
 ) {
+    private val logger = Logger.withTag("DeclarativeWidgetLoader")
+
     fun load(): List<WidgetDescriptor> {
         if (!widgetsDir.exists()) return emptyList()
 
@@ -34,7 +37,7 @@ class DeclarativeWidgetLoader(
                 source = WidgetSource.Declarative(folder.toString()),
             )
         }.getOrElse { error ->
-            println("Failed to load declarative widget from $folder: ${error.message}")
+            logger.e(error) { "Failed to load declarative widget from $folder" }
             null
         }
     }

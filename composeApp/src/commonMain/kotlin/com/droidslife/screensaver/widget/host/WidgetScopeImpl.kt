@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.widget.host
 
+import co.touchlab.kermit.Logger
 import com.droidslife.screensaver.widget.api.WidgetLogger
 import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetStorage
@@ -15,15 +16,17 @@ class WidgetScopeImpl(
 ) : WidgetScope
 
 private class PrintlnWidgetLogger(private val widgetId: String) : WidgetLogger {
+    private val logger = Logger.withTag("widget:$widgetId")
+
     override fun info(msg: String) {
-        println("[widget:$widgetId] INFO $msg")
+        logger.i { msg }
     }
 
     override fun warn(msg: String, error: Throwable?) {
-        println("[widget:$widgetId] WARN $msg${error?.let { ": ${it.message}" } ?: ""}")
+        logger.w(error) { msg }
     }
 
     override fun error(msg: String, error: Throwable?) {
-        println("[widget:$widgetId] ERROR $msg${error?.let { ": ${it.message}" } ?: ""}")
+        logger.e(error) { msg }
     }
 }

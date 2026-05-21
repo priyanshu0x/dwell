@@ -13,12 +13,6 @@ object TimeZoneUtils {
      * Common time zone to city mappings.
      * This is a fallback for when the API call fails.
      */
-    // Major cities in India (all share the same time zone: Asia/Kolkata)
-    private val indianCities = listOf(
-        "New Delhi", "Mumbai", "Kolkata", "Chennai", "Bangalore", "Hyderabad", 
-        "Pune", "Ahmedabad", "Jaipur", "Lucknow"
-    )
-
     private val timeZoneToCityMap = mapOf(
         // North America
         "America/New_York" to "New York",
@@ -52,10 +46,7 @@ object TimeZoneUtils {
         "Europe/Stockholm" to "Stockholm",
         "Europe/Oslo" to "Oslo",
 
-        // Asia - India is handled separately with indianCities
-        "Asia/Kolkata" to "New Delhi", // Default for India
-
-        // Asia - Other
+        "Asia/Kolkata" to "Mumbai",
         "Asia/Tokyo" to "Tokyo",
         "Asia/Shanghai" to "Shanghai",
         "Asia/Hong_Kong" to "Hong Kong",
@@ -104,26 +95,6 @@ object TimeZoneUtils {
     suspend fun getCityFromTimeZone(weatherApi: WeatherApi, timeZone: TimeZone? = null): String? = withContext(Dispatchers.Default) {
         val tz = timeZone ?: getCurrentTimeZone()
         val tzId = tz.id
-
-        println("[DEBUG] Current timezone: $tzId") // Debug log to see the actual timezone
-
-        // Special case for India (Asia/Kolkata time zone)
-        if (tzId == "Asia/Kolkata") {
-            // Randomly select one of the Indian cities
-            val city = indianCities.random()
-            println("[DEBUG] Selected Indian city: $city") // Debug log
-            return@withContext city
-        }
-
-        // For other time zones, try to get a city from the predefined mapping
-        val mappedCity = timeZoneToCityMap[tzId]
-        if (mappedCity != null) {
-            println("[DEBUG] Found mapped city: $mappedCity for timezone: $tzId") // Debug log
-            return@withContext mappedCity
-        }
-
-        // If no mapping is found, return null
-        println("[DEBUG] No mapping found for timezone: $tzId") // Debug log
-        return@withContext null
+        return@withContext timeZoneToCityMap[tzId]
     }
 }

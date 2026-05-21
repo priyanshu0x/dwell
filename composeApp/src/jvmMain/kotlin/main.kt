@@ -1,5 +1,3 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,22 +19,21 @@ import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
-import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 
 fun main(args: Array<String>) = application {
     val launchArgs = remember(args.toList()) { Args.parse(args) }
+
+    if (launchArgs.mode == LaunchMode.Preview) {
+        exitApplication()
+        return@application
+    }
 
     remember {
         initKoin {
             modules(appModule)
         }
         true
-    }
-
-    if (launchArgs.mode == LaunchMode.Preview) {
-        exitApplication()
-        return@application
     }
 
     val settingsViewModel = koinInject<SettingsViewModel>()
@@ -136,19 +133,5 @@ fun main(args: Array<String>) = application {
                 modifier = windowEvents.mouseEventModifier
             )
         }
-    }
-}
-
-@Preview
-@Composable
-fun AppPreview() { 
-    KoinApplication(application = {}) {
-        App(
-            showCitySelectionDialog = false, 
-            onCityDialogDismiss = {},
-            onShowCityDialog = {},
-            showHelpDialog = false,
-            onHelpDialogDismiss = {}
-        ) 
     }
 }

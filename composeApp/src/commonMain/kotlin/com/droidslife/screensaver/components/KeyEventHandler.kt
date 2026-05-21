@@ -54,7 +54,7 @@ class KeyEventHandler(
                     if (state.exitOnMouseMovementEnabled) {
                         onAction(KeyEventAction.RequestExit)
                     } else {
-                        println("Exit functionality is disabled. Use Ctrl+Z to enable.")
+                        onAction(KeyEventAction.ShowToast("Enable exit with Ctrl + Z"))
                     }
                     return true
                 }

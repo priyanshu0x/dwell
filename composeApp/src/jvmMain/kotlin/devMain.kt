@@ -44,6 +44,7 @@ fun main() = application {
             onExited = { exitApplication() },
             showHelpDialog = windowEvents.showHelpDialog,
             onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
+            onShowHelpDialog = windowEvents.onShowHelpDialog,
             modifier = windowEvents.mouseEventModifier
         )
     }

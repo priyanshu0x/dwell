@@ -10,8 +10,7 @@ import kotlin.math.max
 import kotlin.math.sqrt
 import kotlin.math.pow
 
-// Extension function to calculate distance between two points
-private fun Offset.getDistance(): Float {
+private fun Offset.vectorLength(): Float {
     return sqrt(x.pow(2) + y.pow(2))
 }
 
@@ -154,7 +153,7 @@ private fun DrawScope.interpolate(
     val color = lerpColor(topColor, bottomColor, ty)
 
     // Calculate distance from center for oval gradient effect
-    val distanceFromCenter = (position - center).getDistance()
+    val distanceFromCenter = (position - center).vectorLength()
     val normalizedDistance = (distanceFromCenter / maxDistance).coerceIn(0f, 1f)
 
     // Apply an extremely smooth oval gradient effect with no visible transitions
@@ -277,9 +276,9 @@ private fun DrawScope.drawTriangle(
         ),
         center = Offset(centerX, centerY),
         radius = maxOf(
-            (p1 - Offset(centerX, centerY)).getDistance(),
-            (p2 - Offset(centerX, centerY)).getDistance(),
-            (p3 - Offset(centerX, centerY)).getDistance()
+            (p1 - Offset(centerX, centerY)).vectorLength(),
+            (p2 - Offset(centerX, centerY)).vectorLength(),
+            (p3 - Offset(centerX, centerY)).vectorLength()
         ) * 2.0f // Greatly extend beyond the triangle to ensure no visible borders
     )
 

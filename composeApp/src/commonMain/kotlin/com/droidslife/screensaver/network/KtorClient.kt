@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.network
 
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
@@ -17,7 +18,7 @@ object KtorClient {
      * 
      * @return A configured HttpClient instance.
      */
-    fun create(): HttpClient {
+    fun create(maxRetries: Int = 0): HttpClient {
         return HttpClient {
             // Install ContentNegotiation plugin with kotlinx.serialization
             install(ContentNegotiation) {
@@ -41,10 +42,13 @@ object KtorClient {
                 // Default request configuration can be added here if needed
             }
 
-            // Configure retry mechanism
-            // Note: As of Ktor 2.x, there's no built-in retry plugin
-            // A custom retry mechanism would need to be implemented
-            // or a third-party library could be used
+            if (maxRetries > 0) {
+                install(HttpRequestRetry) {
+                    retryOnServerErrors(maxRetries)
+                    retryOnException(maxRetries, retryOnTimeout = true)
+                    exponentialDelay()
+                }
+            }
         }
     }
 
@@ -55,8 +59,6 @@ object KtorClient {
      * @return A configured HttpClient instance with retry functionality.
      */
     fun createWithRetry(maxRetries: Int = 3): HttpClient {
-        // In a real implementation, you would add retry logic here
-        // For now, we'll just return the regular client
-        return create()
+        return create(maxRetries)
     }
 }

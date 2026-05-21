@@ -50,43 +50,33 @@ fun rememberWindowEventHandlers(
         when (action) {
             is KeyEventAction.CycleClockDesign -> {
                 clockViewModel.cycleClockDesign()
-                println("Clock design changed to: ${clockViewModel.clockDesign}")
             }
             is KeyEventAction.ToggleAutoChange -> {
-                val isEnabled = clockViewModel.toggleAutoChange()
-                println("Auto-change ${if (isEnabled) "enabled" else "disabled"}")
+                clockViewModel.toggleAutoChange()
             }
             is KeyEventAction.ToggleShuffle -> {
-                val isEnabled = clockViewModel.toggleShuffleMode()
-                println("Shuffle mode ${if (isEnabled) "enabled" else "disabled"}")
+                clockViewModel.toggleShuffleMode()
             }
             is KeyEventAction.ShowCityDialog -> {
                 showCitySelectionDialog = true
-                println("City selection dialog shown")
             }
             is KeyEventAction.ExitApplication -> {
-                println("Exiting application via Ctrl+X shortcut")
                 onExitApplication()
             }
             is KeyEventAction.RequestExit -> {
-                println("Exit requested")
                 onExitApplication()
             }
             is KeyEventAction.ToggleExitOnMouseMovement -> {
                 exitOnMouseMovementEnabled = !exitOnMouseMovementEnabled
-                println("Exit on mouse movement ${if (exitOnMouseMovementEnabled) "enabled" else "disabled"}")
             }
             is KeyEventAction.OpenSettings -> {
                 settingsViewModel.openSettingsDialog()
-                println("Settings dialog opened")
             }
             is KeyEventAction.ShowHelp -> {
                 showHelpDialog = true
-                println("Help dialog shown")
             }
             is KeyEventAction.ToggleTheme -> {
                 settingsViewModel.toggleTheme()
-                println("Theme toggled")
             }
             is KeyEventAction.ShowToast -> {
                 toastState.show(action.message)
