@@ -12,6 +12,7 @@ import com.droidslife.screensaver.settings.StartupRegistration
 import com.droidslife.screensaver.settings.createPreferencesRepository
 import com.droidslife.screensaver.settings.createSecretStorage
 import com.droidslife.screensaver.settings.createStartupRegistration
+import com.droidslife.screensaver.widget.builtin.CalendarWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ExpensesWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
 import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
@@ -76,7 +77,20 @@ val appModule = module {
     single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
     single { ExpensesWidgetFactory(get()) }
+    single { CalendarWidgetFactory() }
 
     // Widget registry
-    single { WidgetRegistry(listOf(get<ClockWidgetFactory>(), get<WeatherWidgetFactory>(), get<TodosWidgetFactory>(), get<ExpensesWidgetFactory>()), get(), get()) }
+    single {
+        WidgetRegistry(
+            listOf(
+                get<ClockWidgetFactory>(),
+                get<WeatherWidgetFactory>(),
+                get<TodosWidgetFactory>(),
+                get<ExpensesWidgetFactory>(),
+                get<CalendarWidgetFactory>(),
+            ),
+            get(),
+            get(),
+        )
+    }
 }
