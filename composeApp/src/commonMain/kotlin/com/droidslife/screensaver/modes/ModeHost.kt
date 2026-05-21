@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.modes.ambient.AmbientMode
 import com.droidslife.screensaver.modes.cinematic.CinematicMode
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -41,8 +42,8 @@ fun ModeHost(
                 onOpenSettings = onOpenSettings,
                 onOpenHelp = onOpenHelp,
             )
-            Mode.Ambient -> PlaceholderMode(
-                label = "Ambient — wired in Phase 5",
+            Mode.Ambient -> AmbientMode(
+                settingsViewModel = settingsViewModel,
                 onOpenSettings = onOpenSettings,
                 onOpenHelp = onOpenHelp,
             )
