@@ -66,22 +66,60 @@ class WidgetRegistryTest {
 
         assertEquals(2, factory.createCount)
     }
+
+    @Test
+    fun factoryCreateFailureDoesNotRegisterWidgetAndCancelsScope() {
+        val factory = FakeWidgetFactory(createThrows = true)
+        val registry = WidgetRegistry(listOf(factory), HttpClient(OkHttp))
+
+        registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
+
+        assertFalse(registry.instances.value.containsKey("test.widget"))
+        assertFalse(factory.lastScope?.coroutineScope?.isActive ?: true)
+    }
+
+    @Test
+    fun disposeFailureStillRemovesWidgetAndCancelsScope() {
+        val factory = FakeWidgetFactory(widget = ThrowingDisposeWidget)
+        val registry = WidgetRegistry(listOf(factory), HttpClient(OkHttp))
+        registry.syncWithSettings(SettingsModel(enabledWidgetIds = setOf("test.widget")))
+        val instance = registry.instances.value.getValue("test.widget")
+
+        registry.disable("test.widget")
+
+        assertFalse(registry.instances.value.containsKey("test.widget"))
+        assertFalse(instance.scope.coroutineScope.isActive)
+    }
 }
 
 private class FakeWidgetFactory(
     override val id: String = "test.widget",
+    private val createThrows: Boolean = false,
+    private val widget: Widget = FakeWidget,
 ) : WidgetFactory {
     var createCount = 0
+    var lastScope: WidgetScope? = null
 
     override val displayName: String = "Test Widget"
 
     override fun create(config: WidgetConfig, scope: WidgetScope): Widget {
         createCount += 1
-        return FakeWidget
+        lastScope = scope
+        if (createThrows) error("create failed")
+        return widget
     }
 }
 
 private object FakeWidget : Widget {
     @Composable
     override fun Content(modifier: Modifier) = Unit
+}
+
+private object ThrowingDisposeWidget : Widget {
+    @Composable
+    override fun Content(modifier: Modifier) = Unit
+
+    override fun onDispose() {
+        error("dispose failed")
+    }
 }

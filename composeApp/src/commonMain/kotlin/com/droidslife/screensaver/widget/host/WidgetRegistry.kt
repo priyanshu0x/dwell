@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.widget.host
 
+import co.touchlab.kermit.Logger
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WIDGET_API_VERSION
 import com.droidslife.screensaver.widget.api.WidgetConfig
@@ -23,6 +24,7 @@ class WidgetRegistry(
     private val secretStorage: SecretStorage = createSecretStorage(),
     private val widgetLoader: WidgetLoader = createWidgetLoader(),
 ) {
+    private val logger = Logger.withTag("WidgetRegistry")
     private val builtInDescriptors = builtInFactories
         .filter { it.apiVersion <= WIDGET_API_VERSION }
         .map { factory ->
@@ -71,15 +73,26 @@ class WidgetRegistry(
             coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
             httpClient = httpClient,
         )
-        val widget = descriptor.factory.create(config, scope)
+        val widget = try {
+            descriptor.factory.create(config, scope)
+        } catch (error: Exception) {
+            scope.coroutineScope.cancel()
+            logger.e(error) { "Failed to create widget $id" }
+            return
+        }
         _instances.value = _instances.value + (id to WidgetInstance(descriptor, widget, config, scope))
     }
 
     fun disable(id: String) {
         val instance = _instances.value[id] ?: return
-        instance.widget.onDispose()
-        instance.scope.coroutineScope.cancel()
-        _instances.value = _instances.value - id
+        try {
+            instance.widget.onDispose()
+        } catch (error: Exception) {
+            logger.e(error) { "Widget $id failed during dispose" }
+        } finally {
+            instance.scope.coroutineScope.cancel()
+            _instances.value = _instances.value - id
+        }
     }
 
     fun updateConfig(id: String, config: JsonObject) {
