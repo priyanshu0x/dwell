@@ -17,6 +17,7 @@ import com.droidslife.screensaver.widget.builtin.ExpensesWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
 import com.droidslife.screensaver.widget.builtin.IdleCounterWidgetFactory
 import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
+import com.droidslife.screensaver.widget.builtin.WeatherForecastWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherWidgetFactory
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.weather.WeatherApi
@@ -80,6 +81,7 @@ val appModule = module {
     single { ExpensesWidgetFactory(get()) }
     single { CalendarWidgetFactory() }
     single { IdleCounterWidgetFactory() }
+    single { WeatherForecastWidgetFactory(get(), get()) }
 
     // Widget registry
     single {
@@ -91,6 +93,7 @@ val appModule = module {
                 get<ExpensesWidgetFactory>(),
                 get<CalendarWidgetFactory>(),
                 get<IdleCounterWidgetFactory>(),
+                get<WeatherForecastWidgetFactory>(),
             ),
             get(),
             get(),
