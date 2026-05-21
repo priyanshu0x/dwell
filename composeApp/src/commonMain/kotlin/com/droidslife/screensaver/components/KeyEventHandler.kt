@@ -41,6 +41,69 @@ class KeyEventHandler(
             return true
         }
 
+        // Ctrl+, or Cmd+, opens Settings sheet
+        if (event.type == KeyEventType.KeyDown &&
+            (event.isCtrlPressed || event.isMetaPressed) &&
+            event.key == Key.Comma
+        ) {
+            onAction(KeyEventAction.OpenSettings)
+            onAction(KeyEventAction.ShowToast(if (event.isMetaPressed) "Cmd + ," else "Ctrl + ,"))
+            return true
+        }
+
+        // Ctrl+R or Cmd+R reloads widgets
+        if (event.type == KeyEventType.KeyDown &&
+            (event.isCtrlPressed || event.isMetaPressed) &&
+            event.key == Key.R
+        ) {
+            onAction(KeyEventAction.ReloadWidgets)
+            onAction(KeyEventAction.ShowToast(if (event.isMetaPressed) "Cmd + R" else "Ctrl + R"))
+            return true
+        }
+
+        // Plain (unmodified) shortcuts. Only handle when no Ctrl/Meta is pressed so they
+        // don't shadow OS / window-level chords.
+        if (event.type == KeyEventType.KeyDown && !event.isCtrlPressed && !event.isMetaPressed) {
+            when (event.key) {
+                Key.M -> {
+                    onAction(KeyEventAction.CycleMode)
+                    onAction(KeyEventAction.ShowToast("M"))
+                    return true
+                }
+                Key.One -> {
+                    onAction(KeyEventAction.JumpCinematic)
+                    onAction(KeyEventAction.ShowToast("1"))
+                    return true
+                }
+                Key.Two -> {
+                    onAction(KeyEventAction.JumpAmbient)
+                    onAction(KeyEventAction.ShowToast("2"))
+                    return true
+                }
+                Key.Three -> {
+                    onAction(KeyEventAction.JumpConsole)
+                    onAction(KeyEventAction.ShowToast("3"))
+                    return true
+                }
+                Key.V -> {
+                    onAction(KeyEventAction.CycleVariant)
+                    onAction(KeyEventAction.ShowToast("V"))
+                    return true
+                }
+                Key.W -> {
+                    onAction(KeyEventAction.ToggleDrawer)
+                    onAction(KeyEventAction.ShowToast("W"))
+                    return true
+                }
+                Key.L -> {
+                    onAction(KeyEventAction.ToggleConsoleEdit)
+                    onAction(KeyEventAction.ShowToast("L"))
+                    return true
+                }
+                else -> { /* fall through */ }
+            }
+        }
+
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
             when (event.key) {
                 Key.N -> {
@@ -53,12 +116,6 @@ class KeyEventHandler(
                     // Toggle auto-changing of clock design
                     onAction(KeyEventAction.ToggleAutoChange)
                     onAction(KeyEventAction.ShowToast("Ctrl + P"))
-                    return true
-                }
-                Key.R -> {
-                    // Toggle shuffle mode for clock design
-                    onAction(KeyEventAction.ToggleShuffle)
-                    onAction(KeyEventAction.ShowToast("Ctrl + R"))
                     return true
                 }
                 Key.S -> {

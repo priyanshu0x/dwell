@@ -41,14 +41,14 @@ fun BoxScope.WidgetDrawer(
     settingsViewModel: SettingsViewModel,
     registry: WidgetRegistry,
 ) {
-    var visible by remember { mutableStateOf(false) }
+    var hoverVisible by remember { mutableStateOf(false) }
     var lastHover by remember { mutableStateOf(0L) }
 
     // Hover-area detector at bottom 10% of screen
     Box(
         Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.10f)
             .onPointerEvent(PointerEventType.Enter) {
-                visible = true
+                hoverVisible = true
                 lastHover = System.currentTimeMillis()
             }
             .onPointerEvent(PointerEventType.Move) {
@@ -60,9 +60,9 @@ fun BoxScope.WidgetDrawer(
     )
 
     LaunchedEffect(lastHover) {
-        if (visible) {
+        if (hoverVisible) {
             delay(2000)
-            if (System.currentTimeMillis() - lastHover >= 2000) visible = false
+            if (System.currentTimeMillis() - lastHover >= 2000) hoverVisible = false
         }
     }
 
@@ -70,6 +70,8 @@ fun BoxScope.WidgetDrawer(
     val enabled = instances.values.toList()
 
     if (enabled.isEmpty()) return
+
+    val visible = hoverVisible || settingsViewModel.drawerVisible
 
     AnimatedVisibility(
         visible = visible,

@@ -54,6 +54,21 @@ class SettingsViewModel(
         consoleEditMode = on
     }
 
+    /**
+     * Runtime-only flag that forces the Cinematic widget drawer visible (e.g. from the W
+     * keyboard shortcut). The drawer's hover/auto-hide logic still applies on top.
+     */
+    var drawerVisible by mutableStateOf(false)
+        private set
+
+    fun toggleDrawer() {
+        drawerVisible = !drawerVisible
+    }
+
+    fun updateDrawerVisible(on: Boolean) {
+        drawerVisible = on
+    }
+
     init {
         // Load settings from the repository
         preferencesRepository.getSettings()
