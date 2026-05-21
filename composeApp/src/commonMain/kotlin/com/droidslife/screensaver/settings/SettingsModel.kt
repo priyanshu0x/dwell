@@ -99,8 +99,7 @@ data class SettingsModel(
     val quieterLumen: Boolean = false,
     val showSeconds: Boolean = false,
     val showDate: Boolean = true,
-    // TODO(Phase 1 dependency): Add widgetLayouts: Map<String, GridRect> once
-    //  com.droidslife.screensaver.widget.api.GridRect lands in widget-api (Task 1.2).
+    val widgetLayouts: Map<String, com.droidslife.screensaver.widget.api.GridRect> = emptyMap(),
     val widgetOrder: List<String> = emptyList(),
     val exitOnKeypress: Boolean = true,
 )

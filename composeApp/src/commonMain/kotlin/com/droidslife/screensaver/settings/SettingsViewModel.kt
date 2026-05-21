@@ -250,27 +250,12 @@ class SettingsViewModel(
         updateSettings(settings.copy(exitOnKeypress = enabled))
     }
 
-    /**
-     * Sets the layout rectangle for a single widget.
-     *
-     * TODO(Phase 1 dependency): Re-enable the rect parameter once
-     *  com.droidslife.screensaver.widget.api.GridRect lands in widget-api (Task 1.2)
-     *  and the `widgetLayouts` field is added to [SettingsModel].
-     */
-    fun setWidgetLayout(widgetId: String) {
-        // No-op until GridRect / widgetLayouts is available.
-        // Signature will become setWidgetLayout(widgetId: String, rect: GridRect).
-        @Suppress("UNUSED_PARAMETER")
-        widgetId
+    fun setWidgetLayout(widgetId: String, rect: com.droidslife.screensaver.widget.api.GridRect) {
+        updateSettings(settings.copy(widgetLayouts = settings.widgetLayouts + (widgetId to rect)))
     }
 
-    /**
-     * Resets all per-widget layout rectangles.
-     *
-     * TODO(Phase 1 dependency): Implement once `widgetLayouts` exists on [SettingsModel].
-     */
     fun resetWidgetLayouts() {
-        // No-op until widgetLayouts is available.
+        updateSettings(settings.copy(widgetLayouts = emptyMap()))
     }
 
     fun cycleMode() {
