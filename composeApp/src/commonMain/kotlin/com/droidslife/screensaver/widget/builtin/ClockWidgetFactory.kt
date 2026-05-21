@@ -2,8 +2,7 @@ package com.droidslife.screensaver.widget.builtin
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,7 +10,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
@@ -96,25 +94,35 @@ private class ClockWidget(
         }
 
         Column(
-            modifier = modifier,
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.Start,
         ) {
+            Text(
+                text = "TIME",
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 9.sp,
+                letterSpacing = 2.25.sp,
+                color = DwellColors.TextLow,
+                maxLines = 1,
+            )
             Text(
                 text = text,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 160.sp,
+                letterSpacing = (-6.4).sp,
                 color = DwellColors.TextHigh,
                 maxLines = 1,
             )
             if (showDate) {
-                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = formatDateLine(now.dayOfWeek, now.month, now.day),
+                    text = formatDateLine(now.dayOfWeek, now.month, now.day).uppercase(),
                     fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.Medium,
                     fontSize = 14.sp,
-                    letterSpacing = 0.15.sp,
+                    letterSpacing = 2.1.sp,
                     color = DwellColors.TextMid,
                 )
             }
