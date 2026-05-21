@@ -31,6 +31,11 @@ sealed class KeyEventAction {
     object ExitApplication : KeyEventAction()
 
     /**
+     * Action to request the host-level exit flow.
+     */
+    object RequestExit : KeyEventAction()
+
+    /**
      * Action to toggle exit on mouse movement functionality.
      */
     object ToggleExitOnMouseMovement : KeyEventAction()

@@ -1,9 +1,8 @@
 package com.droidslife.screensaver.components
 
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.key.*
 
 /**
  * Class to handle all keyboard shortcuts in the application
@@ -18,8 +17,11 @@ class KeyEventHandler(
      */
     @OptIn(ExperimentalComposeUiApi::class)
     fun handleWindowKeyEvent(event: KeyEvent): Boolean {
-        println(event.key)
-        println(event.isCtrlPressed)
+        if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+            onAction(KeyEventAction.RequestExit)
+            return true
+        }
+
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
             when (event.key) {
                 Key.N -> {
@@ -50,7 +52,7 @@ class KeyEventHandler(
                     // Exit the application if exit functionality is enabled
                     onAction(KeyEventAction.ShowToast("Ctrl + X"))
                     if (state.exitOnMouseMovementEnabled) {
-                        onAction(KeyEventAction.ExitApplication)
+                        onAction(KeyEventAction.RequestExit)
                     } else {
                         println("Exit functionality is disabled. Use Ctrl+Z to enable.")
                     }

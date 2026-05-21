@@ -1,18 +1,14 @@
 package com.droidslife.screensaver.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
 import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.settings.SettingsViewModel
-import kotlin.math.abs
 import org.koin.compose.koinInject
 
 data class WindowEventHandlers(
@@ -27,10 +23,10 @@ data class WindowEventHandlers(
     val onHelpDialogDismiss: () -> Unit,
 )
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun rememberWindowEventHandlers(
     onExitApplication: () -> Unit,
+    openSettingsOnStart: Boolean = false,
 ): WindowEventHandlers {
     val clockViewModel = koinInject<ClockViewModel>()
     val settingsViewModel = koinInject<SettingsViewModel>()
@@ -38,8 +34,13 @@ fun rememberWindowEventHandlers(
     var showCitySelectionDialog by remember { mutableStateOf(false) }
     var exitOnMouseMovementEnabled by remember { mutableStateOf(true) }
     var showHelpDialog by remember { mutableStateOf(false) }
-    var lastMousePosition by remember { mutableStateOf(Offset.Zero) }
     val toastState = rememberToastState()
+
+    LaunchedEffect(openSettingsOnStart) {
+        if (openSettingsOnStart) {
+            settingsViewModel.openSettingsDialog()
+        }
+    }
 
     val keyEventState = KeyEventState(
         exitOnMouseMovementEnabled = exitOnMouseMovementEnabled,
@@ -64,6 +65,10 @@ fun rememberWindowEventHandlers(
             }
             is KeyEventAction.ExitApplication -> {
                 println("Exiting application via Ctrl+X shortcut")
+                onExitApplication()
+            }
+            is KeyEventAction.RequestExit -> {
+                println("Exit requested")
                 onExitApplication()
             }
             is KeyEventAction.ToggleExitOnMouseMovement -> {
@@ -92,31 +97,9 @@ fun rememberWindowEventHandlers(
         onAction = onAction,
     )
 
-    val movementThreshold = 5f
-    val mouseEventModifier = Modifier
-        .onPointerEvent(PointerEventType.Move) {
-            if (exitOnMouseMovementEnabled) {
-                val currentPosition = it.changes.first().position
-                val deltaX = abs(currentPosition.x - lastMousePosition.x)
-                val deltaY = abs(currentPosition.y - lastMousePosition.y)
-
-                if ((deltaX > movementThreshold || deltaY > movementThreshold) && lastMousePosition != Offset.Zero) {
-                    println("Exiting application due to significant mouse movement: dx=$deltaX, dy=$deltaY")
-                    onExitApplication()
-                }
-
-                lastMousePosition = currentPosition
-            }
-        }
-        .onPointerEvent(PointerEventType.Press) {
-            if (exitOnMouseMovementEnabled) {
-                println("Exiting application due to mouse press")
-            }
-        }
-
     return WindowEventHandlers(
         keyEventHandler = keyEventHandler,
-        mouseEventModifier = mouseEventModifier,
+        mouseEventModifier = Modifier,
         toastState = toastState,
         showCitySelectionDialog = showCitySelectionDialog,
         onCityDialogDismiss = { showCitySelectionDialog = false },

@@ -3,18 +3,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.*
 import com.droidslife.screensaver.App
+import com.droidslife.screensaver.Args
+import com.droidslife.screensaver.LaunchMode
 import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberWindowEventHandlers
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import org.koin.compose.KoinApplication
 
-fun main() = application {
+fun main(args: Array<String>) = application {
+    val launchArgs = Args.parse(args)
+
     initKoin {
         modules(appModule)
     }
 
-    val windowEvents = rememberWindowEventHandlers(::exitApplication)
+    if (launchArgs.mode == LaunchMode.Preview) {
+        exitApplication()
+        return@application
+    }
+
+    val windowEvents = rememberWindowEventHandlers(
+        onExitApplication = ::exitApplication,
+        openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
+    )
 
     Window(
         title = "Screen Saver App",
