@@ -6,37 +6,74 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 
+/**
+ * Read-only configuration values supplied to a widget instance.
+ *
+ * Values come from the host Settings UI or a declarative widget manifest. Secret
+ * fields are intentionally resolved through [secret] so their values do not need
+ * to live in the normal JSON configuration document.
+ */
 class WidgetConfig(
     private val values: JsonObject,
     private val secretResolver: (String) -> String? = { null },
 ) {
+    /**
+     * Raw JSON object for advanced widgets that need custom nested settings.
+     */
     val rawJson: JsonObject get() = values
 
+    /**
+     * Reads a string value or [default] when missing or not a primitive.
+     */
     fun string(key: String, default: String = ""): String {
         return primitive(key)?.content ?: default
     }
 
+    /**
+     * Reads an integer value or [default] when missing or not an integer.
+     */
     fun int(key: String, default: Int = 0): Int {
         return primitive(key)?.intOrNull ?: default
     }
 
+    /**
+     * Reads a boolean value or [default] when missing or not a boolean.
+     */
     fun bool(key: String, default: Boolean = false): Boolean {
         return primitive(key)?.booleanOrNull ?: default
     }
 
+    /**
+     * Reads a duration as milliseconds.
+     *
+     * Supported values are raw millisecond numbers or whole-number strings with
+     * `s`, `m`, or `h` suffixes, for example `30s`, `5m`, or `1h`.
+     */
     fun durationMillis(key: String, default: Long = 0): Long {
         val value = primitive(key)?.content ?: return default
         return parseDurationMillis(value) ?: default
     }
 
+    /**
+     * Reads a selected enum option value.
+     */
     fun enum(key: String, default: String): String {
         return string(key, default)
     }
 
+    /**
+     * Resolves a secret value by field key.
+     *
+     * Returns `null` when the secret is missing or the host cannot access the
+     * configured secret store.
+     */
     fun secret(key: String): String? {
         return secretResolver(key)
     }
 
+    /**
+     * Reads the raw JSON element for [key].
+     */
     fun raw(key: String): JsonElement? = values[key]
 
     private fun primitive(key: String): JsonPrimitive? = values[key] as? JsonPrimitive
