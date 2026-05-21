@@ -1,34 +1,27 @@
 package com.droidslife.screensaver.widget.builtin
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.weather.WeatherState
 import com.droidslife.screensaver.weather.WeatherViewModel
 import com.droidslife.screensaver.widget.api.ConfigField
@@ -39,7 +32,6 @@ import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.api.WidgetSummary
-import kotlinx.coroutines.delay
 
 class WeatherWidgetFactory(
     private val weatherViewModel: WeatherViewModel,
@@ -126,22 +118,74 @@ private class WeatherWidget(
         )
 
         when (state) {
-            is WeatherState.Loading -> WeatherLoadingState(modifier)
-            is WeatherState.Success -> WeatherSuccessState(state, modifier)
+            is WeatherState.Loading -> WeatherTile(
+                label = "WEATHER",
+                value = "—",
+                subtitle = "Loading…",
+                modifier = modifier,
+            )
+            is WeatherState.Success -> {
+                val data = state.weatherData
+                val cityName = data.location.name.ifBlank { configuredCity }
+                val subtitle = buildString {
+                    append(data.current.condition.text)
+                    append(" · feels ${data.current.feelslikeC.toInt()}°")
+                    append(" · humidity ${data.current.humidity}%")
+                }
+                WeatherTile(
+                    label = if (cityName.isNotBlank()) "WEATHER · ${cityName.uppercase()}" else "WEATHER",
+                    value = "${data.current.tempC.toInt()}°",
+                    subtitle = subtitle,
+                    valueIsAccent = true,
+                    modifier = modifier,
+                )
+            }
             is WeatherState.Error -> {
                 if (!apiKeyConfigured) {
-                    WeatherUnconfiguredState(
+                    WeatherTile(
+                        label = "WEATHER",
+                        value = "—",
+                        subtitle = "Add a WeatherAPI key to enable",
                         modifier = modifier,
-                        onOpenSettings = { settingsViewModel.openSettingsDialog() },
+                        trailing = {
+                            TextButton(
+                                onClick = { settingsViewModel.openSettingsDialog() },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    horizontal = 0.dp,
+                                    vertical = 0.dp,
+                                ),
+                            ) {
+                                Text(
+                                    "Open Settings",
+                                    fontSize = 11.sp,
+                                    color = DwellColors.StatusAccent,
+                                    fontFamily = DwellFonts.interTight(),
+                                )
+                            }
+                        },
                     )
                 } else {
-                    WeatherFailureState(
+                    WeatherTile(
+                        label = "WEATHER",
+                        value = "—",
+                        subtitle = "Couldn't load",
                         modifier = modifier,
-                        onRetry = {
-                            if (configuredCity.isNotBlank()) {
-                                weatherViewModel.loadWeatherDataForCity(configuredCity)
-                            } else {
-                                weatherViewModel.loadWeatherData()
+                        trailing = {
+                            IconButton(
+                                onClick = {
+                                    if (configuredCity.isNotBlank()) {
+                                        weatherViewModel.loadWeatherDataForCity(configuredCity)
+                                    } else {
+                                        weatherViewModel.loadWeatherData()
+                                    }
+                                },
+                                modifier = Modifier.padding(0.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = "Retry",
+                                    tint = DwellColors.TextMid,
+                                )
                             }
                         },
                     )
@@ -152,116 +196,46 @@ private class WeatherWidget(
 }
 
 @Composable
-private fun WeatherSuccessState(state: WeatherState.Success, modifier: Modifier) {
-    val data = state.weatherData
-    Column(modifier = modifier) {
+private fun WeatherTile(
+    label: String,
+    value: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    valueIsAccent: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val accent = LocalConsoleAccent.current.primary
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
         Text(
-            text = data.location.name.uppercase(),
-            style = MaterialTheme.typography.titleLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-            ),
+            text = label,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 9.sp,
+            letterSpacing = 2.25.sp,
+            color = DwellColors.TextLow,
+            maxLines = 1,
+        )
+        Text(
+            text = value,
+            fontFamily = DwellFonts.jetBrainsMono(),
+            fontWeight = FontWeight.Medium,
+            fontSize = 44.sp,
+            color = if (valueIsAccent) accent else DwellColors.TextHigh,
+            maxLines = 1,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "${data.current.tempC.toInt()}°C",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
+                text = subtitle,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 10.sp,
+                color = DwellColors.TextMid,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = data.current.condition.text,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun WeatherLoadingState(modifier: Modifier) {
-    // Debounce: only show skeleton if loading takes longer than ~250ms to avoid flicker.
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(250)
-        visible = true
-    }
-    if (!visible) {
-        // Render an empty placeholder of similar height to avoid layout jumps.
-        Box(modifier = modifier.height(64.dp))
-        return
-    }
-    val placeholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .height(20.dp)
-                .width(120.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(placeholderColor),
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Box(
-            modifier = Modifier
-                .height(16.dp)
-                .width(180.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(placeholderColor),
-        )
-    }
-}
-
-@Composable
-private fun WeatherUnconfiguredState(modifier: Modifier, onOpenSettings: () -> Unit) {
-    Column(modifier = modifier) {
-        Text(
-            text = "Weather",
-            style = MaterialTheme.typography.titleSmall.copy(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                fontWeight = FontWeight.SemiBold,
-            ),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Add a WeatherAPI key to enable weather",
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            ),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(
-            onClick = onOpenSettings,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                horizontal = 8.dp,
-                vertical = 4.dp,
-            ),
-        ) {
-            Text("Open Settings")
-        }
-    }
-}
-
-@Composable
-private fun WeatherFailureState(modifier: Modifier, onRetry: () -> Unit) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "Couldn't load weather",
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-            ),
-            modifier = Modifier.padding(end = 8.dp),
-        )
-        IconButton(onClick = onRetry) {
-            Icon(
-                imageVector = Icons.Filled.Refresh,
-                contentDescription = "Retry",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-            )
+            if (trailing != null) trailing()
         }
     }
 }
