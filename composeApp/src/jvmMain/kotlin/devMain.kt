@@ -1,3 +1,7 @@
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.*
 import com.droidslife.screensaver.App
@@ -12,7 +16,9 @@ fun main() = application {
         modules(appModule)
     }
 
-    val windowEvents = rememberWindowEventHandlers(::exitApplication)
+    var exitRequested by remember { mutableStateOf(false) }
+    val requestExit = { exitRequested = true }
+    val windowEvents = rememberWindowEventHandlers(requestExit)
 
     Window(
         title = "Screen Saver App",
@@ -20,10 +26,11 @@ fun main() = application {
             placement = WindowPlacement.Maximized,
             position = WindowPosition(Alignment.Center),
         ),
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = requestExit,
         resizable = false,
         alwaysOnTop = true,
         undecorated = true,
+        transparent = true,
         onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
     ) {
         DevelopmentEntryPoint {
@@ -34,7 +41,9 @@ fun main() = application {
                 onCityDialogDismiss = windowEvents.onCityDialogDismiss,
                 onShowCityDialog = windowEvents.onShowCityDialog,
                 exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
-                onExitApplication = { exitApplication() },
+                onExitApplication = requestExit,
+                exitRequested = exitRequested,
+                onExited = { exitApplication() },
                 showHelpDialog = windowEvents.showHelpDialog,
                 onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
                 modifier = windowEvents.mouseEventModifier

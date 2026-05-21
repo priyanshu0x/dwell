@@ -1,5 +1,9 @@
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.*
 import com.droidslife.screensaver.App
@@ -23,8 +27,11 @@ fun main(args: Array<String>) = application {
         return@application
     }
 
+    var exitRequested by remember { mutableStateOf(false) }
+    val requestExit = { exitRequested = true }
+
     val windowEvents = rememberWindowEventHandlers(
-        onExitApplication = ::exitApplication,
+        onExitApplication = requestExit,
         openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
     )
 
@@ -34,10 +41,11 @@ fun main(args: Array<String>) = application {
             placement = WindowPlacement.Fullscreen,
             position = WindowPosition(Alignment.Center),
         ),
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = requestExit,
         resizable = false,
         alwaysOnTop = true,
         undecorated = true,
+        transparent = true,
         onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
     ) {
         ShortcutToast(toastState = windowEvents.toastState)
@@ -47,7 +55,9 @@ fun main(args: Array<String>) = application {
             onCityDialogDismiss = windowEvents.onCityDialogDismiss,
             onShowCityDialog = windowEvents.onShowCityDialog,
             exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
-            onExitApplication = { exitApplication() },
+            onExitApplication = requestExit,
+            exitRequested = exitRequested,
+            onExited = { exitApplication() },
             showHelpDialog = windowEvents.showHelpDialog,
             onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
             modifier = windowEvents.mouseEventModifier
