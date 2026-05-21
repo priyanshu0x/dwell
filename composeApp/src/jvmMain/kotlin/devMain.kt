@@ -11,8 +11,11 @@ import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 
 fun main() = application {
-    initKoin {
-        modules(appModule)
+    remember {
+        initKoin {
+            modules(appModule)
+        }
+        true
     }
 
     var exitRequested by remember { mutableStateOf(false) }
