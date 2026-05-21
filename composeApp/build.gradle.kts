@@ -4,6 +4,8 @@ import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.bundling.Zip
 
 val appVersion = "1.0.0"
+val appDisplayName = "Screen Saver App"
+val scrLauncherName = "$appDisplayName.scr"
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -68,7 +70,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
-            packageName = "Screen Saver App"
+            packageName = appDisplayName
             packageVersion = appVersion
             description = "Idle-triggered desktop dashboard screen saver with widget support"
             copyright = "© 2026 DroidsLife"
@@ -101,6 +103,14 @@ compose.desktop {
     }
 }
 
+tasks.configureEach {
+    if (name == "createDistributable") {
+        doFirst {
+            delete(layout.buildDirectory.dir("compose/binaries/main/app"))
+        }
+    }
+}
+
 tasks.register("runHot") {
     group = "compose hot reload"
     description = "Runs the Compose Hot Reload dev entry point."
@@ -112,11 +122,15 @@ tasks.register<Copy>("packageScr") {
     description = "Builds the Windows .scr screen saver launcher from the jpackage executable."
     dependsOn("createDistributable")
 
-    from(layout.buildDirectory.dir("compose/binaries/main/app/Screen Saver App"))
-    from(layout.buildDirectory.file("compose/binaries/main/app/Screen Saver App/Screen Saver App.exe")) {
-        rename { "ScreenSaverApp.scr" }
+    doFirst {
+        delete(layout.buildDirectory.dir("compose/binaries/main/scr"))
     }
-    into(layout.buildDirectory.dir("compose/binaries/main/scr/Screen Saver App"))
+
+    from(layout.buildDirectory.dir("compose/binaries/main/app/$appDisplayName"))
+    from(layout.buildDirectory.file("compose/binaries/main/app/$appDisplayName/$appDisplayName.exe")) {
+        rename { scrLauncherName }
+    }
+    into(layout.buildDirectory.dir("compose/binaries/main/scr/$appDisplayName"))
 }
 
 tasks.register("verifyScrPackage") {
@@ -125,8 +139,8 @@ tasks.register("verifyScrPackage") {
     dependsOn("packageScr")
 
     doLast {
-        val scrDir = layout.buildDirectory.dir("compose/binaries/main/scr/Screen Saver App").get().asFile
-        val scrFile = scrDir.resolve("ScreenSaverApp.scr")
+        val scrDir = layout.buildDirectory.dir("compose/binaries/main/scr/$appDisplayName").get().asFile
+        val scrFile = scrDir.resolve(scrLauncherName)
         val runtimeDir = scrDir.resolve("runtime")
         val appDir = scrDir.resolve("app")
 

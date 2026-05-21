@@ -13,7 +13,7 @@ if (-not $sourcePath) {
 }
 
 $sourceRoot = $sourcePath.Path
-$sourceScr = Join-Path $sourceRoot "ScreenSaverApp.scr"
+$sourceScr = Join-Path $sourceRoot "Screen Saver App.scr"
 $sourceRuntime = Join-Path $sourceRoot "runtime"
 $sourceApp = Join-Path $sourceRoot "app"
 
@@ -30,7 +30,7 @@ if (-not (Test-Path -LiteralPath $sourceApp -PathType Container)) {
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 Copy-Item -Path (Join-Path $sourceRoot "*") -Destination $InstallDir -Recurse -Force
 
-$installedScr = Join-Path $InstallDir "ScreenSaverApp.scr"
+$installedScr = Join-Path $InstallDir "Screen Saver App.scr"
 if (-not (Test-Path -LiteralPath $installedScr -PathType Leaf)) {
     throw "Install failed; launcher missing after copy: $installedScr"
 }

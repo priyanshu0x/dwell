@@ -14,7 +14,7 @@ The zip is written to:
 composeApp/build/compose/binaries/main/ScreenSaverApp-scr-1.0.0.zip
 ```
 
-The `.scr` launcher requires the adjacent `runtime` and `app` folders. Do not copy only `ScreenSaverApp.scr`.
+The `.scr` launcher requires the adjacent `runtime` and `app` folders. Do not copy only `Screen Saver App.scr`.
 
 Install for the current user:
 
