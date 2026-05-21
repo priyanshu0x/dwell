@@ -16,6 +16,10 @@ import kotlin.random.Random
  * ViewModel for managing clock design state.
  */
 class ClockViewModel {
+    companion object {
+        const val DESIGN_COUNT = 11
+    }
+
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var autoChangeJob: Job? = null
 
@@ -38,22 +42,20 @@ class ClockViewModel {
         private set
 
     /**
-     * Cycles through available clock designs (1-8).
+     * Cycles through available clock designs (1-11).
      * @return The new clock design after cycling.
      */
     fun cycleClockDesign(): Int {
-        // Cycle through designs 1-8
-        clockDesign = if (clockDesign >= 8) 1 else clockDesign + 1
+        clockDesign = if (clockDesign >= DESIGN_COUNT) 1 else clockDesign + 1
         return clockDesign
     }
 
     /**
      * Updates the clock design to the specified value.
-     * @param design The design to set (1-8).
+     * @param design The design to set (1-11).
      */
     fun updateClockDesign(design: Int) {
-        // Validate and update the design
-        if (design in 1..8) {
+        if (design in 1..DESIGN_COUNT) {
             clockDesign = design
         }
     }
@@ -97,7 +99,7 @@ class ClockViewModel {
                     // Pick a random design different from the current one
                     var newDesign: Int
                     do {
-                        newDesign = Random.nextInt(1, 9)
+                        newDesign = Random.nextInt(1, DESIGN_COUNT + 1)
                     } while (newDesign == clockDesign)
 
                     updateClockDesign(newDesign)

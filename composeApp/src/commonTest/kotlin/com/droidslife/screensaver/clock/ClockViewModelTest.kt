@@ -46,6 +46,16 @@ class ClockViewModelTest {
         assertEquals(8, viewModel.cycleClockDesign())
         assertEquals(8, viewModel.clockDesign)
 
+        // Cycle through designs 9, 10, and 11
+        assertEquals(9, viewModel.cycleClockDesign())
+        assertEquals(9, viewModel.clockDesign)
+
+        assertEquals(10, viewModel.cycleClockDesign())
+        assertEquals(10, viewModel.clockDesign)
+
+        assertEquals(11, viewModel.cycleClockDesign())
+        assertEquals(11, viewModel.clockDesign)
+
         // Cycle back to design 1
         assertEquals(1, viewModel.cycleClockDesign())
         assertEquals(1, viewModel.clockDesign)
@@ -74,11 +84,21 @@ class ClockViewModelTest {
         viewModel.updateClockDesign(8)
         assertEquals(8, viewModel.clockDesign)
 
-        // Update to invalid design (should not change)
+        // Update to designs that have UI renderers
         viewModel.updateClockDesign(9)
-        assertEquals(8, viewModel.clockDesign)
+        assertEquals(9, viewModel.clockDesign)
+
+        viewModel.updateClockDesign(10)
+        assertEquals(10, viewModel.clockDesign)
+
+        viewModel.updateClockDesign(11)
+        assertEquals(11, viewModel.clockDesign)
+
+        // Update to invalid design (should not change)
+        viewModel.updateClockDesign(12)
+        assertEquals(11, viewModel.clockDesign)
 
         viewModel.updateClockDesign(0)
-        assertEquals(8, viewModel.clockDesign)
+        assertEquals(11, viewModel.clockDesign)
     }
 }

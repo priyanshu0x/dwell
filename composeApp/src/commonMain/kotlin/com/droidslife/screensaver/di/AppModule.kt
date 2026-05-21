@@ -6,6 +6,8 @@ import com.droidslife.screensaver.network.KtorClient
 import com.droidslife.screensaver.settings.PreferencesRepository
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.settings.createPreferencesRepository
+import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
+import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.weather.WeatherApi
 import com.droidslife.screensaver.weather.WeatherRepository
 import com.droidslife.screensaver.weather.WeatherViewModel
@@ -41,4 +43,10 @@ val appModule = module {
 
     // Settings ViewModel
     single { SettingsViewModel(get()) }
+
+    // Built-in widgets
+    single { ClockWidgetFactory(get(), get()) }
+
+    // Widget registry
+    single { WidgetRegistry(listOf(get<ClockWidgetFactory>()), get()) }
 }
