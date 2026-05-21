@@ -31,7 +31,7 @@ private class JvmStartupRegistration : StartupRegistration {
                     "/t",
                     "REG_SZ",
                     "/d",
-                    "\"${appCommand()}\" --daemon",
+                    windowsRunCommand(appCommand(), "--daemon"),
                     "/f",
                 ).redirectErrorStream(true).start().waitFor()
             }
@@ -62,7 +62,7 @@ private class JvmStartupRegistration : StartupRegistration {
             [Desktop Entry]
             Type=Application
             Name=Screen Saver App
-            Exec=${appCommand()} --daemon
+            Exec=${desktopExecCommand(appCommand(), "--daemon")}
             X-GNOME-Autostart-enabled=true
             Terminal=false
             """.trimIndent(),
@@ -76,4 +76,23 @@ private class JvmStartupRegistration : StartupRegistration {
 
     private fun isWindows(): Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
     private fun isLinux(): Boolean = System.getProperty("os.name").contains("Linux", ignoreCase = true)
+}
+
+internal fun windowsRunCommand(executable: String, arguments: String): String {
+    return "\"${executable.replace("\"", "\\\"")}\" $arguments"
+}
+
+internal fun desktopExecCommand(executable: String, arguments: String): String {
+    return "${desktopExecArg(executable)} $arguments"
+}
+
+private fun desktopExecArg(value: String): String {
+    if (value.none { it.isWhitespace() || it in "\"\\`$" }) return value
+    val escaped = buildString {
+        value.forEach { char ->
+            if (char in "\"\\`$") append('\\')
+            append(char)
+        }
+    }
+    return "\"$escaped\""
 }
