@@ -70,8 +70,8 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
             packageName = "Screen Saver App"
             packageVersion = appVersion
-            description = "A modern flip clock screen saver application"
-            copyright = "© 2025 DroidsLife"
+            description = "Idle-triggered desktop dashboard screen saver with widget support"
+            copyright = "© 2026 DroidsLife"
             vendor = "DroidsLife"
 
             // JVM options

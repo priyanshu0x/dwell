@@ -5,7 +5,7 @@
 Build the native app and full `.scr` bundle:
 
 ```powershell
-.\gradlew.bat :composeApp:packageScrZip
+.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:packageScrZip
 ```
 
 The zip is written to:
@@ -41,7 +41,7 @@ To smoke-test only the copy/validation path without changing screen saver regist
 Build the current OS package:
 
 ```sh
-./gradlew :composeApp:packageDistributionForCurrentOS
+./gradlew --no-daemon --no-configuration-cache :composeApp:packageDistributionForCurrentOS
 ```
 
 After installing the package, register the user daemon:
