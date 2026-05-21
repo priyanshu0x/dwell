@@ -37,6 +37,9 @@ import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
+import com.droidslife.screensaver.widget.api.WidgetSize
+import com.droidslife.screensaver.widget.api.WidgetSummary
+import kotlinx.datetime.Month
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -58,6 +61,11 @@ class ExpensesWidgetFactory(
     override val displayName: String = "Expenses"
     override val description: String = "Current-month expense tracking with local storage"
     override val category: WidgetCategory = WidgetCategory.FINANCE
+    override val preferredSize: WidgetSize = WidgetSize(
+        minCols = 3, minRows = 2,
+        defaultCols = 4, defaultRows = 2,
+        maxCols = 8, maxRows = 3,
+    )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.Currency(
             key = "currency",
@@ -90,6 +98,43 @@ private class ExpensesWidget(
     private var noteInput by mutableStateOf("")
     private var unsyncedCount by mutableStateOf(0)
     private var inputVisible by mutableStateOf(false)
+
+    override fun summary(): WidgetSummary {
+        val currency = config.enum("currency", "USD")
+        val total = expenses.sumOf { it.amount }
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val monthName = monthShortName(now.month)
+        val topCategories = expenses
+            .groupBy { it.category }
+            .map { (cat, items) -> cat to items.sumOf { it.amount } }
+            .sortedByDescending { it.second }
+            .take(3)
+        val subtitle = if (topCategories.isEmpty()) {
+            "No expenses yet"
+        } else {
+            topCategories.joinToString(" · ") { (cat, amt) -> "$cat $currency ${"%.2f".format(amt)}" }
+        }
+        return WidgetSummary(
+            primaryValue = "$currency ${"%.2f".format(total)}",
+            primaryLabel = "Spend · $monthName",
+            subtitle = subtitle,
+        )
+    }
+
+    private fun monthShortName(month: Month): String = when (month) {
+        Month.JANUARY -> "Jan"
+        Month.FEBRUARY -> "Feb"
+        Month.MARCH -> "Mar"
+        Month.APRIL -> "Apr"
+        Month.MAY -> "May"
+        Month.JUNE -> "Jun"
+        Month.JULY -> "Jul"
+        Month.AUGUST -> "Aug"
+        Month.SEPTEMBER -> "Sep"
+        Month.OCTOBER -> "Oct"
+        Month.NOVEMBER -> "Nov"
+        Month.DECEMBER -> "Dec"
+    }
 
     override fun onResume() {
         scope.coroutineScope.launch {
