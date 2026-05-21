@@ -10,7 +10,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlinx.serialization)
-    alias(libs.plugins.hot.reload)
+    id("org.jetbrains.compose.hot-reload")
 }
 kotlin {
     jvmToolchain(21)
@@ -26,7 +26,7 @@ kotlin {
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
-            implementation(libs.compose.material.icons.core)
+            implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.animation)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.components.ui.tooling.preview)
@@ -53,7 +53,7 @@ kotlin {
         }
 
         jvmMain.dependencies {
-            implementation(libs.compose.desktop.current.os)
+            implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.jna)

@@ -1,7 +1,8 @@
 [versions]
 
 kotlin = "2.3.21"
-compose = "1.9.0"
+compose = "1.11.0"
+compose-material3 = "1.9.0"
 compose-material-icons = "1.7.3"
 kermit = "2.0.5"
 kotlinx-coroutines = "1.11.0"
@@ -44,13 +45,11 @@ jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }
-compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose" }
-compose-material-icons-core = { module = "org.jetbrains.compose.material:material-icons-core", version.ref = "compose-material-icons" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
+compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material-icons" }
 compose-animation = { module = "org.jetbrains.compose.animation:animation", version.ref = "compose" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
 compose-components-ui-tooling-preview = { module = "org.jetbrains.compose.components:components-ui-tooling-preview", version.ref = "compose" }
-compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose" }
-compose-desktop-current-os = { module = "org.jetbrains.compose.desktop:desktop-jvm-windows-x64", version.ref = "compose" }
 # Koin dependencies
 koin-bom = { module = "io.insert-koin:koin-bom", version.ref = "koin" }
 koin-core = { module = "io.insert-koin:koin-core" }
