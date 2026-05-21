@@ -48,6 +48,9 @@ interface WidgetFactory {
      */
     val configSchema: List<ConfigField> get() = emptyList()
 
+    /** Console-grid size constraints. Default = 4×2, clamped between 2×1 and 12×6. */
+    val preferredSize: WidgetSize get() = WidgetSize()
+
     /**
      * Creates a fresh widget instance for the supplied configuration and host scope.
      *
