@@ -11,13 +11,16 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * ViewModel for managing application settings.
  * @param preferencesRepository The repository for storing and retrieving preferences.
  */
 class SettingsViewModel(
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val secretStorage: SecretStorage = createSecretStorage(),
+    private val startupRegistration: StartupRegistration = createStartupRegistration(),
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -142,6 +145,48 @@ class SettingsViewModel(
 
     fun updateWidgetConfig(widgetId: String, config: JsonObject) {
         updateSettings(settings.copy(widgetConfigs = settings.widgetConfigs + (widgetId to config)))
+    }
+
+    fun updateWidgetSecret(widgetId: String, key: String, value: String) {
+        val secretId = widgetSecretId(widgetId, key)
+        val currentConfig = settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
+        updateSettings(settings.copy(widgetConfigs = settings.widgetConfigs + (widgetId to JsonObject(currentConfig + (key to JsonPrimitive(secretId))))))
+        viewModelScope.launch {
+            if (value.isBlank()) {
+                secretStorage.delete(secretId)
+            } else {
+                secretStorage.write(secretId, value)
+            }
+        }
+    }
+
+    fun setIdleTimeoutMinutes(minutes: Int) {
+        updateSettings(settings.copy(idleTimeoutMinutes = minutes.coerceIn(1, 240)))
+    }
+
+    fun setTrayIconEnabled(enabled: Boolean) {
+        updateSettings(settings.copy(trayIconEnabled = enabled))
+    }
+
+    fun setStartWithSystem(enabled: Boolean) {
+        updateSettings(settings.copy(startWithSystem = enabled))
+        viewModelScope.launch {
+            startupRegistration.setEnabled(enabled)
+        }
+    }
+
+    fun setBackendBaseUrl(url: String) {
+        updateSettings(settings.copy(backendBaseUrl = url))
+    }
+
+    fun updateBackendApiKey(value: String) {
+        viewModelScope.launch {
+            if (value.isBlank()) {
+                secretStorage.delete(settings.backendApiKeySecretId)
+            } else {
+                secretStorage.write(settings.backendApiKeySecretId, value)
+            }
+        }
     }
 
     fun effectiveEnabledWidgetIds(defaultIds: Set<String> = defaultWidgetIds): Set<String> {

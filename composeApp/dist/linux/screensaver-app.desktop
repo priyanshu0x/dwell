@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Screen Saver App
+Exec=screensaver-app --show
+Terminal=false
+Categories=Utility;

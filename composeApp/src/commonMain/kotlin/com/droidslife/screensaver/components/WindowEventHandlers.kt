@@ -21,6 +21,7 @@ data class WindowEventHandlers(
     val exitOnMouseMovementEnabled: Boolean,
     val showHelpDialog: Boolean,
     val onHelpDialogDismiss: () -> Unit,
+    val onShowHelpDialog: () -> Unit,
 )
 
 @Composable
@@ -107,5 +108,6 @@ fun rememberWindowEventHandlers(
         exitOnMouseMovementEnabled = exitOnMouseMovementEnabled,
         showHelpDialog = showHelpDialog,
         onHelpDialogDismiss = { showHelpDialog = false },
+        onShowHelpDialog = { showHelpDialog = true },
     )
 }

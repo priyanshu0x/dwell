@@ -1,0 +1,79 @@
+package com.droidslife.screensaver.settings
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.writeText
+
+actual fun createStartupRegistration(): StartupRegistration = JvmStartupRegistration()
+
+private class JvmStartupRegistration : StartupRegistration {
+    override suspend fun setEnabled(enabled: Boolean) = withContext(Dispatchers.IO) {
+        when {
+            isWindows() -> setWindowsRunKey(enabled)
+            isLinux() -> setLinuxAutostart(enabled)
+            else -> Unit
+        }
+    }
+
+    private fun setWindowsRunKey(enabled: Boolean) {
+        val valueName = "ScreenSaverApp"
+        if (enabled) {
+            runCatching {
+                ProcessBuilder(
+                    "reg",
+                    "add",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                    "/v",
+                    valueName,
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    "\"${appCommand()}\" --daemon",
+                    "/f",
+                ).redirectErrorStream(true).start().waitFor()
+            }
+        } else {
+            runCatching {
+                ProcessBuilder(
+                    "reg",
+                    "delete",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                    "/v",
+                    valueName,
+                    "/f",
+                ).redirectErrorStream(true).start().waitFor()
+            }
+        }
+    }
+
+    private fun setLinuxAutostart(enabled: Boolean) {
+        val autostartDir = Path.of(System.getProperty("user.home"), ".config", "autostart")
+        val desktopFile = autostartDir.resolve("screensaver-app.desktop")
+        if (!enabled) {
+            desktopFile.deleteIfExists()
+            return
+        }
+        autostartDir.createDirectories()
+        desktopFile.writeText(
+            """
+            [Desktop Entry]
+            Type=Application
+            Name=Screen Saver App
+            Exec=${appCommand()} --daemon
+            X-GNOME-Autostart-enabled=true
+            Terminal=false
+            """.trimIndent(),
+        )
+    }
+
+    private fun appCommand(): String {
+        return System.getProperty("jpackage.app-path")
+            ?: ProcessHandle.current().info().command().orElse("Screen Saver App")
+    }
+
+    private fun isWindows(): Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    private fun isLinux(): Boolean = System.getProperty("os.name").contains("Linux", ignoreCase = true)
+}

@@ -35,6 +35,7 @@ internal fun App(
     onExited: () -> Unit = onExitApplication,
     showHelpDialog: Boolean = false,
     onHelpDialogDismiss: () -> Unit = {},
+    onShowHelpDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
         // Get the settings view model to access the theme preference
@@ -82,7 +83,7 @@ internal fun App(
                         onExitApplication = onExitApplication,
                         showHelpDialog = showHelpDialog,
                         onHelpDialogDismiss = onHelpDialogDismiss,
-                        onShowHelpDialog = { /* This is a no-op because we can't set showHelpDialog to true here */ }
+                        onShowHelpDialog = onShowHelpDialog,
                     )
                 }
             }

@@ -2,6 +2,7 @@ package com.droidslife.screensaver.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,7 +38,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.host.WidgetDescriptor
 import kotlinx.serialization.json.JsonObject
@@ -55,7 +55,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * @param onClockFormatToggle Callback when the clock format is toggled.
  * @param onAutoPlayToggle Callback when the auto play is toggled.
  * @param onShuffleToggle Callback when the shuffle is toggled.
- * @param onDesignSelected Callback when a design is selected.
  */
 @Composable
 fun SettingsDialog(
@@ -66,10 +65,15 @@ fun SettingsDialog(
     onClockFormatToggle: () -> Unit,
     onAutoPlayToggle: () -> Unit,
     onShuffleToggle: () -> Unit,
-    onDesignSelected: (Int) -> Unit,
     onWidgetEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onWidgetConfigChange: (String, JsonObject) -> Unit = { _, _ -> },
+    onWidgetSecretChange: (String, String, String) -> Unit = { _, _, _ -> },
     onWidgetReload: () -> Unit = {},
+    onIdleTimeoutChange: (Int) -> Unit = {},
+    onTrayIconToggle: (Boolean) -> Unit = {},
+    onStartWithSystemToggle: (Boolean) -> Unit = {},
+    onBackendBaseUrlChange: (String) -> Unit = {},
+    onBackendApiKeyChange: (String) -> Unit = {},
 ) {
     var showShortcutsDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf("Display") }
@@ -102,9 +106,9 @@ fun SettingsDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Display", "Widgets", "About").forEach { tab ->
+                    listOf("Display", "Widgets", "Activation", "Backend", "About").forEach { tab ->
                         Button(
                             onClick = { selectedTab = tab },
                             modifier = Modifier.weight(1f),
@@ -121,14 +125,25 @@ fun SettingsDialog(
                         onClockFormatToggle = onClockFormatToggle,
                         onAutoPlayToggle = onAutoPlayToggle,
                         onShuffleToggle = onShuffleToggle,
-                        onDesignSelected = onDesignSelected,
                     )
                     "Widgets" -> WidgetSettings(
                         settings = settings,
                         widgetDescriptors = widgetDescriptors,
                         onWidgetEnabledChange = onWidgetEnabledChange,
                         onWidgetConfigChange = onWidgetConfigChange,
+                        onWidgetSecretChange = onWidgetSecretChange,
                         onWidgetReload = onWidgetReload,
+                    )
+                    "Activation" -> ActivationSettings(
+                        settings = settings,
+                        onIdleTimeoutChange = onIdleTimeoutChange,
+                        onTrayIconToggle = onTrayIconToggle,
+                        onStartWithSystemToggle = onStartWithSystemToggle,
+                    )
+                    "Backend" -> BackendSettings(
+                        settings = settings,
+                        onBackendBaseUrlChange = onBackendBaseUrlChange,
+                        onBackendApiKeyChange = onBackendApiKeyChange,
                     )
                     "About" -> AboutSettings()
                 }
@@ -154,7 +169,6 @@ private fun DisplaySettings(
     onClockFormatToggle: () -> Unit,
     onAutoPlayToggle: () -> Unit,
     onShuffleToggle: () -> Unit,
-    onDesignSelected: (Int) -> Unit,
 ) {
     SectionTitle("Theme")
     SettingSwitch("Dark Theme", settings.isDarkTheme, onThemeToggle)
@@ -176,13 +190,6 @@ private fun DisplaySettings(
     SectionTitle("Playback")
     SettingSwitch("Auto Play", settings.autoPlayEnabled, onAutoPlayToggle)
     SettingSwitch("Shuffle", settings.shuffleEnabled, onShuffleToggle)
-    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-    SectionTitle("Design")
-    (1..ClockViewModel.DESIGN_COUNT).forEach { design ->
-        val label = "Design $design"
-        SettingRadio(label, settings.selectedDesignId == design) { onDesignSelected(design) }
-    }
 }
 
 @Composable
@@ -191,6 +198,7 @@ private fun WidgetSettings(
     widgetDescriptors: List<WidgetDescriptor>,
     onWidgetEnabledChange: (String, Boolean) -> Unit,
     onWidgetConfigChange: (String, JsonObject) -> Unit,
+    onWidgetSecretChange: (String, String, String) -> Unit,
     onWidgetReload: () -> Unit,
 ) {
     val defaultEnabled = setOf("com.droidslife.screensaver.clock", "com.droidslife.screensaver.weather")
@@ -245,6 +253,7 @@ private fun WidgetSettings(
                         field = field,
                         config = currentConfig,
                         onConfigChange = { onWidgetConfigChange(descriptor.id, it) },
+                        onSecretChange = { key, value -> onWidgetSecretChange(descriptor.id, key, value) },
                     )
                 }
             }
@@ -258,6 +267,7 @@ private fun ConfigFieldRenderer(
     field: ConfigField,
     config: JsonObject,
     onConfigChange: (JsonObject) -> Unit,
+    onSecretChange: (String, String) -> Unit,
 ) {
     fun update(value: JsonPrimitive) {
         onConfigChange(JsonObject(config + (field.key to value)))
@@ -288,14 +298,71 @@ private fun ConfigFieldRenderer(
             )
         }
         is ConfigField.Duration -> TextConfigField(field.label, config[field.key]?.jsonPrimitive?.content ?: field.default, ::update)
-        is ConfigField.Secret -> TextConfigField(
-            label = field.label,
-            value = config[field.key]?.jsonPrimitive?.content ?: "",
-            onValueChange = ::update,
-            visualTransformation = PasswordVisualTransformation(),
-        )
+        is ConfigField.Secret -> {
+            var value by remember(field.key, config[field.key]) { mutableStateOf("") }
+            TextConfigField(
+                label = field.label,
+                value = value,
+                onValueChange = {
+                    value = it.content
+                    onSecretChange(field.key, it.content)
+                },
+                visualTransformation = PasswordVisualTransformation(),
+            )
+        }
         is ConfigField.Text -> TextConfigField(field.label, config[field.key]?.jsonPrimitive?.content ?: field.default, ::update)
     }
+}
+
+@Composable
+private fun ActivationSettings(
+    settings: SettingsModel,
+    onIdleTimeoutChange: (Int) -> Unit,
+    onTrayIconToggle: (Boolean) -> Unit,
+    onStartWithSystemToggle: (Boolean) -> Unit,
+) {
+    SectionTitle("Idle")
+    OutlinedTextField(
+        value = settings.idleTimeoutMinutes.toString(),
+        onValueChange = { onIdleTimeoutChange(it.toIntOrNull() ?: settings.idleTimeoutMinutes) },
+        label = { Text("Idle timeout minutes") },
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        singleLine = true,
+    )
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    SectionTitle("Daemon")
+    SettingSwitch("Tray Icon", settings.trayIconEnabled) { onTrayIconToggle(!settings.trayIconEnabled) }
+    SettingSwitch("Start With System", settings.startWithSystem) { onStartWithSystemToggle(!settings.startWithSystem) }
+}
+
+@Composable
+private fun BackendSettings(
+    settings: SettingsModel,
+    onBackendBaseUrlChange: (String) -> Unit,
+    onBackendApiKeyChange: (String) -> Unit,
+) {
+    var apiKey by remember(settings.backendApiKeySecretId) { mutableStateOf("") }
+
+    SectionTitle("Sync")
+    OutlinedTextField(
+        value = settings.backendBaseUrl,
+        onValueChange = onBackendBaseUrlChange,
+        label = { Text("Base URL") },
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        singleLine = true,
+    )
+    OutlinedTextField(
+        value = apiKey,
+        onValueChange = {
+            apiKey = it
+            onBackendApiKeyChange(it)
+        },
+        label = { Text("API Key") },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        singleLine = true,
+    )
 }
 
 @Composable

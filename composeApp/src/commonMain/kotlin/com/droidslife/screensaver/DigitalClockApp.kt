@@ -152,17 +152,19 @@ fun DigitalClockApp(
             onClockFormatToggle = { settingsViewModel.toggleClockFormat() },
             onAutoPlayToggle = { settingsViewModel.toggleAutoPlay() },
             onShuffleToggle = { settingsViewModel.toggleShuffle() },
-            onDesignSelected = {
-                settingsViewModel.setSelectedDesign(it)
-                clockViewModel.updateClockDesign(it)
-            },
             widgetDescriptors = widgetDescriptors,
             onWidgetEnabledChange = settingsViewModel::setWidgetEnabled,
             onWidgetConfigChange = settingsViewModel::updateWidgetConfig,
+            onWidgetSecretChange = settingsViewModel::updateWidgetSecret,
             onWidgetReload = {
                 widgetRegistry.reload()
                 widgetRegistry.syncWithSettings(settingsViewModel.settings)
             },
+            onIdleTimeoutChange = settingsViewModel::setIdleTimeoutMinutes,
+            onTrayIconToggle = settingsViewModel::setTrayIconEnabled,
+            onStartWithSystemToggle = settingsViewModel::setStartWithSystem,
+            onBackendBaseUrlChange = settingsViewModel::setBackendBaseUrl,
+            onBackendApiKeyChange = settingsViewModel::updateBackendApiKey,
         )
     }
 

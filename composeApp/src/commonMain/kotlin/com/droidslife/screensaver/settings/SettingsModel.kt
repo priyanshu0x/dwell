@@ -48,5 +48,30 @@ data class SettingsModel(
     /**
      * Per-widget JSON configuration keyed by widget ID.
      */
-    val widgetConfigs: Map<String, JsonObject> = emptyMap()
+    val widgetConfigs: Map<String, JsonObject> = emptyMap(),
+
+    /**
+     * Minutes of OS idle time before the daemon opens the dashboard.
+     */
+    val idleTimeoutMinutes: Int = 5,
+
+    /**
+     * Whether the daemon should try to show a system tray icon.
+     */
+    val trayIconEnabled: Boolean = true,
+
+    /**
+     * Whether the app should register itself for login startup.
+     */
+    val startWithSystem: Boolean = false,
+
+    /**
+     * Optional backend base URL for future sync-capable widgets.
+     */
+    val backendBaseUrl: String = "",
+
+    /**
+     * Secret id for the backend API token stored outside settings JSON.
+     */
+    val backendApiKeySecretId: String = "backend.apiKey",
 )

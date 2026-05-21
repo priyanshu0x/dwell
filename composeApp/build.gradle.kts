@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.Copy
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -47,6 +48,8 @@ kotlin {
             implementation(libs.compose.desktop.current.os)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.jna)
+            implementation(libs.jna.platform)
         }
 
     }
@@ -103,4 +106,16 @@ tasks.register("runHot") {
     group = "compose hot reload"
     description = "Runs the Compose Hot Reload dev entry point."
     dependsOn("hotDevJvm")
+}
+
+tasks.register<Copy>("packageScr") {
+    group = "distribution"
+    description = "Builds the Windows .scr screen saver launcher from the jpackage executable."
+    dependsOn("createDistributable")
+
+    from(layout.buildDirectory.dir("compose/binaries/main/app/Screen Saver App"))
+    from(layout.buildDirectory.file("compose/binaries/main/app/Screen Saver App/Screen Saver App.exe")) {
+        rename { "ScreenSaverApp.scr" }
+    }
+    into(layout.buildDirectory.dir("compose/binaries/main/scr/Screen Saver App"))
 }

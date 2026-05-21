@@ -6,7 +6,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 
-class WidgetConfig(private val values: JsonObject) {
+class WidgetConfig(
+    private val values: JsonObject,
+    private val secretResolver: (String) -> String? = { null },
+) {
     val rawJson: JsonObject get() = values
 
     fun string(key: String, default: String = ""): String {
@@ -31,7 +34,7 @@ class WidgetConfig(private val values: JsonObject) {
     }
 
     fun secret(key: String): String? {
-        return primitive(key)?.content
+        return secretResolver(key) ?: primitive(key)?.content
     }
 
     fun raw(key: String): JsonElement? = values[key]

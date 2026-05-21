@@ -1,0 +1,11 @@
+[Unit]
+Description=Screen Saver App daemon
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/screensaver-app --daemon
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

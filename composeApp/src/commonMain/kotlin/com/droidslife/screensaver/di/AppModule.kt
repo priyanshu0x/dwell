@@ -4,17 +4,21 @@ import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.network.KtorClient
 import com.droidslife.screensaver.settings.PreferencesRepository
+import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.settings.StartupRegistration
 import com.droidslife.screensaver.settings.createPreferencesRepository
+import com.droidslife.screensaver.settings.createSecretStorage
+import com.droidslife.screensaver.settings.createStartupRegistration
+import com.droidslife.screensaver.widget.builtin.ExpensesWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
+import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherWidgetFactory
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.weather.WeatherApi
 import com.droidslife.screensaver.weather.WeatherRepository
 import com.droidslife.screensaver.weather.WeatherViewModel
 import io.ktor.client.HttpClient
-import org.koin.core.module.dsl.factoryOf
-import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 /**
@@ -32,6 +36,8 @@ val appModule = module {
 
     // Preferences Repository
     single<PreferencesRepository> { createPreferencesRepository() }
+    single<SecretStorage> { createSecretStorage() }
+    single<StartupRegistration> { createStartupRegistration() }
 
     // Weather Repository
     single { WeatherRepository(get(), get()) }
@@ -43,12 +49,14 @@ val appModule = module {
     single { ClockViewModel() }
 
     // Settings ViewModel
-    single { SettingsViewModel(get()) }
+    single { SettingsViewModel(get(), get(), get()) }
 
     // Built-in widgets
     single { ClockWidgetFactory(get(), get()) }
     single { WeatherWidgetFactory(get()) }
+    single { TodosWidgetFactory() }
+    single { ExpensesWidgetFactory() }
 
     // Widget registry
-    single { WidgetRegistry(listOf(get<ClockWidgetFactory>(), get<WeatherWidgetFactory>()), get()) }
+    single { WidgetRegistry(listOf(get<ClockWidgetFactory>(), get<WeatherWidgetFactory>(), get<TodosWidgetFactory>(), get<ExpensesWidgetFactory>()), get(), get()) }
 }

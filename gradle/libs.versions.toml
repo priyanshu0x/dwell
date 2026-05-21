@@ -13,6 +13,7 @@ kstore = "1.0.0"
 hot-reload = "1.1.1"
 koin = "4.2.1"
 charleskorn-kaml = "0.104.0"
+jna = "5.18.1"
 
 
 [libraries]
@@ -38,6 +39,8 @@ coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.re
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kstore = { module = "io.github.xxfast:kstore", version.ref = "kstore" }
 charleskorn-kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "charleskorn-kaml" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }

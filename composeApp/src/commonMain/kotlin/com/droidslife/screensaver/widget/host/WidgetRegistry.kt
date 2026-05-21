@@ -4,17 +4,22 @@ import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WIDGET_API_VERSION
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.settings.SettingsModel
+import com.droidslife.screensaver.settings.SecretStorage
+import com.droidslife.screensaver.settings.createSecretStorage
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 class WidgetRegistry(
     builtInFactories: List<WidgetFactory>,
     private val httpClient: HttpClient,
+    private val secretStorage: SecretStorage = createSecretStorage(),
     private val widgetLoader: WidgetLoader = createWidgetLoader(),
 ) {
     private val builtInDescriptors = builtInFactories
@@ -56,7 +61,10 @@ class WidgetRegistry(
     fun enable(id: String, configJson: JsonObject) {
         if (_instances.value.containsKey(id)) return
         val descriptor = descriptorById[id] ?: return
-        val config = WidgetConfig(configJson)
+        val config = WidgetConfig(configJson) { key ->
+            val secretId = (configJson[key] as? JsonPrimitive)?.content ?: return@WidgetConfig null
+            runBlocking { secretStorage.read(secretId) }
+        }
         val scope = WidgetScopeImpl(
             widgetId = id,
             coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
