@@ -24,7 +24,7 @@ class TrayDaemon {
             addSeparator()
             add(MenuItem("Quit").also { it.addActionListener { onQuit() } })
         }
-        val icon = TrayIcon(defaultImage(), "Screen Saver App", popup).apply {
+        val icon = TrayIcon(defaultImage(), "Dwell", popup).apply {
             isImageAutoSize = true
             addActionListener { onShow() }
         }

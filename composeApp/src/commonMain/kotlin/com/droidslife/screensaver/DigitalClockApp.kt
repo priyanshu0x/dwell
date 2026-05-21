@@ -483,13 +483,13 @@ fun DigitalClockApp(
                     ) {
                         Icon(
                             imageVector = if (clockViewModel.isAutoChangeEnabled) Icons.Filled.Close else Icons.Filled.PlayArrow,
-                            contentDescription = if (clockViewModel.isAutoChangeEnabled) "Pause auto-change" else "Start auto-change",
+                            contentDescription = if (clockViewModel.isAutoChangeEnabled) "Stop auto-cycling clock designs" else "Auto-cycle clock designs",
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (clockViewModel.isAutoChangeEnabled) 1f else 0.6f),
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     Text(
-                        text = if (clockViewModel.isAutoChangeEnabled) "Stop" else "Auto",
+                        text = if (clockViewModel.isAutoChangeEnabled) "Stop" else "Auto-cycle",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             fontSize = 10.sp
@@ -513,7 +513,7 @@ fun DigitalClockApp(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,
-                            contentDescription = "Toggle shuffle mode",
+                            contentDescription = "Shuffle clock designs",
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (clockViewModel.isShuffleModeEnabled) 1f else 0.6f),
                             modifier = Modifier.size(20.dp)
                         )

@@ -73,7 +73,7 @@ val appModule = module {
 
     // Built-in widgets
     single { ClockWidgetFactory(get(), get()) }
-    single { WeatherWidgetFactory(get()) }
+    single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
     single { ExpensesWidgetFactory(get()) }
 

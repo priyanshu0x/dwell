@@ -26,6 +26,7 @@ fun WidgetGrid(
     modifier: Modifier = Modifier,
     registry: WidgetRegistry = koinInject(),
     showChrome: Boolean = true,
+    showHeader: Boolean = false,
 ) {
     val instances by registry.instances.collectAsState()
     val orderedInstances = instances.values.sortedBy { it.descriptor.displayName }
@@ -50,6 +51,7 @@ fun WidgetGrid(
                 ResumedWidgetCard(
                     instance = instance,
                     showChrome = false,
+                    showHeader = showHeader,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -71,6 +73,7 @@ fun WidgetGrid(
             ResumedWidgetCard(
                 instance = instance,
                 showChrome = showChrome,
+                showHeader = showHeader,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -81,6 +84,7 @@ fun WidgetGrid(
 private fun ResumedWidgetCard(
     instance: WidgetInstance,
     showChrome: Boolean,
+    showHeader: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     DisposableEffect(instance) {
@@ -92,5 +96,6 @@ private fun ResumedWidgetCard(
         instance = instance,
         modifier = modifier,
         showChrome = showChrome,
+        showHeader = showHeader,
     )
 }

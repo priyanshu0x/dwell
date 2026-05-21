@@ -22,6 +22,25 @@ class KeyEventHandler(
             return true
         }
 
+        if (event.type == KeyEventType.KeyDown && event.key == Key.F1) {
+            onAction(KeyEventAction.ShowHelp)
+            onAction(KeyEventAction.ShowToast("F1"))
+            return true
+        }
+
+        // '?' (Shift + /) opens help on US keyboards.
+        if (event.type == KeyEventType.KeyDown && event.isShiftPressed && event.key == Key.Slash) {
+            onAction(KeyEventAction.ShowHelp)
+            onAction(KeyEventAction.ShowToast("?"))
+            return true
+        }
+
+        if (event.type == KeyEventType.KeyDown && (event.isMetaPressed) && event.key == Key.Q) {
+            onAction(KeyEventAction.RequestExit)
+            onAction(KeyEventAction.ShowToast("Cmd + Q"))
+            return true
+        }
+
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
             when (event.key) {
                 Key.N -> {
@@ -74,6 +93,12 @@ class KeyEventHandler(
                     // Show help dialog
                     onAction(KeyEventAction.ShowHelp)
                     onAction(KeyEventAction.ShowToast("Ctrl + H"))
+                    return true
+                }
+                Key.Q -> {
+                    // Quit the application
+                    onAction(KeyEventAction.RequestExit)
+                    onAction(KeyEventAction.ShowToast("Ctrl + Q"))
                     return true
                 }
                 Key.T -> {

@@ -45,7 +45,7 @@ fun main(args: Array<String>) = application {
 
     if (launchArgs.mode == LaunchMode.Daemon && !dashboardVisible) {
         Window(
-            title = "Screen Saver App Daemon",
+            title = "Dwell Daemon",
             visible = false,
             onCloseRequest = {},
         ) {}
@@ -98,7 +98,7 @@ fun main(args: Array<String>) = application {
         )
 
         Window(
-            title = "Screen Saver App",
+            title = "Dwell",
             state = rememberWindowState(
                 placement = WindowPlacement.Fullscreen,
                 position = WindowPosition(Alignment.Center),

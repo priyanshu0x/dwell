@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.widget.host.WidgetInstance
 
@@ -17,6 +18,7 @@ fun WidgetCard(
     instance: WidgetInstance,
     modifier: Modifier = Modifier,
     showChrome: Boolean = true,
+    showHeader: Boolean = false,
 ) {
     if (!showChrome) {
         WidgetContent(instance = instance, modifier = modifier)
@@ -31,13 +33,17 @@ fun WidgetCard(
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = instance.widget.header ?: instance.descriptor.displayName,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
             WidgetContent(instance = instance, modifier = Modifier.fillMaxWidth())
+            if (showHeader) {
+                Text(
+                    text = (instance.widget.header ?: instance.descriptor.displayName).uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                    ),
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.padding(top = 10.dp).fillMaxWidth(),
+                )
+            }
         }
     }
 }
