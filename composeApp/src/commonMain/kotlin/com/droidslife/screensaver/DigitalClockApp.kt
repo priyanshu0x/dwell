@@ -166,6 +166,9 @@ fun DigitalClockApp(
             onBackendBaseUrlChange = settingsViewModel::setBackendBaseUrl,
             onBackendApiKeyChange = settingsViewModel::updateBackendApiKey,
             onWeatherApiKeyChange = settingsViewModel::updateWeatherApiKey,
+            backendApiKeySaved = settingsViewModel.isSecretSaved(settingsViewModel.settings.backendApiKeySecretId),
+            weatherApiKeySaved = settingsViewModel.isSecretSaved(settingsViewModel.settings.weatherApiKeySecretId),
+            savedSecretIds = settingsViewModel.savedSecretIds,
         )
     }
 

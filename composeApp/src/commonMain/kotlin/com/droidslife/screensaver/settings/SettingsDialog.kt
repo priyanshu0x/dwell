@@ -76,6 +76,9 @@ fun SettingsDialog(
     onBackendBaseUrlChange: (String) -> Unit = {},
     onBackendApiKeyChange: (String) -> Unit = {},
     onWeatherApiKeyChange: (String) -> Unit = {},
+    backendApiKeySaved: Boolean = false,
+    weatherApiKeySaved: Boolean = false,
+    savedSecretIds: Set<String> = emptySet(),
 ) {
     var showShortcutsDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf("Display") }
@@ -128,6 +131,7 @@ fun SettingsDialog(
                         onAutoPlayToggle = onAutoPlayToggle,
                         onShuffleToggle = onShuffleToggle,
                         onWeatherApiKeyChange = onWeatherApiKeyChange,
+                        weatherApiKeySaved = weatherApiKeySaved,
                     )
                     "Widgets" -> WidgetSettings(
                         settings = settings,
@@ -136,6 +140,7 @@ fun SettingsDialog(
                         onWidgetConfigChange = onWidgetConfigChange,
                         onWidgetSecretChange = onWidgetSecretChange,
                         onWidgetReload = onWidgetReload,
+                        savedSecretIds = savedSecretIds,
                     )
                     "Activation" -> ActivationSettings(
                         settings = settings,
@@ -147,6 +152,7 @@ fun SettingsDialog(
                         settings = settings,
                         onBackendBaseUrlChange = onBackendBaseUrlChange,
                         onBackendApiKeyChange = onBackendApiKeyChange,
+                        backendApiKeySaved = backendApiKeySaved,
                     )
                     "About" -> AboutSettings()
                 }
@@ -173,6 +179,7 @@ private fun DisplaySettings(
     onAutoPlayToggle: () -> Unit,
     onShuffleToggle: () -> Unit,
     onWeatherApiKeyChange: (String) -> Unit,
+    weatherApiKeySaved: Boolean,
 ) {
     var weatherApiKey by remember(settings.weatherApiKeySecretId) { mutableStateOf("") }
 
@@ -199,6 +206,9 @@ private fun DisplaySettings(
         },
         label = { Text("WeatherAPI Key") },
         visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            SecretSavedText(weatherApiKeySaved, weatherApiKey.isBlank())
+        },
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         singleLine = true,
     )
@@ -217,6 +227,7 @@ private fun WidgetSettings(
     onWidgetConfigChange: (String, JsonObject) -> Unit,
     onWidgetSecretChange: (String, String, String) -> Unit,
     onWidgetReload: () -> Unit,
+    savedSecretIds: Set<String>,
 ) {
     val defaultEnabled = widgetDescriptors
         .filter { it.source is WidgetSource.BuiltIn }
@@ -272,6 +283,7 @@ private fun WidgetSettings(
                     ConfigFieldRenderer(
                         field = field,
                         config = currentConfig,
+                        savedSecretIds = savedSecretIds,
                         onConfigChange = { onWidgetConfigChange(descriptor.id, it) },
                         onSecretChange = { key, value -> onWidgetSecretChange(descriptor.id, key, value) },
                     )
@@ -286,6 +298,7 @@ private fun WidgetSettings(
 private fun ConfigFieldRenderer(
     field: ConfigField,
     config: JsonObject,
+    savedSecretIds: Set<String>,
     onConfigChange: (JsonObject) -> Unit,
     onSecretChange: (String, String) -> Unit,
 ) {
@@ -320,6 +333,7 @@ private fun ConfigFieldRenderer(
         is ConfigField.Duration -> TextConfigField(field.label, config[field.key]?.jsonPrimitive?.content ?: field.default, ::update)
         is ConfigField.Secret -> {
             var value by remember(field.key, config[field.key]) { mutableStateOf("") }
+            val saved = config[field.key]?.jsonPrimitive?.content in savedSecretIds
             TextConfigField(
                 label = field.label,
                 value = value,
@@ -328,6 +342,7 @@ private fun ConfigFieldRenderer(
                     onSecretChange(field.key, it.content)
                 },
                 visualTransformation = PasswordVisualTransformation(),
+                supportingText = secretSavedMessage(saved, value.isBlank()),
             )
         }
         is ConfigField.Text -> TextConfigField(field.label, config[field.key]?.jsonPrimitive?.content ?: field.default, ::update)
@@ -361,6 +376,7 @@ private fun BackendSettings(
     settings: SettingsModel,
     onBackendBaseUrlChange: (String) -> Unit,
     onBackendApiKeyChange: (String) -> Unit,
+    backendApiKeySaved: Boolean,
 ) {
     var apiKey by remember(settings.backendApiKeySecretId) { mutableStateOf("") }
 
@@ -380,6 +396,9 @@ private fun BackendSettings(
         },
         label = { Text("API Key") },
         visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            SecretSavedText(backendApiKeySaved, apiKey.isBlank())
+        },
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         singleLine = true,
     )
@@ -391,14 +410,32 @@ private fun TextConfigField(
     value: String,
     onValueChange: (JsonPrimitive) -> Unit,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    supportingText: String? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = { onValueChange(JsonPrimitive(it)) },
         label = { Text(label) },
         visualTransformation = visualTransformation,
+        supportingText = supportingText?.let { message -> { Text(message) } },
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     )
+}
+
+@Composable
+private fun SecretSavedText(saved: Boolean, inputBlank: Boolean) {
+    val message = secretSavedMessage(saved, inputBlank)
+    if (message != null) {
+        Text(message)
+    }
+}
+
+private fun secretSavedMessage(saved: Boolean, inputBlank: Boolean): String? {
+    return when {
+        saved && inputBlank -> "Saved. Enter a new value to replace it."
+        saved -> "New value will replace the saved key."
+        else -> null
+    }
 }
 
 private fun Int.coerceToField(field: ConfigField.IntField): Int {

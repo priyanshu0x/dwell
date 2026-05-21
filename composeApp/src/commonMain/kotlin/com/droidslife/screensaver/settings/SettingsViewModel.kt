@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -36,10 +37,16 @@ class SettingsViewModel(
     var isSettingsDialogOpen by mutableStateOf(false)
         private set
 
+    var savedSecretIds by mutableStateOf<Set<String>>(emptySet())
+        private set
+
     init {
         // Load settings from the repository
         preferencesRepository.getSettings()
-            .onEach { settings = it }
+            .onEach {
+                settings = it
+                refreshSecretStatuses(it)
+            }
             .launchIn(viewModelScope)
     }
 
@@ -154,8 +161,10 @@ class SettingsViewModel(
         viewModelScope.launch {
             if (value.isBlank()) {
                 secretStorage.delete(secretId)
+                savedSecretIds -= secretId
             } else {
                 secretStorage.write(secretId, value)
+                savedSecretIds += secretId
             }
         }
     }
@@ -183,8 +192,10 @@ class SettingsViewModel(
         viewModelScope.launch {
             if (value.isBlank()) {
                 secretStorage.delete(settings.backendApiKeySecretId)
+                savedSecretIds -= settings.backendApiKeySecretId
             } else {
                 secretStorage.write(settings.backendApiKeySecretId, value)
+                savedSecretIds += settings.backendApiKeySecretId
             }
         }
     }
@@ -193,11 +204,15 @@ class SettingsViewModel(
         viewModelScope.launch {
             if (value.isBlank()) {
                 secretStorage.delete(settings.weatherApiKeySecretId)
+                savedSecretIds -= settings.weatherApiKeySecretId
             } else {
                 secretStorage.write(settings.weatherApiKeySecretId, value)
+                savedSecretIds += settings.weatherApiKeySecretId
             }
         }
     }
+
+    fun isSecretSaved(secretId: String): Boolean = secretId in savedSecretIds
 
     fun effectiveEnabledWidgetIds(defaultIds: Set<String> = defaultWidgetIds): Set<String> {
         return settings.enabledWidgetIds.ifEmpty { defaultIds }
@@ -225,6 +240,25 @@ class SettingsViewModel(
      */
     fun closeSettingsDialog() {
         isSettingsDialogOpen = false
+    }
+
+    private suspend fun refreshSecretStatuses(currentSettings: SettingsModel) {
+        val ids = buildSet {
+            add(currentSettings.backendApiKeySecretId)
+            add(currentSettings.weatherApiKeySecretId)
+            currentSettings.widgetConfigs.values
+                .flatMap { it.values }
+                .mapNotNull { it.secretIdOrNull() }
+                .forEach(::add)
+        }
+        savedSecretIds = ids
+            .filter { secretStorage.read(it)?.isNotBlank() == true }
+            .toSet()
+    }
+
+    private fun JsonElement.secretIdOrNull(): String? {
+        val value = (this as? JsonPrimitive)?.content ?: return null
+        return value.takeIf { it.startsWith("widget.") }
     }
 
     private companion object {
