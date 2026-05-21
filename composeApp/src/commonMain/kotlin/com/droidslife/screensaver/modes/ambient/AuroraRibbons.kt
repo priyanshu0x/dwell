@@ -34,72 +34,149 @@ fun AuroraRibbons(modifier: Modifier = Modifier) {
         label = "aurora-t",
     )
 
-    Canvas(modifier.blur(20.dp)) {
+    // Mockup uses `mix-blend-mode: screen + filter: blur(20px) saturate(1.1)` on the whole
+    // SVG. Compose Desktop's Modifier.blur only blurs the rasterised layer, so to match the
+    // diffuse "luminous mist" look we (a) crank the blur up, (b) layer several overlapping
+    // bands per ribbon with decreasing alpha and increasing half-height to create a
+    // vertical falloff, and (c) feather each band with a vertical gradient so the edges
+    // fade to transparent rather than sit as a slab.
+    Canvas(modifier.blur(60.dp)) {
         val h = size.height
 
         // Ribbon 1: green → teal, upper, drifts L→R
-        drawRibbon(
-            yBase = h * 0.28f,
-            amplitude = h * 0.06f,
+        drawSoftRibbon(
+            yBase = h * 0.30f,
+            amplitude = h * 0.14f,
             phase = t * 2f * PI.toFloat(),
             color = DwellColors.BorealisGreen,
             secondaryColor = DwellColors.BorealisTeal,
+            halfHeight = h * 0.08f,
+            peakAlpha = 0.65f,
+            waveFrequency = 2.2f,
         )
         // Ribbon 2: magenta → blue-ish, mid, drifts R→L
-        drawRibbon(
-            yBase = h * 0.50f,
-            amplitude = h * 0.08f,
+        drawSoftRibbon(
+            yBase = h * 0.52f,
+            amplitude = h * 0.16f,
             phase = -t * 2f * PI.toFloat() + 1.5f,
             color = DwellColors.BorealisMagenta,
             secondaryColor = Color(0xFF7BB4EF),
+            halfHeight = h * 0.09f,
+            peakAlpha = 0.55f,
+            waveFrequency = 1.8f,
         )
         // Ribbon 3: faint green, lower, drifts L→R with different phase
-        drawRibbon(
-            yBase = h * 0.75f,
-            amplitude = h * 0.05f,
+        drawSoftRibbon(
+            yBase = h * 0.78f,
+            amplitude = h * 0.09f,
             phase = t * 2f * PI.toFloat() + 3f,
-            color = DwellColors.BorealisGreen.copy(alpha = 0.5f),
-            secondaryColor = DwellColors.BorealisGreen.copy(alpha = 0f),
+            color = DwellColors.BorealisGreen,
+            secondaryColor = DwellColors.BorealisGreen,
+            halfHeight = h * 0.06f,
+            peakAlpha = 0.35f,
+            waveFrequency = 1.4f,
         )
     }
 }
 
-private fun DrawScope.drawRibbon(
+/**
+ * Draw a single aurora ribbon as several overlapping layers: a tight bright core,
+ * a mid-thickness mid-alpha mid-layer, and one or two wide low-alpha halos. The
+ * subsequent Modifier.blur turns the stack into soft luminous mist.
+ */
+private fun DrawScope.drawSoftRibbon(
     yBase: Float,
     amplitude: Float,
     phase: Float,
     color: Color,
     secondaryColor: Color,
+    halfHeight: Float,
+    peakAlpha: Float,
+    waveFrequency: Float,
+) {
+    val layers = listOf(
+        0.35f to peakAlpha,          // bright core
+        0.60f to peakAlpha * 0.55f,
+        1.00f to peakAlpha * 0.28f,
+        1.60f to peakAlpha * 0.14f,  // wide diffuse halo
+    )
+    layers.forEach { (heightScale, alpha) ->
+        drawRibbonBand(
+            yBase = yBase,
+            amplitude = amplitude,
+            phase = phase,
+            color = color,
+            secondaryColor = secondaryColor,
+            ribbonHalfHeight = halfHeight * heightScale,
+            alphaScale = alpha,
+            waveFrequency = waveFrequency,
+        )
+    }
+}
+
+private fun DrawScope.drawRibbonBand(
+    yBase: Float,
+    amplitude: Float,
+    phase: Float,
+    color: Color,
+    secondaryColor: Color,
+    ribbonHalfHeight: Float,
+    alphaScale: Float,
+    waveFrequency: Float,
 ) {
     val w = size.width
-    val steps = 64
-    val ribbonHalfHeight = 40f
+    val steps = 96
     val path = Path()
-    // Top edge — left to right
-    val startY0 = yBase + amplitude * sin(phase + 0f)
-    path.moveTo(-50f, startY0 - ribbonHalfHeight)
+
+    // Two superimposed sines give an aurora-like curve with more "swoop" variation than
+    // a single sine, matching the cubic-bezier shapes in the mockup.
+    fun curveY(x: Float): Float {
+        val u = x / w
+        return yBase +
+            amplitude * sin(phase + u * waveFrequency * PI.toFloat()) +
+            amplitude * 0.45f * sin(phase * 1.3f + u * waveFrequency * 2.1f * PI.toFloat())
+    }
+
+    path.moveTo(-50f, curveY(-50f) - ribbonHalfHeight)
     for (i in 0..steps) {
         val x = -50f + (w + 100f) * i / steps
-        val y = yBase + amplitude * sin(phase + (x / w) * 3f)
-        path.lineTo(x, y - ribbonHalfHeight)
+        path.lineTo(x, curveY(x) - ribbonHalfHeight)
     }
-    // Bottom edge — right to left, closing the shape
     for (i in steps downTo 0) {
         val x = -50f + (w + 100f) * i / steps
-        val y = yBase + amplitude * sin(phase + (x / w) * 3f)
-        path.lineTo(x, y + ribbonHalfHeight)
+        path.lineTo(x, curveY(x) + ribbonHalfHeight)
     }
     path.close()
+
+    // Horizontal fade (matches mockup stops 0 → peak → peak → 0).
+    val horizontalBrush = Brush.horizontalGradient(
+        colorStops = arrayOf(
+            0.00f to color.copy(alpha = 0f),
+            0.30f to color.copy(alpha = alphaScale),
+            0.65f to secondaryColor.copy(alpha = alphaScale * 0.85f),
+            1.00f to secondaryColor.copy(alpha = 0f),
+        ),
+    )
     drawPath(
         path = path,
-        brush = Brush.horizontalGradient(
-            colors = listOf(
-                color.copy(alpha = 0f),
-                color,
-                secondaryColor,
-                secondaryColor.copy(alpha = 0f),
-            ),
+        brush = horizontalBrush,
+        blendMode = BlendMode.Screen,
+    )
+
+    // Vertical soft-fade overlay — feathers the top/bottom edges so each layer reads as
+    // mist rather than a slab. The Y range covers the full extent the curve can occupy.
+    val verticalBrush = Brush.verticalGradient(
+        colorStops = arrayOf(
+            0.0f to Color.Black.copy(alpha = 0f),
+            0.5f to Color.Black.copy(alpha = alphaScale * 0.35f),
+            1.0f to Color.Black.copy(alpha = 0f),
         ),
+        startY = yBase - ribbonHalfHeight - amplitude,
+        endY = yBase + ribbonHalfHeight + amplitude,
+    )
+    drawPath(
+        path = path,
+        brush = verticalBrush,
         blendMode = BlendMode.Screen,
     )
 }
