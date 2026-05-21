@@ -1,5 +1,9 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.GradleException
 import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.bundling.Zip
+
+val appVersion = "1.0.0"
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -59,9 +63,9 @@ compose.desktop {
         mainClass = "MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
+            targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
             packageName = "Screen Saver App"
-            packageVersion = "1.0.0"
+            packageVersion = appVersion
             description = "A modern flip clock screen saver application"
             copyright = "© 2025 DroidsLife"
             vendor = "DroidsLife"
@@ -89,15 +93,6 @@ compose.desktop {
                 // Create a desktop shortcut
                 menu = true
             }
-
-            macOS {
-                iconFile.set(project.file("desktopAppIcons/MacosIcon.icns"))
-                bundleID = "com.droidslife.screensaver.desktopApp"
-                appCategory = "public.app-category.utilities"
-                signing {
-                    sign.set(false)
-                }
-            }
         }
     }
 }
@@ -118,4 +113,39 @@ tasks.register<Copy>("packageScr") {
         rename { "ScreenSaverApp.scr" }
     }
     into(layout.buildDirectory.dir("compose/binaries/main/scr/Screen Saver App"))
+}
+
+tasks.register("verifyScrPackage") {
+    group = "verification"
+    description = "Verifies that the .scr package contains the launcher and adjacent runtime."
+    dependsOn("packageScr")
+
+    doLast {
+        val scrDir = layout.buildDirectory.dir("compose/binaries/main/scr/Screen Saver App").get().asFile
+        val scrFile = scrDir.resolve("ScreenSaverApp.scr")
+        val runtimeDir = scrDir.resolve("runtime")
+        val appDir = scrDir.resolve("app")
+
+        if (!scrFile.isFile) {
+            throw GradleException("Missing screensaver launcher: ${scrFile.absolutePath}")
+        }
+        if (!runtimeDir.isDirectory) {
+            throw GradleException("Missing packaged runtime beside .scr: ${runtimeDir.absolutePath}")
+        }
+        if (!appDir.isDirectory) {
+            throw GradleException("Missing packaged app directory beside .scr: ${appDir.absolutePath}")
+        }
+    }
+}
+
+tasks.register<Zip>("packageScrZip") {
+    group = "distribution"
+    description = "Builds a zip containing the full Windows .scr screensaver bundle."
+    dependsOn("verifyScrPackage")
+
+    archiveFileName.set("ScreenSaverApp-scr-$appVersion.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main"))
+    from(layout.buildDirectory.dir("compose/binaries/main/scr")) {
+        into("ScreenSaverApp-scr")
+    }
 }
