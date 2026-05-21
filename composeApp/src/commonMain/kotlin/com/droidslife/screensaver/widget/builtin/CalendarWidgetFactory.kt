@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -86,11 +88,22 @@ private fun CalendarMonth(modifier: Modifier) {
     val rows = (totalCells + 6) / 7 // up to 6 rows
 
     val weekdayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
+    val monthYear = "${monthShortName(today.month).uppercase()} ${today.year}"
 
     Column(
-        modifier = modifier.padding(8.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        Text(
+            text = monthYear,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 9.sp,
+            letterSpacing = 2.25.sp,
+            color = DwellColors.TextLow,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(4.dp))
         // weekday header row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             weekdayLabels.forEach { label ->
