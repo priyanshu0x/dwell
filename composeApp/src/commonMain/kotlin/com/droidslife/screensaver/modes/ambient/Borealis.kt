@@ -65,14 +65,17 @@ fun Borealis(modifier: Modifier = Modifier) {
                 ),
             ),
     ) {
-        // Star field — fixed positions, fixed alphas
+        // Star field — fixed positions, fixed alphas. Radius is dp-scaled so the dots
+        // actually render at HiDPI / large screens; a hard-coded 0.8f became sub-pixel
+        // on a 1080p+ display and disappeared entirely.
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
+            val starRadius = 1.2.dp.toPx()
             starPositions.forEachIndexed { i, pos ->
                 drawCircle(
                     color = Color.White.copy(alpha = starAlphas[i]),
-                    radius = 0.8f,
+                    radius = starRadius,
                     center = Offset(pos.x * w, pos.y * h),
                 )
             }
