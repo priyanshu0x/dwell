@@ -33,7 +33,7 @@ fun NoirBackdrop(modifier: Modifier = Modifier) {
     Canvas(modifier.fillMaxSize().background(Color(0xFF020203))) {
         val cx = (0.38f + 0.10f * kotlin.math.sin(t)) * size.width
         val cy = (0.42f + 0.04f * kotlin.math.sin(t + Math.PI.toFloat() / 2f)) * size.height
-        val r = 600.dp.toPx()
+        val r = 900.dp.toPx()
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(DwellColors.NoirGlow.copy(alpha = 0.30f), Color.Transparent),
