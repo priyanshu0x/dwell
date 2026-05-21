@@ -1,19 +1,20 @@
 package com.droidslife.screensaver.widget.builtin
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,8 +23,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.network.BackendResult
@@ -111,21 +117,35 @@ private class TodosWidget(
         val visibleTodos = sortedTodos()
         val openTodos = visibleTodos.filterNot { it.done }
         val displayed = openTodos.take(5)
-        Column(modifier = modifier) {
-            // Header row: title + add toggle
+        val openCount = openTodos.size
+
+        Column(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            // Header: tiny uppercase label + tiny add toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Todos",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = if (openCount > 0) "TODOS · $openCount OPEN" else "TODOS",
+                    fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 9.sp,
+                    letterSpacing = 2.25.sp,
+                    color = DwellColors.TextLow,
+                    maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { inputVisible = !inputVisible }) {
+                IconButton(
+                    onClick = { inputVisible = !inputVisible },
+                    modifier = Modifier.size(20.dp),
+                ) {
                     Icon(
                         imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
                         contentDescription = if (inputVisible) "Hide add form" else "Add task",
+                        tint = DwellColors.TextLow,
                     )
                 }
             }
@@ -149,47 +169,67 @@ private class TodosWidget(
                 }
             }
 
-            if (displayed.isEmpty()) {
-                Text(
-                    text = "Nothing to do",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            } else {
-                displayed.forEach { todo ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(checked = todo.done, onCheckedChange = { toggle(todo.id) })
-                        Text(
-                            text = todo.text,
-                            modifier = Modifier.weight(1f),
-                            textDecoration = if (todo.done) TextDecoration.LineThrough else TextDecoration.None,
-                        )
-                        if (inputVisible) {
-                            IconButton(onClick = { delete(todo.id) }) {
-                                Icon(Icons.Filled.Close, contentDescription = "Delete task")
+            // Body: list of todos
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp),
+                verticalArrangement = Arrangement.Top,
+            ) {
+                if (displayed.isEmpty()) {
+                    Text(
+                        text = "Nothing to do",
+                        fontFamily = DwellFonts.interTight(),
+                        fontSize = 11.sp,
+                        color = DwellColors.TextMid,
+                    )
+                } else {
+                    displayed.forEach { todo ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = todo.text,
+                                fontFamily = DwellFonts.interTight(),
+                                fontSize = 11.sp,
+                                color = if (todo.done) DwellColors.TextFaint else DwellColors.TextHigh,
+                                textDecoration = if (todo.done) TextDecoration.LineThrough else TextDecoration.None,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (inputVisible) {
+                                IconButton(
+                                    onClick = { delete(todo.id) },
+                                    modifier = Modifier.size(18.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = "Delete task",
+                                        tint = DwellColors.TextLow,
+                                    )
+                                }
                             }
                         }
                     }
                 }
-                if (openTodos.size > displayed.size) {
-                    Text(
-                        text = "+${openTodos.size - displayed.size} more",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
             }
 
-            if (unsyncedCount > 0) {
+            // Subtitle line
+            val subtitle = when {
+                openCount > displayed.size ->
+                    "+ ${openCount - displayed.size} more"
+                unsyncedCount > 0 -> "$unsyncedCount unsynced"
+                openCount == 0 && displayed.isEmpty() -> "all clear"
+                else -> ""
+            }
+            if (subtitle.isNotBlank()) {
                 Text(
-                    text = "$unsyncedCount unsynced",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp),
+                    text = subtitle,
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 10.sp,
+                    color = if (unsyncedCount > 0 && openCount <= displayed.size)
+                        DwellColors.StatusError
+                    else DwellColors.TextMid,
                 )
             }
         }
