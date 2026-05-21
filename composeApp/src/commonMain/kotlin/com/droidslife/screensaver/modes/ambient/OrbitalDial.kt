@@ -82,18 +82,20 @@ fun OrbitalDial(currentMinute: Int, modifier: Modifier = Modifier) {
             )
         }
 
-        // active minute tick (pulses)
+        // active minute tick (pulses). Drawn longer + thicker than the regular
+        // 60-tick ring so it reads clearly on top of the same-position base tick.
         val activeAngle = (currentMinute * 6 - 90).toFloat() * PI.toFloat() / 180f
-        val activeTickLen = 14.dp.toPx()
+        val activeTickLen = 18.dp.toPx()
+        val activeTickOuter = 4.dp.toPx() // overshoot the ring slightly
         val ax1 = cx + (r - activeTickLen) * cos(activeAngle)
         val ay1 = cy + (r - activeTickLen) * sin(activeAngle)
-        val ax2 = cx + r * cos(activeAngle)
-        val ay2 = cy + r * sin(activeAngle)
+        val ax2 = cx + (r + activeTickOuter) * cos(activeAngle)
+        val ay2 = cy + (r + activeTickOuter) * sin(activeAngle)
         drawLine(
             color = cyan.copy(alpha = pulse),
             start = Offset(ax1, ay1),
             end = Offset(ax2, ay2),
-            strokeWidth = 2f,
+            strokeWidth = 3.5f,
         )
     }
 }
