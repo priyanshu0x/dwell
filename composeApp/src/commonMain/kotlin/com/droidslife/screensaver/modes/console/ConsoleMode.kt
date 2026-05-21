@@ -14,6 +14,7 @@ import com.droidslife.screensaver.ui.CornerButtons
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.api.WidgetRenderTarget
+import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 
 private val defaultLayouts: Map<String, GridRect> = mapOf(
@@ -47,6 +48,18 @@ fun ConsoleMode(
             instance.widget.Render(
                 target = WidgetRenderTarget.Tile,
                 scope = instance.scope,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (settingsViewModel.consoleEditMode) {
+            val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
+                instances.mapValues { it.value.descriptor.factory.preferredSize }
+            }
+            ConsoleEditOverlay(
+                placements = placements,
+                sizeConstraints = sizeConstraints,
+                onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
+                onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                 modifier = Modifier.fillMaxSize(),
             )
         }

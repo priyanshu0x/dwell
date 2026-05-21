@@ -40,6 +40,20 @@ class SettingsViewModel(
     var savedSecretIds by mutableStateOf<Set<String>>(emptySet())
         private set
 
+    /**
+     * Runtime-only flag for Console layout edit mode. Not persisted.
+     */
+    var consoleEditMode by mutableStateOf(false)
+        private set
+
+    fun toggleConsoleEditMode() {
+        consoleEditMode = !consoleEditMode
+    }
+
+    fun updateConsoleEditMode(on: Boolean) {
+        consoleEditMode = on
+    }
+
     init {
         // Load settings from the repository
         preferencesRepository.getSettings()
