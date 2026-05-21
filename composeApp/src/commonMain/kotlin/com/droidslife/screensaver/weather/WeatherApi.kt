@@ -6,6 +6,7 @@ import com.droidslife.screensaver.settings.WEATHER_API_KEY_SECRET_ID
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -36,8 +37,10 @@ class WeatherApi(
     ): WeatherData = withContext(Dispatchers.Default) {
         try {
             val apiKey = apiKey()
-            val url = "${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}?q=$latitude,$longitude&key=$apiKey"
-            client.get(url).body<WeatherData>()
+            client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
+                parameter("q", "$latitude,$longitude")
+                parameter("key", apiKey)
+            }.body<WeatherData>()
         } catch (e: Exception) {
             throw WeatherApiException("Failed to load weather for coordinates $latitude,$longitude", e)
         }
@@ -51,8 +54,10 @@ class WeatherApi(
     suspend fun getWeatherDataByCity(cityName: String): WeatherData = withContext(Dispatchers.Default) {
         try {
             val apiKey = apiKey()
-            val url = "${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}?q=$cityName&key=$apiKey"
-            client.get(url).body<WeatherData>()
+            client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
+                parameter("q", cityName)
+                parameter("key", apiKey)
+            }.body<WeatherData>()
         } catch (e: Exception) {
             throw WeatherApiException("Failed to load weather for $cityName", e)
         }
@@ -66,8 +71,10 @@ class WeatherApi(
     suspend fun searchCity(query: String): List<CitySearchResult> = withContext(Dispatchers.Default) {
         try {
             val apiKey = apiKey()
-            val url = "${Constants.WeatherApi.BASE_URL}/search.json?q=$query&key=$apiKey"
-            val response = client.get(url).body<String>()
+            val response = client.get("${Constants.WeatherApi.BASE_URL}/search.json") {
+                parameter("q", query)
+                parameter("key", apiKey)
+            }.body<String>()
 
             val json = Json { ignoreUnknownKeys = true }
             val jsonArray = json.parseToJsonElement(response).jsonArray

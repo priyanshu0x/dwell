@@ -12,8 +12,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class DataSourceTest {
@@ -37,6 +39,19 @@ class DataSourceTest {
         val config = WidgetConfig(JsonObject(mapOf("apiKey" to JsonPrimitive("secret-id"))))
 
         assertNull(config.secret("apiKey"))
+    }
+
+    @Test
+    fun fileDataSourceRejectsPathsOutsideWidgetFolder() {
+        val folder = createTempDirectory(prefix = "screen-saver-widget")
+        folder.resolve("data.json").writeText("""{"ok":true}""")
+
+        assertFailsWith<IllegalArgumentException> {
+            SourceManifest(
+                type = "file",
+                path = "../secret.json",
+            ).toDataSource(folder, WidgetConfig(JsonObject(emptyMap())), TestScope)
+        }
     }
 }
 

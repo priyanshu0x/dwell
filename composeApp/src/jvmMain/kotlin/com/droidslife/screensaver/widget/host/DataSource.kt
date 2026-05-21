@@ -26,9 +26,16 @@ fun SourceManifest.toDataSource(
     return when (type.lowercase()) {
         "command" -> CommandDataSource(folder, command, durationMillis(timeout, 10_000L), config)
         "http" -> HttpDataSource(scope, url, method, headers, durationMillis(timeout, 10_000L), config)
-        "file" -> FileDataSource(folder.resolve(path))
+        "file" -> FileDataSource(resolveWidgetFile(folder, path))
         else -> error("Unsupported source type: $type")
     }
+}
+
+private fun resolveWidgetFile(folder: Path, relativePath: String): Path {
+    val root = folder.toAbsolutePath().normalize()
+    val resolved = root.resolve(relativePath).normalize()
+    require(resolved.startsWith(root)) { "File source path must stay inside widget folder" }
+    return resolved
 }
 
 private class CommandDataSource(
