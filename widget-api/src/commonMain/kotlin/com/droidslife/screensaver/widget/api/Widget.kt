@@ -22,6 +22,22 @@ interface Widget {
     fun Content(modifier: Modifier)
 
     /**
+     * Per-target render. Default delegates to Content for Tile; Chip/Minimal use host defaults.
+     * Override per-target to customize.
+     */
+    @Composable
+    fun Render(target: WidgetRenderTarget, scope: WidgetScope, modifier: Modifier = Modifier) {
+        when (target) {
+            WidgetRenderTarget.Tile    -> Content(modifier)
+            WidgetRenderTarget.Chip    -> Content(modifier) // host will wrap with chip chrome
+            WidgetRenderTarget.Minimal -> Content(modifier) // host will wrap with minimal chrome
+        }
+    }
+
+    /** At-a-glance summary. Required for non-Console renderers. */
+    fun summary(): WidgetSummary = WidgetSummary(primaryValue = "—")
+
+    /**
      * Optional card header override.
      *
      * Return `null` to let the host use [WidgetFactory.displayName].
