@@ -2,6 +2,7 @@ package com.droidslife.screensaver.modes.console
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
@@ -18,17 +19,35 @@ private val PADDING = 32.dp
  * 12x6 grid layout engine for Console mode. Each placement is positioned and
  * sized according to its [GridRect]. Cells are emitted lazily via [cell].
  */
+/**
+ * Per-tile pixel-precise transform applied on top of its [GridRect] while a
+ * drag or resize is in progress. Empty/zero outside an active gesture; the
+ * tile reverts to its grid-snapped position the moment the gesture ends.
+ */
+data class TileLiveDrag(val dx: Float, val dy: Float, val dw: Float, val dh: Float) {
+    companion object {
+        val Zero = TileLiveDrag(0f, 0f, 0f, 0f)
+    }
+}
+
 @Composable
 fun ConsoleGrid(
     placements: Map<String, GridRect>,
     modifier: Modifier = Modifier,
+    liveDrags: Map<String, TileLiveDrag> = emptyMap(),
     cell: @Composable (id: String) -> Unit,
 ) {
     Layout(
         modifier = modifier,
         content = {
+            // key(id) pins each cell's composition state to its id rather than
+            // its iteration position, so reordering placements (e.g. when
+            // ConsoleMode lifts the last-focused tile to the end of the map)
+            // doesn't reset remember state or cancel in-flight drag gestures.
             placements.forEach { (id, _) ->
-                Box(modifier = Modifier.layoutId(id)) { cell(id) }
+                key(id) {
+                    Box(modifier = Modifier.layoutId(id)) { cell(id) }
+                }
             }
         },
     ) { measurables, constraints ->
@@ -42,13 +61,16 @@ fun ConsoleGrid(
         val byId = measurables.associateBy { it.layoutId as String }
 
         val placed = placements.map { (id, rect) ->
-            val w = rect.cols * cellW + (rect.cols - 1) * gap
-            val h = rect.rows * cellH + (rect.rows - 1) * gap
-            val placeable = byId[id]?.measure(
-                Constraints.fixed(w.coerceAtLeast(0), h.coerceAtLeast(0))
-            )
-            val x = padding + rect.col * (cellW + gap)
-            val y = padding + rect.row * (cellH + gap)
+            val baseW = rect.cols * cellW + (rect.cols - 1) * gap
+            val baseH = rect.rows * cellH + (rect.rows - 1) * gap
+            val live = liveDrags[id] ?: TileLiveDrag.Zero
+            val w = (baseW + live.dw.toInt()).coerceAtLeast(0)
+            val h = (baseH + live.dh.toInt()).coerceAtLeast(0)
+            val placeable = byId[id]?.measure(Constraints.fixed(w, h))
+            val baseX = padding + rect.col * (cellW + gap)
+            val baseY = padding + rect.row * (cellH + gap)
+            val x = baseX + live.dx.toInt()
+            val y = baseY + live.dy.toInt()
             Triple(placeable, x, y)
         }
 
