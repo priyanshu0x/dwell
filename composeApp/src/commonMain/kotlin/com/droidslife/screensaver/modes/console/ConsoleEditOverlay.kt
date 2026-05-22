@@ -3,12 +3,9 @@ package com.droidslife.screensaver.modes.console
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -261,34 +258,18 @@ private fun EditTile(
                     )
                 },
         ) {
-            // Top row: size badge (left, only while actively dragging/resizing) +
-            // persistent drag handle (right).
+            // Size badge top-left, visible only while actively dragging/resizing.
             val activeRect = ghosts[id]
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                if (activeRect != null) {
-                    Text(
-                        text = "${activeRect.cols}×${activeRect.rows}",
-                        fontSize = 9.sp,
-                        color = DwellColors.LumenCyan,
-                        fontFamily = DwellFonts.jetBrainsMono(),
-                        fontWeight = FontWeight.Medium,
-                    )
-                } else {
-                    // Placeholder keeps the drag handle anchored to the right edge.
-                    Box(Modifier)
-                }
+            if (activeRect != null) {
                 Text(
-                    text = "⋮⋮",
-                    fontSize = 10.sp,
-                    color = DwellColors.LumenCyan.copy(alpha = 0.85f),
+                    text = "${activeRect.cols}×${activeRect.rows}",
+                    fontSize = 9.sp,
+                    color = DwellColors.LumenCyan,
                     fontFamily = DwellFonts.jetBrainsMono(),
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                 )
             }
         }
