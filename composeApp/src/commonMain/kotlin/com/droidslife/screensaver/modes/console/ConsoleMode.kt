@@ -107,7 +107,9 @@ fun ConsoleMode(
                 }
                 val isHovered = hoveredTile == id
                 val targetBorder = if (isHovered) {
-                    accent.primary.copy(alpha = 0.6f).compositeOver(baseBorder)
+                    // Subtle lift only — too much accent on hover competes
+                    // with the active-drag cyan and made the dashboard noisy.
+                    accent.primary.copy(alpha = 0.22f).compositeOver(baseBorder)
                 } else baseBorder
                 val targetBg = if (isHovered) {
                     Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)

@@ -217,7 +217,7 @@ private fun EditTile(
         // while a tile is mid-drag. While dragging the dashed cyan rule wins.
         val settledCollides = !isActive && overlapsAny(id, rect, placements)
         val idleAlpha by animateFloatAsState(
-            targetValue = if (isHovered) 0.7f else 0.35f,
+            targetValue = if (isHovered) 0.5f else 0.35f,
             animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
             label = "edit-border-alpha",
         )
