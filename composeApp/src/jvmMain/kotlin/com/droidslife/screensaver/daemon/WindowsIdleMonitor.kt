@@ -23,12 +23,16 @@ private interface User32 : StdCallLibrary {
     }
 }
 
-private class LastInputInfo : Structure() {
+class LastInputInfo : Structure() {
     @JvmField
-    var cbSize: Int = size()
+    var cbSize: Int = 0
 
     @JvmField
     var dwTime: Int = 0
+
+    init {
+        cbSize = size()
+    }
 
     override fun getFieldOrder(): List<String> = listOf("cbSize", "dwTime")
 }
