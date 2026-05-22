@@ -4,7 +4,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -13,12 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -26,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -61,14 +64,23 @@ private fun CornerIconButton(
     label: String,
     onClick: () -> Unit,
 ) {
-    IconButton(
-        onClick = onClick,
+    // Hand-rolled Box-button (not Material 3 IconButton) so we own the exact
+    // 28dp footprint — IconButton forces a 40dp touch target which previously
+    // produced a "tail" of empty space below the visible circle.
+    Box(
         modifier = Modifier
             .size(28.dp)
             .clip(CircleShape)
             .background(DwellColors.Surface1)
-            .border(1.dp, DwellColors.Stroke, CircleShape),
+            .border(1.dp, DwellColors.Stroke, CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = label, tint = DwellColors.TextMid)
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = DwellColors.TextMid,
+            modifier = Modifier.size(14.dp),
+        )
     }
 }
