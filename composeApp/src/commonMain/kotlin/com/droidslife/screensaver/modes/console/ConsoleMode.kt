@@ -113,7 +113,9 @@ fun ConsoleMode(
                     accent.primary.copy(alpha = 0.22f).compositeOver(baseBorder)
                 } else baseBorder
                 val targetBg = if (isHovered) {
-                    Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)
+                    // Needs enough delta over Surface1 (#131316) that the 420 ms
+                    // tween reads as motion instead of a single-frame state flip.
+                    Color.White.copy(alpha = 0.10f).compositeOver(DwellColors.Surface1)
                 } else DwellColors.Surface1
                 val borderColor by animateColorAsState(
                     targetValue = targetBorder,
