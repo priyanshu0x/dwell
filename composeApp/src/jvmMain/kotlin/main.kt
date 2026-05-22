@@ -137,7 +137,10 @@ fun main(args: Array<String>) = application {
             ),
             onCloseRequest = requestDashboardExit,
             resizable = false,
-            alwaysOnTop = true,
+            // Dropped alwaysOnTop: the OS should be able to switch focus
+            // (Super, Alt-Tab) without our window staying floated over the
+            // user's actual work. We hide ourselves below when focus is lost.
+            alwaysOnTop = false,
             undecorated = true,
             transparent = true,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }

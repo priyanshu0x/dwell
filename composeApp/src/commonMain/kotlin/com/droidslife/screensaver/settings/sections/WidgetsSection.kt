@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -108,16 +110,10 @@ fun WidgetsSection(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 14.sp,
                             )
-                            Text(
-                                text = id,
-                                color = DwellColors.TextLow,
-                                fontFamily = DwellFonts.jetBrainsMono(),
-                                fontSize = 10.sp,
-                            )
                             if (descriptor.factory.description.isNotBlank()) {
                                 Text(
                                     text = descriptor.factory.description,
-                                    color = DwellColors.TextMid,
+                                    color = DwellColors.TextLow,
                                     fontFamily = DwellFonts.interTight(),
                                     fontSize = 11.sp,
                                     modifier = Modifier.padding(top = 2.dp),
@@ -218,9 +214,10 @@ private fun WidgetConfigPanel(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         schema.forEach { field ->
+            if (shouldHideField(field, config)) return@forEach
             ConfigFieldRow(
                 field = field,
                 config = config,
@@ -232,6 +229,14 @@ private fun WidgetConfigPanel(
             )
         }
     }
+}
+
+// Conditional fields: the WeatherAPI key only matters when WeatherAPI is the
+// active source. Hiding it on wttr.in removes a row of dead chrome.
+private fun shouldHideField(field: ConfigField, config: JsonObject): Boolean {
+    if (field.key != "apiKey") return false
+    val provider = config["provider"]?.jsonPrimitive?.content
+    return provider != null && provider != "weatherapi"
 }
 
 @Composable
@@ -397,7 +402,7 @@ private fun ChoiceRow(
     onSelect: (String) -> Unit,
     helper: String? = null,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = label,
             color = DwellColors.TextHigh,
@@ -405,24 +410,40 @@ private fun ChoiceRow(
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            options.forEach { (value, displayLabel) ->
+        // Single rounded container with options side-by-side reads as one
+        // segmented control instead of two unrelated chips.
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
+                .background(DwellColors.Surface1),
+        ) {
+            options.forEachIndexed { index, (value, displayLabel) ->
                 val isSelected = value == selectedValue
-                val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
+                val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent
                 val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
                 androidx.compose.foundation.layout.Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .weight(1f)
                         .background(bg)
-                        .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
                         .clickable { onSelect(value) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = displayLabel,
                         color = fg,
                         fontFamily = DwellFonts.interTight(),
-                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                        fontSize = 13.sp,
+                    )
+                }
+                if (index < options.lastIndex) {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(DwellColors.Stroke),
                     )
                 }
             }
@@ -448,51 +469,57 @@ private fun DwellOutlinedTextField(
     password: Boolean = false,
     numeric: Boolean = false,
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = {
-            Text(
-                text = label,
-                color = DwellColors.TextMid,
+    // Label above the field (vs Material's floating label, which hops mid-input
+    // and reads as "empty box with a heading inside" when blank).
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            color = DwellColors.TextHigh,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(
                 fontFamily = DwellFonts.interTight(),
-                fontSize = 12.sp,
+                fontSize = 14.sp,
+                color = DwellColors.TextHigh,
+            ),
+            placeholder = placeholder?.let {
+                {
+                    Text(
+                        text = it,
+                        color = DwellColors.TextFaint,
+                        fontFamily = DwellFonts.interTight(),
+                        fontSize = 14.sp,
+                    )
+                }
+            },
+            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = if (numeric) {
+                KeyboardOptions(keyboardType = KeyboardType.Number)
+            } else {
+                KeyboardOptions.Default
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = DwellColors.StatusAccent,
+                unfocusedBorderColor = DwellColors.Stroke,
+                focusedTextColor = DwellColors.TextHigh,
+                unfocusedTextColor = DwellColors.TextHigh,
+                cursorColor = DwellColors.StatusAccent,
+            ),
+        )
+        if (!helper.isNullOrBlank()) {
+            Text(
+                text = helper,
+                color = DwellColors.TextLow,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 11.sp,
             )
-        },
-        placeholder = placeholder?.let {
-            {
-                Text(
-                    text = it,
-                    color = DwellColors.TextFaint,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 13.sp,
-                )
-            }
-        },
-        supportingText = helper?.let {
-            {
-                Text(
-                    text = it,
-                    color = DwellColors.TextLow,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 11.sp,
-                )
-            }
-        },
-        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = if (numeric) {
-            KeyboardOptions(keyboardType = KeyboardType.Number)
-        } else {
-            KeyboardOptions.Default
-        },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = DwellColors.StatusAccent,
-            unfocusedBorderColor = DwellColors.Stroke,
-            focusedTextColor = DwellColors.TextHigh,
-            unfocusedTextColor = DwellColors.TextHigh,
-            cursorColor = DwellColors.StatusAccent,
-        ),
-    )
+        }
+    }
 }

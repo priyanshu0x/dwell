@@ -53,6 +53,13 @@ class WeatherRepository(
         }
     }
 
+    /**
+     * Exposed so callers that cache results can key the cache by provider —
+     * switching the source in Settings then doesn't surface stale data from
+     * the previous one.
+     */
+    fun activeProviderId(): String = providerIdFromSettings()
+
     private fun providerIdFromSettings(): String {
         val widgetConfig = settingsViewModel.settings.widgetConfigs[WEATHER_WIDGET_ID]
             ?: return WttrInProvider.ID
