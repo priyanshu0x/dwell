@@ -2,6 +2,7 @@ package com.droidslife.screensaver.modes.console
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,11 +12,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
@@ -37,6 +44,7 @@ private val defaultLayouts: Map<String, GridRect> = mapOf(
     "com.droidslife.screensaver.pomodoro"        to GridRect(8, 4, 4, 2), // opt-in fallback slot
 )
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ConsoleMode(
     settingsViewModel: SettingsViewModel,
@@ -66,27 +74,52 @@ fun ConsoleMode(
     // gesture is in progress so the tile chrome (rendered by ConsoleGrid)
     // tracks the cursor pixel-by-pixel instead of jumping cell-to-cell.
     val liveDrags = remember { mutableStateMapOf<String, TileLiveDrag>() }
+    // Tracks the most recently interacted tile so we can render it last and
+    // ensure it draws above overlapping siblings.
+    var lastFocused by remember { mutableStateOf<String?>(null) }
+    var hoveredTile by remember { mutableStateOf<String?>(null) }
+
+    // Reorder so the focused id renders LAST (Compose draws in placement order,
+    // last-on-top). Map preserves insertion order.
+    val orderedPlacements = remember(placements, lastFocused) {
+        val focused = lastFocused
+        if (focused != null && focused in placements) {
+            (placements - focused) + (focused to placements.getValue(focused))
+        } else placements
+    }
     CompositionLocalProvider(LocalConsoleAccent provides accent) {
         Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
             ConsoleGrid(
-                placements = placements,
+                placements = orderedPlacements,
                 liveDrags = liveDrags,
                 modifier = Modifier.fillMaxSize(),
             ) { id ->
                 val instance = instances[id] ?: return@ConsoleGrid
-                val borderColor = if (accent.tileBorderTint == androidx.compose.ui.graphics.Color.Transparent) {
+                val baseBorder = if (accent.tileBorderTint == Color.Transparent) {
                     DwellColors.Stroke
                 } else {
                     // Composite the accent tint over the base stroke so Amber gets a
                     // barely-perceptible warm cast on borders.
                     accent.tileBorderTint.compositeOver(DwellColors.Stroke)
                 }
+                val isHovered = hoveredTile == id
+                val borderColor = if (isHovered) {
+                    accent.primary.copy(alpha = 0.6f).compositeOver(baseBorder)
+                } else baseBorder
+                val backgroundColor = if (isHovered) {
+                    Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)
+                } else DwellColors.Surface1
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(DwellRadius.m))
-                        .background(DwellColors.Surface1)
-                        .border(1.dp, borderColor, RoundedCornerShape(DwellRadius.m)),
+                        .background(backgroundColor)
+                        .border(1.dp, borderColor, RoundedCornerShape(DwellRadius.m))
+                        .onPointerEvent(PointerEventType.Enter) { hoveredTile = id }
+                        .onPointerEvent(PointerEventType.Exit) {
+                            if (hoveredTile == id) hoveredTile = null
+                        }
+                        .clickable { lastFocused = id },
                 ) {
                     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
                         instance.widget.Render(
@@ -102,9 +135,12 @@ fun ConsoleMode(
                     instances.mapValues { it.value.descriptor.factory.preferredSize }
                 }
                 ConsoleEditOverlay(
-                    placements = placements,
+                    placements = orderedPlacements,
                     sizeConstraints = sizeConstraints,
                     liveDrags = liveDrags,
+                    hoveredTile = hoveredTile,
+                    onHover = { id -> hoveredTile = id },
+                    onFocus = { id -> lastFocused = id },
                     showBanner = showEditChrome,
                     onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },

@@ -16,9 +16,12 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -62,6 +65,9 @@ fun ConsoleEditOverlay(
     liveDrags: SnapshotStateMap<String, TileLiveDrag>,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
+    hoveredTile: String? = null,
+    onHover: (String?) -> Unit = {},
+    onFocus: (String) -> Unit = {},
     showBanner: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -94,6 +100,9 @@ fun ConsoleEditOverlay(
                 ghosts = ghosts,
                 liveDrags = liveDrags,
                 placements = placements,
+                isHovered = hoveredTile == id,
+                onHover = onHover,
+                onFocus = onFocus,
                 onMove = onMove,
                 onResize = onResize,
             )
@@ -153,6 +162,7 @@ fun ConsoleEditOverlay(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun EditTile(
     id: String,
@@ -167,6 +177,9 @@ private fun EditTile(
     ghosts: SnapshotStateMap<String, GridRect>,
     liveDrags: SnapshotStateMap<String, TileLiveDrag>,
     placements: Map<String, GridRect>,
+    isHovered: Boolean,
+    onHover: (String?) -> Unit,
+    onFocus: (String) -> Unit,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
 ) {
@@ -199,15 +212,18 @@ private fun EditTile(
         // Red border lives only on settled tiles that overlap a sibling — never
         // while a tile is mid-drag. While dragging the dashed cyan rule wins.
         val settledCollides = !isActive && overlapsAny(id, rect, placements)
+        val idleAlpha = if (isHovered) 0.7f else 0.35f
         val borderColor = when {
             isActive -> DwellColors.LumenCyan
             settledCollides -> DwellColors.StatusError
-            else -> DwellColors.LumenCyan.copy(alpha = 0.35f)
+            else -> DwellColors.LumenCyan.copy(alpha = idleAlpha)
         }
         val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .onPointerEvent(PointerEventType.Enter) { onHover(id) }
+                .onPointerEvent(PointerEventType.Exit) { onHover(null) }
                 // Hover stays default — only the active drag swaps in the
                 // grabbing fist so the user sees they've grabbed the tile.
                 .then(
@@ -233,6 +249,7 @@ private fun EditTile(
                         onDragStart = {
                             ghosts[id] = rect
                             liveDrags[id] = TileLiveDrag.Zero
+                            onFocus(id)
                         },
                         onDrag = { change, drag ->
                             change.consume()
@@ -328,6 +345,7 @@ private fun EditTile(
                         onDragStart = {
                             ghosts[id] = rect
                             liveDrags[id] = TileLiveDrag.Zero
+                            onFocus(id)
                         },
                         onDrag = { change, drag ->
                             change.consume()
