@@ -3,8 +3,10 @@ package com.droidslife.screensaver.modes.console
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -67,14 +69,16 @@ fun ConsoleMode(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(DwellRadius.m))
                         .background(DwellColors.Surface1)
-                        .border(1.dp, borderColor, RoundedCornerShape(DwellRadius.m))
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .border(1.dp, borderColor, RoundedCornerShape(DwellRadius.m)),
                 ) {
-                    instance.widget.Render(
-                        target = WidgetRenderTarget.Tile,
-                        scope = instance.scope,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
+                        instance.widget.Render(
+                            target = WidgetRenderTarget.Tile,
+                            scope = instance.scope,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    TileResizeCorner()
                 }
             }
             if (settingsViewModel.consoleEditMode) {
@@ -95,5 +99,35 @@ fun ConsoleMode(
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
         }
+    }
+}
+
+@Composable
+private fun BoxScope.TileResizeCorner() {
+    // L-shape inset from the bottom-right corner. Brand cyan at low alpha so it
+    // reads across both Console accents (Standard green, Amber) without
+    // clashing. Purely decorative outside Edit Layout — a hint that the tile
+    // is resizable.
+    androidx.compose.foundation.Canvas(
+        modifier = Modifier
+            .align(androidx.compose.ui.Alignment.BottomEnd)
+            .padding(end = 10.dp, bottom = 10.dp)
+            .size(18.dp),
+    ) {
+        val stroke = 2f
+        val color = DwellColors.LumenCyan.copy(alpha = 0.55f)
+        val end = size.width - stroke / 2
+        drawLine(
+            color,
+            androidx.compose.ui.geometry.Offset(end, size.height * 0.35f),
+            androidx.compose.ui.geometry.Offset(end, size.height),
+            stroke,
+        )
+        drawLine(
+            color,
+            androidx.compose.ui.geometry.Offset(size.width * 0.35f, end),
+            androidx.compose.ui.geometry.Offset(size.width, end),
+            stroke,
+        )
     }
 }

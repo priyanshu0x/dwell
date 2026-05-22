@@ -42,7 +42,9 @@ class SettingsViewModel(
     /**
      * Runtime-only flag for Console layout edit mode. Not persisted.
      */
-    var consoleEditMode by mutableStateOf(false)
+    // Always on — Console layout is freely editable; the resize-corner mark on
+    // each tile is the visual affordance. `L` toggles the EDIT LAYOUT banner.
+    var consoleEditMode by mutableStateOf(true)
         private set
 
     fun toggleConsoleEditMode() {
