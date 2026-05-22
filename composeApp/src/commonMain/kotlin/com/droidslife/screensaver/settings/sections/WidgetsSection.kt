@@ -2,6 +2,7 @@ package com.droidslife.screensaver.settings.sections
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -278,14 +279,145 @@ private fun ConfigFieldRow(
                 numeric = true,
             )
         }
+        is ConfigField.Enum -> {
+            val current = config[field.key]?.jsonPrimitive?.content ?: field.default
+            ChoiceRow(
+                label = field.label,
+                options = field.options.map { it.value to it.label },
+                selectedValue = current,
+                onSelect = { onUpdate(JsonPrimitive(it)) },
+                helper = field.help,
+            )
+        }
+        is ConfigField.Duration -> {
+            val value = config[field.key]?.jsonPrimitive?.content ?: field.default
+            DwellOutlinedTextField(
+                label = field.label,
+                value = value,
+                onValueChange = { onUpdate(JsonPrimitive(it)) },
+                helper = field.help ?: "Format: 30s · 2m · 1h",
+            )
+        }
+        is ConfigField.DurationChoice -> {
+            val current = config[field.key]?.jsonPrimitive?.content ?: field.default
+            ChoiceRow(
+                label = field.label,
+                options = field.options.map { it.value to it.label },
+                selectedValue = current,
+                onSelect = { onUpdate(JsonPrimitive(it)) },
+                helper = field.help,
+            )
+        }
+        is ConfigField.Currency -> {
+            val current = config[field.key]?.jsonPrimitive?.content ?: field.default
+            // Show "popular" pinned currencies inline as chips. Anything else can
+            // still be typed in as a raw 3-letter code (the dropdown of all 150
+            // ISO 4217 currencies is platform-specific and deferred).
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = field.label,
+                    color = DwellColors.TextHigh,
+                    fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    field.popular.forEach { code ->
+                        val isSelected = code == current
+                        val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
+                        val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(bg)
+                                .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
+                                .clickable { onUpdate(JsonPrimitive(code)) }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Text(
+                                text = code,
+                                color = fg,
+                                fontFamily = DwellFonts.jetBrainsMono(),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+                DwellOutlinedTextField(
+                    label = "ISO 4217 code",
+                    value = current,
+                    onValueChange = { onUpdate(JsonPrimitive(it.uppercase().take(3))) },
+                    helper = field.help ?: "e.g. USD, EUR, JPY",
+                )
+            }
+        }
+        is ConfigField.StringList -> {
+            // Comma-separated string editor — chip editor is deferred to widget-api
+            // (needs FlowRow). On read, the legacy comma string is split into a list.
+            val raw = config[field.key]?.jsonPrimitive?.content
+                ?: field.default.joinToString(",")
+            DwellOutlinedTextField(
+                label = field.label,
+                value = raw,
+                onValueChange = { onUpdate(JsonPrimitive(it)) },
+                helper = field.help ?: "Comma-separated list",
+            )
+        }
         else -> {
-            // ConfigField.Enum / Duration / DurationChoice / Currency / StringList / DesignPicker
-            // are used by existing widgets but rendered with a richer UI in the legacy
-            // dialog. TODO(phase 13 follow-up): port their renderers into the section
-            // primitives so this panel can fully replace the legacy dialog.
+            // ConfigField.DesignPicker is unused after the 11-design retirement.
             BodyText(
                 "${field.label}: editor not yet available in the new sheet",
                 dim = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(
+    label: String,
+    options: List<Pair<String, String>>,
+    selectedValue: String,
+    onSelect: (String) -> Unit,
+    helper: String? = null,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = label,
+            color = DwellColors.TextHigh,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEach { (value, displayLabel) ->
+                val isSelected = value == selectedValue
+                val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
+                val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(bg)
+                        .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
+                        .clickable { onSelect(value) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = displayLabel,
+                        color = fg,
+                        fontFamily = DwellFonts.interTight(),
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        }
+        if (!helper.isNullOrBlank()) {
+            Text(
+                text = helper,
+                color = DwellColors.TextLow,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 11.sp,
             )
         }
     }
