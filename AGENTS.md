@@ -65,4 +65,4 @@ Custom fonts (Orbitron, Seven-Segment, Technology, IndieFlower) and SVG icons li
 
 ## Comments
 
-Comment **why**, not what. Skip if removing it wouldn't confuse anyone. Keep them short.
+Use industry-standard comments: explain **why** (not what), skip the obvious, keep them short. If removing it wouldn't confuse a future reader, don't write it.
