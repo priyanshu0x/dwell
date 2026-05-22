@@ -16,8 +16,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.settings.CinematicVariant
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -60,14 +68,15 @@ private fun BoxScope.CinematicForeground(
 ) {
     val settings = settingsViewModel.settings
     val now by produceTicker(includeSeconds = settings.showSeconds)
-    val time = formatClock(now, is24Hour = settings.is24HourFormat, showSeconds = settings.showSeconds)
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val startPad = maxWidth * 0.08f
         val topPad = maxHeight * 0.26f
         Column(modifier = Modifier.padding(start = startPad, top = topPad)) {
-            Text(
-                text = time,
+            ClockText(
+                now = now,
+                is24Hour = settings.is24HourFormat,
+                showSeconds = settings.showSeconds,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 280.sp,
@@ -107,16 +116,63 @@ private fun formatMetaLine(now: LocalDateTime): String {
 }
 
 /**
- * Format HH:MM (or HH:MM:SS) with optional AM/PM suffix.
- * Shared by all three modes via [DwellClock].
+ * Render the dashboard clock with the primary HH:MM as the headline, and
+ * optional `:SS` + ` AM/PM` rendered as a *secondary* glyph: ~42 % of the
+ * primary size, 55 % alpha. Keeps the time legible at a glance while not
+ * forcing the smaller details to compete with the hours.
+ *
+ * Shared by Cinematic, Lumen, and Borealis (each passes its own font / weight /
+ * size / color).
  */
-internal fun formatClock(now: LocalDateTime, is24Hour: Boolean, showSeconds: Boolean): String {
+@Composable
+internal fun ClockText(
+    now: LocalDateTime,
+    is24Hour: Boolean,
+    showSeconds: Boolean,
+    fontFamily: FontFamily,
+    fontWeight: FontWeight,
+    fontSize: TextUnit,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
     val hour24 = now.hour
     val hour = if (is24Hour) hour24 else (hour24 % 12).let { if (it == 0) 12 else it }
     val hh = hour.toString().padStart(2, '0')
     val mm = now.minute.toString().padStart(2, '0')
-    val core = if (showSeconds) "$hh:$mm:${now.second.toString().padStart(2, '0')}" else "$hh:$mm"
-    return if (is24Hour) core else "$core ${if (hour24 < 12) "AM" else "PM"}"
+    val ss = now.second.toString().padStart(2, '0')
+    val primary = "$hh:$mm"
+    val ampm = if (!is24Hour) (if (hour24 < 12) "AM" else "PM") else null
+
+    // Secondary style: ~36 % of the primary size, 55 % alpha, same family + weight.
+    // Both seconds and AM/PM use the *same* SpanStyle so they read as a pair of
+    // equal-weight subordinate glyphs. Seconds are superscript-aligned (no colon
+    // separator — the visual size drop is the separator) and AM/PM trails on the
+    // regular baseline.
+    val secondary = SpanStyle(
+        fontSize = 0.36.em,
+        color = color.copy(alpha = 0.55f),
+    )
+    val secondsStyle = secondary.copy(baselineShift = BaselineShift(0.55f))
+
+    val annotated = buildAnnotatedString {
+        append(primary)
+        if (showSeconds) {
+            // thin space + superscript seconds, no preceding colon
+            withStyle(secondsStyle) { append(" $ss") }
+        }
+        if (ampm != null) {
+            withStyle(secondary) { append(" $ampm") }
+        }
+    }
+
+    Text(
+        text = annotated,
+        fontFamily = fontFamily,
+        fontWeight = fontWeight,
+        fontSize = fontSize,
+        color = color,
+        modifier = modifier,
+    )
 }
 
 @Composable

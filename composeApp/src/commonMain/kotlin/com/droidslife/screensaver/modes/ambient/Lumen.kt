@@ -131,12 +131,10 @@ fun Lumen(
             modifier = Modifier.align(Alignment.Center).offset(y = (-20).dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = com.droidslife.screensaver.modes.cinematic.formatClock(
-                    now,
-                    is24Hour = settings.is24HourFormat,
-                    showSeconds = settings.showSeconds,
-                ),
+            com.droidslife.screensaver.modes.cinematic.ClockText(
+                now = now,
+                is24Hour = settings.is24HourFormat,
+                showSeconds = settings.showSeconds,
                 fontFamily = DwellFonts.interTight(),
                 // Force ExtraLight (200) explicitly; the symbolic FontWeight.ExtraLight
                 // was rendering as Regular in some Skia builds.
