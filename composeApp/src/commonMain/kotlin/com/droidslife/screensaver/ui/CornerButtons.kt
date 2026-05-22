@@ -55,8 +55,12 @@ fun CornerButtons(
             .onPointerEvent(PointerEventType.Exit) { hovered = false },
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        CornerIconButton(Icons.Filled.Settings, "Settings", onSettings)
-        CornerIconButton(Icons.AutoMirrored.Filled.HelpOutline, "Help", onHelp)
+        ShortcutHint(shortcut = "S · Ctrl+,") {
+            CornerIconButton(Icons.Filled.Settings, "Settings", onSettings)
+        }
+        ShortcutHint(shortcut = "F1 · ?") {
+            CornerIconButton(Icons.AutoMirrored.Filled.HelpOutline, "Help", onHelp)
+        }
     }
 }
 

@@ -17,11 +17,6 @@ class KeyEventHandler(
      */
     @OptIn(ExperimentalComposeUiApi::class)
     fun handleWindowKeyEvent(event: KeyEvent): Boolean {
-        if (event.type == KeyEventType.KeyDown && (event.key == Key.AltLeft || event.key == Key.AltRight)) {
-            onAction(KeyEventAction.RequestExit)
-            return true
-        }
-
         if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
             onAction(KeyEventAction.RequestExit)
             return true
@@ -103,6 +98,11 @@ class KeyEventHandler(
                 Key.L -> {
                     onAction(KeyEventAction.ToggleConsoleEdit)
                     onAction(KeyEventAction.ShowToast("L"))
+                    return true
+                }
+                Key.S -> {
+                    onAction(KeyEventAction.OpenSettings)
+                    onAction(KeyEventAction.ShowToast("S"))
                     return true
                 }
                 else -> { /* fall through */ }
