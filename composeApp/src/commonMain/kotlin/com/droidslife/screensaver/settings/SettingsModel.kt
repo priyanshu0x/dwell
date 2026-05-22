@@ -81,4 +81,7 @@ data class SettingsModel(
     val widgetLayouts: Map<String, com.droidslife.screensaver.widget.api.GridRect> = emptyMap(),
     val widgetOrder: List<String> = emptyList(),
     val exitOnKeypress: Boolean = true,
+
+    /** Flipped after the first-run welcome toast is shown so we don't repeat it. */
+    val welcomeShown: Boolean = false,
 )
