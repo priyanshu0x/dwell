@@ -16,14 +16,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.BuildInfo
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
-// Hardcoded build metadata. TODO(phase 13+): wire to a generated BuildConfig
-// so version + hash track the actual build.
 private const val AppName = "Dwell"
-private const val AppVersion = "1.0.0"
-private const val BuildHash = "dev"
 private const val AppLicense = "MIT"
 private const val Tagline = "A calm three-mode dashboard for the screensaver hour."
 
@@ -66,8 +66,9 @@ fun AboutSection() {
                     fontSize = 13.sp,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    MetaLine("Version", AppVersion)
-                    MetaLine("Build", BuildHash)
+                    MetaLine("Version", BuildInfo.VERSION)
+                    MetaLine("Build", BuildInfo.COMMIT)
+                    MetaLine("Built", formatBuildDate(BuildInfo.BUILD_EPOCH_S))
                     MetaLine("License", AppLicense)
                 }
             }
@@ -104,6 +105,13 @@ fun AboutSection() {
             }
         }
     }
+}
+
+private fun formatBuildDate(epochS: Long): String {
+    val ldt = Instant.fromEpochSeconds(epochS).toLocalDateTime(TimeZone.currentSystemDefault())
+    val mm = ldt.monthNumber.toString().padStart(2, '0')
+    val dd = ldt.day.toString().padStart(2, '0')
+    return "${ldt.year}-$mm-$dd"
 }
 
 @Composable
