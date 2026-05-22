@@ -114,9 +114,7 @@ fun ConsoleMode(
                     accent.primary.copy(alpha = 0.22f).compositeOver(baseBorder)
                 } else baseBorder
                 val targetBg = if (isHovered) {
-                    // Needs enough delta over Surface1 (#131316) that the 420 ms
-                    // tween reads as motion instead of a single-frame state flip.
-                    Color.White.copy(alpha = 0.10f).compositeOver(DwellColors.Surface1)
+                    Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)
                 } else DwellColors.Surface1
                 // Key the LaunchedEffect on a stable Boolean, NOT the target
                 // Color. Color is a value class backed by ULong; passing it to
