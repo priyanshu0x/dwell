@@ -102,6 +102,12 @@ if /I "%CMD%"=="uninstall" (
     echo   ^(Your settings + widget data at %%USERPROFILE%%\.screensaver remain untouched.^)
     goto :end
 )
+if /I "%CMD%"=="version" (
+    echo Dwell 1.0.0
+    for /f %%c in ('git -C "%ROOT%" rev-parse --short HEAD 2^>nul') do echo   commit: %%c
+    for /f %%b in ('git -C "%ROOT%" rev-parse --abbrev-ref HEAD 2^>nul') do echo   branch: %%b
+    goto :end
+)
 if /I "%CMD%"=="status" (
     echo Dwell — status
     echo   Project root: %ROOT%

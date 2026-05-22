@@ -111,6 +111,7 @@ Commands:
              LaunchAgent on macOS).
   unregister Remove the autostart / LaunchAgent (settings stay).
   status     Show whether Dwell is running + which JDK / settings file is in use.
+  version    Print the current version + git commit + branch.
   help       Show this help.
 
 First run will auto-install JDK 21 to ~/jdks/ and download Gradle dependencies.
@@ -300,6 +301,16 @@ PLIST
             count=$(find "$HOME/.screensaver/widgets" -maxdepth 2 \( -name '*.jar' -o -name 'widget.yaml' \) 2>/dev/null | wc -l | tr -d ' ')
             echo "  Third-party widgets: $count installed at ~/.screensaver/widgets/"
         fi
+        ;;
+    version|--version|-v)
+        # Print version + short git commit. Reads from the same source the
+        # Gradle build pulls into BuildInfo.kt.
+        ver="1.0.0"  # KEEP IN SYNC with appVersion in composeApp/build.gradle.kts
+        commit=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        branch=$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+        echo "Dwell $ver"
+        echo "  commit: $commit"
+        echo "  branch: $branch"
         ;;
     help|-h|--help)
         usage
