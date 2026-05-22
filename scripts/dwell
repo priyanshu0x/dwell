@@ -107,6 +107,9 @@ Commands:
 
   install    Symlink this script into ~/.local/bin so you can type `dwell show` anywhere.
   uninstall  Remove the symlink (does not touch ~/.screensaver).
+  register   Register Dwell to run at login (autostart + systemd user unit on Linux,
+             LaunchAgent on macOS).
+  unregister Remove the autostart / LaunchAgent (settings stay).
   status     Show whether Dwell is running + which JDK / settings file is in use.
   help       Show this help.
 
@@ -148,6 +151,109 @@ case "$cmd" in
         bootstrap_java; first_build_hint
         echo "Dwell — compiling…"
         exec ./gradlew :composeApp:compileKotlinJvm :composeApp:compileTestKotlinJvm --console=plain
+        ;;
+    register)
+        # Register Dwell to run as a tray daemon at login.
+        # Linux: writes ~/.config/autostart/dwell.desktop + ~/.config/systemd/user/dwell.service.
+        # macOS: writes ~/Library/LaunchAgents/dev.dwell.daemon.plist and loads it.
+        case "$(uname -s)" in
+            Linux)
+                autostart="$HOME/.config/autostart"
+                systemd_user="$HOME/.config/systemd/user"
+                mkdir -p "$autostart" "$systemd_user"
+                cat > "$autostart/dwell.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Dwell
+Comment=Idle-triggered screensaver dashboard
+Exec=$ROOT/scripts/dwell daemon
+Icon=$ROOT/composeApp/desktopAppIcons/LinuxIcon.png
+X-GNOME-Autostart-enabled=true
+NoDisplay=false
+DESKTOP
+                cat > "$systemd_user/dwell.service" <<UNIT
+[Unit]
+Description=Dwell screensaver daemon
+After=graphical-session.target
+
+[Service]
+ExecStart=$ROOT/scripts/dwell daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+UNIT
+                echo "✓ Wrote $autostart/dwell.desktop"
+                echo "✓ Wrote $systemd_user/dwell.service"
+                if command -v systemctl >/dev/null 2>&1; then
+                    systemctl --user daemon-reload 2>/dev/null || true
+                    if systemctl --user enable --now dwell.service 2>/dev/null; then
+                        echo "✓ Enabled + started dwell.service (systemd user)"
+                    else
+                        echo "  Could not start dwell.service automatically. Run manually:"
+                        echo "    systemctl --user enable --now dwell.service"
+                    fi
+                fi
+                ;;
+            Darwin)
+                la="$HOME/Library/LaunchAgents"
+                mkdir -p "$la"
+                cat > "$la/dev.dwell.daemon.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>dev.dwell.daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$ROOT/scripts/dwell</string>
+    <string>daemon</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>WorkingDirectory</key><string>$ROOT</string>
+</dict>
+</plist>
+PLIST
+                launchctl unload "$la/dev.dwell.daemon.plist" 2>/dev/null || true
+                launchctl load "$la/dev.dwell.daemon.plist"
+                echo "✓ Loaded LaunchAgent dev.dwell.daemon (autostarts at login)"
+                ;;
+            *)
+                echo "✗ $cmd: this OS isn't supported (yet). On Windows use scripts\\dwell.cmd register." >&2
+                exit 1 ;;
+        esac
+        echo
+        echo "  To stop and unregister later, run: ./scripts/dwell unregister"
+        ;;
+    unregister)
+        case "$(uname -s)" in
+            Linux)
+                if command -v systemctl >/dev/null 2>&1; then
+                    systemctl --user disable --now dwell.service 2>/dev/null || true
+                fi
+                rm -f "$HOME/.config/autostart/dwell.desktop"
+                rm -f "$HOME/.config/systemd/user/dwell.service"
+                if command -v systemctl >/dev/null 2>&1; then
+                    systemctl --user daemon-reload 2>/dev/null || true
+                fi
+                echo "✓ Removed autostart + systemd user unit (settings at ~/.screensaver untouched)."
+                ;;
+            Darwin)
+                la="$HOME/Library/LaunchAgents/dev.dwell.daemon.plist"
+                if [ -f "$la" ]; then
+                    launchctl unload "$la" 2>/dev/null || true
+                    rm -f "$la"
+                    echo "✓ Unloaded + removed LaunchAgent"
+                else
+                    echo "  No LaunchAgent found."
+                fi
+                ;;
+            *)
+                echo "✗ $cmd: this OS isn't supported (yet)." >&2
+                exit 1 ;;
+        esac
         ;;
     install)
         target_dir="${DWELL_BIN_DIR:-$HOME/.local/bin}"

@@ -54,6 +54,34 @@ if /I "%CMD%"=="dev" (
     call gradlew.bat :composeApp:runHot --console=plain
     goto :end
 )
+if /I "%CMD%"=="register" (
+    :: Drop a Startup-folder shortcut that runs `dwell.cmd daemon` at login.
+    set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+    powershell -NoProfile -Command ^
+        "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTUP%\Dwell.lnk');" ^
+        "$s.TargetPath = '%HERE%dwell.cmd';" ^
+        "$s.Arguments = 'daemon';" ^
+        "$s.WorkingDirectory = '%ROOT%';" ^
+        "$s.IconLocation = '%ROOT%\composeApp\desktopAppIcons\WindowsIcon.ico';" ^
+        "$s.Save();"
+    if errorlevel 1 (
+        echo ✗ Failed to write Startup shortcut.
+        exit /b 1
+    )
+    echo ✓ Wrote Startup shortcut: %STARTUP%\Dwell.lnk
+    echo   To stop and remove later, run: scripts\dwell.cmd unregister
+    goto :end
+)
+if /I "%CMD%"=="unregister" (
+    set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+    if exist "%STARTUP%\Dwell.lnk" (
+        del "%STARTUP%\Dwell.lnk"
+        echo ✓ Removed Startup shortcut.
+    ) else (
+        echo   No Startup shortcut found.
+    )
+    goto :end
+)
 if /I "%CMD%"=="install" (
     if not defined DWELL_BIN_DIR set "DWELL_BIN_DIR=%USERPROFILE%\bin"
     if not exist "%DWELL_BIN_DIR%" mkdir "%DWELL_BIN_DIR%"
@@ -152,11 +180,16 @@ echo.
 echo Usage: scripts\dwell.cmd ^<command^>
 echo.
 echo Commands:
-echo   show      Open the dashboard once.
-echo   daemon    Run as a tray daemon ^(dashboard appears after idle timeout^).
-echo   config    Open the dashboard with Settings pre-opened.
-echo   dev       Run with Compose Hot Reload ^(for development^).
-echo   help      Show this help.
+echo   show       Open the dashboard once.
+echo   daemon     Run as a tray daemon ^(dashboard appears after idle timeout^).
+echo   config     Open the dashboard with Settings pre-opened.
+echo   dev        Run with Compose Hot Reload ^(for development^).
+echo   register   Register Dwell to run at login ^(Startup folder shortcut^).
+echo   unregister Remove the Startup shortcut.
+echo   install    Drop a `dwell.cmd` shim into %%USERPROFILE%%\bin.
+echo   uninstall  Remove the shim ^(settings stay^).
+echo   status     Show whether Dwell is running + which JDK / settings is in use.
+echo   help       Show this help.
 echo.
 echo First run will auto-install JDK 21 to %%USERPROFILE%%\jdks\.
 goto :end
