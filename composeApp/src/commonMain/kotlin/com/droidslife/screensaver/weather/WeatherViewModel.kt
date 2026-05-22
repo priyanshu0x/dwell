@@ -3,6 +3,7 @@ package com.droidslife.screensaver.weather
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.droidslife.screensaver.location.FALLBACK_CITY
 import com.droidslife.screensaver.location.Location
 import com.droidslife.screensaver.location.TimeZoneUtils
 import com.droidslife.screensaver.settings.PreferencesRepository
@@ -71,13 +72,9 @@ class WeatherViewModel(
                 // If there's no stored city, try to get a city based on the timezone
                 val timeZoneCity = TimeZoneUtils.getCityFromTimeZone(weatherApi)
 
-                if (timeZoneCity != null) {
-                    loadWeatherDataForCity(timeZoneCity)
-                    preferencesRepository.setCurrentCity(timeZoneCity)
-                } else {
-                    loadWeatherDataForCity("Mumbai")
-                    preferencesRepository.setCurrentCity("Mumbai")
-                }
+                val city = timeZoneCity ?: FALLBACK_CITY
+                loadWeatherDataForCity(city)
+                preferencesRepository.setCurrentCity(city)
             }
         }
     }
