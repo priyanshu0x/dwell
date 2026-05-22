@@ -82,6 +82,9 @@ data class SettingsModel(
     val widgetOrder: List<String> = emptyList(),
     val exitOnKeypress: Boolean = true,
 
+    /** Dismiss the dashboard when the mouse moves (true) or only on key/tap (false). */
+    val dismissOnMouseMovement: Boolean = true,
+
     /** Flipped after the first-run welcome toast is shown so we don't repeat it. */
     val welcomeShown: Boolean = false,
 )

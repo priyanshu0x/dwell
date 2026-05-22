@@ -42,16 +42,11 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             SectionHeader("Dismiss behavior")
-            // TODO(phase 11+): SettingsModel does not yet hold an
-            // `exitOnMouseMovement` boolean — the runtime state is hoisted
-            // into App() as `exitOnMouseMovementEnabled`. Once the field is
-            // added, wire this toggle to it.
             ToggleRow(
                 label = "Exit on mouse movement",
-                checked = true,
-                onCheckedChange = { /* no-op placeholder */ },
-                description = "Disabled — pending SettingsModel field (see TODO)",
-                enabled = false,
+                checked = settings.dismissOnMouseMovement,
+                onCheckedChange = settingsViewModel::setDismissOnMouseMovement,
+                description = "Moving the mouse dismisses the dashboard",
             )
             ToggleRow(
                 label = "Exit on keypress",

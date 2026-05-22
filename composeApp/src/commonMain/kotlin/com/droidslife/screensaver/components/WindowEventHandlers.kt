@@ -30,7 +30,7 @@ fun rememberWindowEventHandlers(
     val settingsViewModel = koinInject<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
 
-    var exitOnMouseMovementEnabled by remember { mutableStateOf(true) }
+    val exitOnMouseMovementEnabled = settingsViewModel.settings.dismissOnMouseMovement
     var showHelpDialog by remember { mutableStateOf(false) }
     val toastState = rememberToastState()
 
@@ -52,7 +52,7 @@ fun rememberWindowEventHandlers(
                 onExitApplication()
             }
             is KeyEventAction.ToggleExitOnMouseMovement -> {
-                exitOnMouseMovementEnabled = !exitOnMouseMovementEnabled
+                settingsViewModel.setDismissOnMouseMovement(!settingsViewModel.settings.dismissOnMouseMovement)
             }
             is KeyEventAction.OpenSettings -> {
                 settingsViewModel.openSettingsDialog()

@@ -224,6 +224,10 @@ class SettingsViewModel(
         updateSettings(settings.copy(exitOnKeypress = enabled))
     }
 
+    fun setDismissOnMouseMovement(enabled: Boolean) {
+        updateSettings(settings.copy(dismissOnMouseMovement = enabled))
+    }
+
     /** Mark the first-run welcome toast as shown so it doesn't repeat. */
     fun markWelcomeShown() {
         if (!settings.welcomeShown) updateSettings(settings.copy(welcomeShown = true))
