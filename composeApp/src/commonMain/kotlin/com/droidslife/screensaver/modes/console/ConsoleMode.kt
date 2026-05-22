@@ -1,5 +1,7 @@
 package com.droidslife.screensaver.modes.console
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
 import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellMotion
 import com.droidslife.screensaver.ui.DwellRadius
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.api.WidgetRenderTarget
@@ -103,12 +106,22 @@ fun ConsoleMode(
                     accent.tileBorderTint.compositeOver(DwellColors.Stroke)
                 }
                 val isHovered = hoveredTile == id
-                val borderColor = if (isHovered) {
+                val targetBorder = if (isHovered) {
                     accent.primary.copy(alpha = 0.6f).compositeOver(baseBorder)
                 } else baseBorder
-                val backgroundColor = if (isHovered) {
+                val targetBg = if (isHovered) {
                     Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)
                 } else DwellColors.Surface1
+                val borderColor by animateColorAsState(
+                    targetValue = targetBorder,
+                    animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
+                    label = "tile-border",
+                )
+                val backgroundColor by animateColorAsState(
+                    targetValue = targetBg,
+                    animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
+                    label = "tile-bg",
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

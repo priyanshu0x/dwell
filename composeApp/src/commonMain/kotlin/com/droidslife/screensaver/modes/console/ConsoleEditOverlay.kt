@@ -1,5 +1,7 @@
 package com.droidslife.screensaver.modes.console
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -39,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.ui.DwellMotion
 import com.droidslife.screensaver.ui.GrabbingPointerIcon
 import com.droidslife.screensaver.ui.ResizeSEPointerIcon
 import com.droidslife.screensaver.widget.api.GridRect
@@ -212,7 +216,11 @@ private fun EditTile(
         // Red border lives only on settled tiles that overlap a sibling — never
         // while a tile is mid-drag. While dragging the dashed cyan rule wins.
         val settledCollides = !isActive && overlapsAny(id, rect, placements)
-        val idleAlpha = if (isHovered) 0.7f else 0.35f
+        val idleAlpha by animateFloatAsState(
+            targetValue = if (isHovered) 0.7f else 0.35f,
+            animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
+            label = "edit-border-alpha",
+        )
         val borderColor = when {
             isActive -> DwellColors.LumenCyan
             settledCollides -> DwellColors.StatusError
