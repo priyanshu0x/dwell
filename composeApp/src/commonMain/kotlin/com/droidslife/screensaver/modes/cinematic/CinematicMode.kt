@@ -32,7 +32,10 @@ import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.weather.WeatherState
+import com.droidslife.screensaver.weather.WeatherViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
+import org.koin.compose.koinInject
 import kotlin.time.Clock
 import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalDateTime
@@ -68,11 +71,16 @@ private fun BoxScope.CinematicForeground(
 ) {
     val settings = settingsViewModel.settings
     val now by produceTicker(includeSeconds = settings.showSeconds)
+    val weatherViewModel = koinInject<WeatherViewModel>()
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val startPad = maxWidth * 0.08f
         val topPad = maxHeight * 0.26f
         Column(modifier = Modifier.padding(start = startPad, top = topPad)) {
+            // lineHeight = fontSize keeps the clock from carrying its full
+            // line-box descent area into the layout — without this, the
+            // 280 sp Bold Inter Tight added ~80 px of empty space below the
+            // visible glyphs and pushed the date / subtitle way down.
             ClockText(
                 now = now,
                 is24Hour = settings.is24HourFormat,
@@ -81,11 +89,12 @@ private fun BoxScope.CinematicForeground(
                 fontWeight = FontWeight.Bold,
                 fontSize = 280.sp,
                 color = DwellColors.TextHigh,
+                tightLineHeight = true,
             )
             if (settings.showDate) {
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = formatMetaLine(now),
+                    text = cinematicSubtitle(now, weatherViewModel),
                     fontFamily = DwellFonts.interTight(),
                     fontWeight = FontWeight.Normal,
                     fontSize = 18.sp,
@@ -116,6 +125,28 @@ private fun formatMetaLine(now: LocalDateTime): String {
 }
 
 /**
+ * "Friday, 22 May · 21° Cloudy · Rewari" when weather is loaded; falls back
+ * to just the date if the provider hasn't responded yet. Reads city + temp
+ * + condition from the shared WeatherViewModel — no hard-coded strings.
+ */
+private fun cinematicSubtitle(now: LocalDateTime, vm: WeatherViewModel): String {
+    val parts = mutableListOf(formatMetaLine(now))
+    val state = vm.state
+    if (state is WeatherState.Success) {
+        val current = state.current
+        val condition = current.conditionText.takeIf { it.isNotBlank() }
+        val tempCondition = buildString {
+            append("${current.tempC.toInt()}°")
+            if (condition != null) append(" $condition")
+        }
+        parts += tempCondition
+    }
+    val city = (vm.selectedCity ?: "").ifBlank { null }
+    if (city != null) parts += city
+    return parts.joinToString(" · ")
+}
+
+/**
  * Render the dashboard clock with the primary HH:MM as the headline, and
  * optional `:SS` + ` AM/PM` rendered as a *secondary* glyph: ~42 % of the
  * primary size, 55 % alpha. Keeps the time legible at a glance while not
@@ -134,6 +165,7 @@ internal fun ClockText(
     fontSize: TextUnit,
     color: Color,
     modifier: Modifier = Modifier,
+    tightLineHeight: Boolean = false,
 ) {
     val hour24 = now.hour
     val hour = if (is24Hour) hour24 else (hour24 % 12).let { if (it == 0) 12 else it }
@@ -154,6 +186,8 @@ internal fun ClockText(
     // primary's cap-line (looks tucked next to HH:MM rather than dropped under).
     val secondaryBottomPad = (fontSize.value * 0.20f).dp
 
+    val primaryLineHeight = if (tightLineHeight) fontSize else TextUnit.Unspecified
+    val secondaryLineHeight = if (tightLineHeight) secondaryFontSize else TextUnit.Unspecified
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Bottom,
@@ -163,6 +197,7 @@ internal fun ClockText(
             fontFamily = fontFamily,
             fontWeight = fontWeight,
             fontSize = fontSize,
+            lineHeight = primaryLineHeight,
             color = color,
         )
         if (showSeconds) {
@@ -171,6 +206,7 @@ internal fun ClockText(
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
                 fontSize = secondaryFontSize,
+                lineHeight = secondaryLineHeight,
                 color = secondaryColor,
                 modifier = Modifier.padding(start = 12.dp, bottom = secondaryBottomPad),
             )
@@ -181,6 +217,7 @@ internal fun ClockText(
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
                 fontSize = secondaryFontSize,
+                lineHeight = secondaryLineHeight,
                 color = secondaryColor,
                 modifier = Modifier.padding(start = 12.dp, bottom = secondaryBottomPad),
             )
