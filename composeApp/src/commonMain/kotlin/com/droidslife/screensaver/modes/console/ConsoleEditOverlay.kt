@@ -97,13 +97,11 @@ fun ConsoleEditOverlay(
             )
         }
 
-        ghosts.forEach { (gid, gr) ->
+        ghosts.forEach { (_, gr) ->
             val w = gr.cols * cellW + (gr.cols - 1) * gapPx
             val h = gr.rows * cellH + (gr.rows - 1) * gapPx
             val x = paddingPx + gr.col * stepX
             val y = paddingPx + gr.row * stepY
-            val collides = overlapsAny(gid, gr, placements)
-            val border = if (collides) DwellColors.StatusError else DwellColors.LumenCyan
             Box(
                 modifier = Modifier
                     .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
@@ -113,11 +111,11 @@ fun ConsoleEditOverlay(
                     )
                     .border(
                         width = 1.dp,
-                        color = border.copy(alpha = 0.7f),
+                        color = DwellColors.LumenCyan.copy(alpha = 0.7f),
                         shape = RoundedCornerShape(12.dp),
                     )
                     .background(
-                        color = border.copy(alpha = 0.08f),
+                        color = DwellColors.LumenCyan.copy(alpha = 0.08f),
                         shape = RoundedCornerShape(12.dp),
                     ),
             )
@@ -189,10 +187,12 @@ private fun EditTile(
     ) {
         val activeRectForBorder = ghosts[id]
         val isActive = activeRectForBorder != null
-        val collides = activeRectForBorder != null && overlapsAny(id, activeRectForBorder, placements)
+        // Red border lives only on settled tiles that overlap a sibling — never
+        // while a tile is mid-drag. While dragging the dashed cyan rule wins.
+        val settledCollides = !isActive && overlapsAny(id, rect, placements)
         val borderColor = when {
-            collides -> DwellColors.StatusError
             isActive -> DwellColors.LumenCyan
+            settledCollides -> DwellColors.StatusError
             else -> DwellColors.LumenCyan.copy(alpha = 0.35f)
         }
         val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
@@ -354,7 +354,11 @@ private fun GridRect.intersectionArea(other: GridRect): Int {
 private fun overlapsAny(selfId: String, rect: GridRect, placements: Map<String, GridRect>): Boolean =
     placements.any { (otherId, other) -> otherId != selfId && rect.intersects(other) }
 
-/** Treat ≥50% area overlap with any other tile as a "total" overlap. */
+/**
+ * True only when [rect] is completely covered by another tile (or completely
+ * covers another). Partial overlaps are allowed — the user can fix them after
+ * the drop using the red border as a hint.
+ */
 private fun totallyOverlapsAny(
     selfId: String,
     rect: GridRect,
@@ -362,6 +366,7 @@ private fun totallyOverlapsAny(
 ): Boolean = placements.any { (otherId, other) ->
     if (otherId == selfId) return@any false
     val area = rect.intersectionArea(other)
-    val threshold = 0.5 * minOf(rect.cols * rect.rows, other.cols * other.rows)
-    area >= threshold
+    val rectArea = rect.cols * rect.rows
+    val otherArea = other.cols * other.rows
+    area == rectArea || area == otherArea
 }
