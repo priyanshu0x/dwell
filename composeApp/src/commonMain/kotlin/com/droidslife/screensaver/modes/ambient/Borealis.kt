@@ -106,12 +106,10 @@ fun Borealis(
             modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = com.droidslife.screensaver.modes.cinematic.formatClock(
-                    now,
-                    is24Hour = settings.is24HourFormat,
-                    showSeconds = settings.showSeconds,
-                ),
+            com.droidslife.screensaver.modes.cinematic.ClockText(
+                now = now,
+                is24Hour = settings.is24HourFormat,
+                showSeconds = settings.showSeconds,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.Light,
                 fontSize = 158.sp,
