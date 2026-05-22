@@ -6,7 +6,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 This is a Kotlin/Compose Multiplatform project with a single `:composeApp` module currently targeting JVM (desktop) only.
 
-- Run desktop app: `./gradlew :composeApp:run` (Windows: `.\gradlew.bat :composeApp:run`)
+- Run dashboard once: `./gradlew :composeApp:run --args="--show"` (Windows: `.\gradlew.bat :composeApp:run --args="--show"`)
+- Run tray daemon: `./gradlew :composeApp:run` (Windows: `.\gradlew.bat :composeApp:run`)
 - Run with Compose hot-reload (uses `DevMainKt`): `./gradlew :composeApp:runHot`
 - Test (commonTest + jvmTest): `./gradlew :composeApp:jvmTest`
 - Single test class: `./gradlew :composeApp:jvmTest --tests "com.droidslife.screensaver.clock.ClockViewModelTest"`
