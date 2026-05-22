@@ -29,42 +29,6 @@ interface PreferencesRepository {
      * @param city The city to set.
      */
     suspend fun setCurrentCity(city: String)
-
-    /**
-     * Gets the auto play status.
-     * @return Whether auto play is enabled.
-     */
-    suspend fun getAutoPlayStatus(): Boolean
-
-    /**
-     * Sets the auto play status.
-     * @param enabled Whether auto play should be enabled.
-     */
-    suspend fun setAutoPlayStatus(enabled: Boolean)
-
-    /**
-     * Gets the shuffle status.
-     * @return Whether shuffle is enabled.
-     */
-    suspend fun getShuffleStatus(): Boolean
-
-    /**
-     * Sets the shuffle status.
-     * @param enabled Whether shuffle should be enabled.
-     */
-    suspend fun setShuffleStatus(enabled: Boolean)
-
-    /**
-     * Gets the currently selected design.
-     * @return The design ID.
-     */
-    suspend fun getSelectedDesign(): Int
-
-    /**
-     * Sets the currently selected design.
-     * @param designId The design ID to set.
-     */
-    suspend fun setSelectedDesign(designId: Int)
 }
 
 expect fun createPreferencesRepository(): PreferencesRepository

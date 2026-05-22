@@ -1,13 +1,13 @@
 package com.droidslife.screensaver.widget.builtin
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,23 +23,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.network.BackendResult
 import com.droidslife.screensaver.storage.SyncRepository
+import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
+import com.droidslife.screensaver.widget.api.WidgetSize
+import com.droidslife.screensaver.widget.api.WidgetSummary
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -48,7 +49,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlin.math.max
 import kotlin.time.Clock
 
 class ExpensesWidgetFactory(
@@ -58,6 +58,11 @@ class ExpensesWidgetFactory(
     override val displayName: String = "Expenses"
     override val description: String = "Current-month expense tracking with local storage"
     override val category: WidgetCategory = WidgetCategory.FINANCE
+    override val preferredSize: WidgetSize = WidgetSize(
+        minCols = 3, minRows = 2,
+        defaultCols = 4, defaultRows = 2,
+        maxCols = 8, maxRows = 3,
+    )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.Currency(
             key = "currency",
@@ -91,6 +96,43 @@ private class ExpensesWidget(
     private var unsyncedCount by mutableStateOf(0)
     private var inputVisible by mutableStateOf(false)
 
+    override fun summary(): WidgetSummary {
+        val currency = config.enum("currency", "USD")
+        val total = expenses.sumOf { it.amount }
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val monthName = monthShortName(now.month)
+        val topCategories = expenses
+            .groupBy { it.category }
+            .map { (cat, items) -> cat to items.sumOf { it.amount } }
+            .sortedByDescending { it.second }
+            .take(3)
+        val subtitle = if (topCategories.isEmpty()) {
+            "No expenses yet"
+        } else {
+            topCategories.joinToString(" · ") { (cat, amt) -> "$cat $currency ${"%.2f".format(amt)}" }
+        }
+        return WidgetSummary(
+            primaryValue = "$currency ${"%.2f".format(total)}",
+            primaryLabel = "Spend · $monthName",
+            subtitle = subtitle,
+        )
+    }
+
+    private fun monthShortName(month: Month): String = when (month) {
+        Month.JANUARY -> "Jan"
+        Month.FEBRUARY -> "Feb"
+        Month.MARCH -> "Mar"
+        Month.APRIL -> "Apr"
+        Month.MAY -> "May"
+        Month.JUNE -> "Jun"
+        Month.JULY -> "Jul"
+        Month.AUGUST -> "Aug"
+        Month.SEPTEMBER -> "Sep"
+        Month.OCTOBER -> "Oct"
+        Month.NOVEMBER -> "Nov"
+        Month.DECEMBER -> "Dec"
+    }
+
     override fun onResume() {
         scope.coroutineScope.launch {
             expenses = scope.storage.read(storageKey(), String::class.java)
@@ -109,92 +151,111 @@ private class ExpensesWidget(
             default = listOf("food", "transport", "entertainment", "bills"),
         )
         val total = expenses.sumOf { it.amount }
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val monthLabel = monthShortName(now.month).uppercase()
 
-        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Total + toggle add form
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        val topCategories = expenses
+            .groupBy { it.category }
+            .map { (cat, items) -> cat to items.sumOf { it.amount } }
+            .sortedByDescending { it.second }
+            .take(3)
+        val subtitle = if (topCategories.isEmpty()) {
+            "No expenses yet"
+        } else {
+            topCategories.joinToString(" · ") { (cat, amt) ->
+                "$cat $currency ${"%.0f".format(amt)}"
+            }
+        }
+
+        Box(modifier = modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = "$currency ${"%.2f".format(total)}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    text = "SPEND · $monthLabel",
+                    fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 9.sp,
+                    letterSpacing = 2.25.sp,
+                    color = DwellColors.TextLow,
+                    maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { inputVisible = !inputVisible }) {
+                IconButton(
+                    onClick = { inputVisible = !inputVisible },
+                    modifier = Modifier.size(20.dp),
+                ) {
                     Icon(
                         imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
                         contentDescription = if (inputVisible) "Hide add form" else "Add expense",
+                        tint = DwellColors.TextLow,
                     )
                 }
             }
 
             if (inputVisible) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = amountInput,
-                        onValueChange = { amountInput = it.filter { char -> char.isDigit() || char == '.' } },
-                        label = { Text("Amount") },
-                        modifier = Modifier.weight(0.8f),
-                        singleLine = true,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = categoryInput,
-                        onValueChange = { categoryInput = it },
-                        label = { Text("Category") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                    )
-                }
-
-                OutlinedTextField(
-                    value = noteInput,
-                    onValueChange = { noteInput = it },
-                    label = { Text("Note") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(onClick = { addExpense(currentCategories) }, enabled = amountInput.toDoubleOrNull() != null) {
-                        Text("Add")
-                    }
-                }
-            }
-
-            ExpenseBars(expenses = expenses, modifier = Modifier.fillMaxWidth().height(56.dp))
-
-            expenses.sortedByDescending { it.occurredAt }.take(5).forEach { expense ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                // Add form covers the tile while open; collapses back to the
+                // big-value layout on close.
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize().align(Alignment.Center),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(expense.category, fontWeight = FontWeight.SemiBold)
-                        if (expense.note.isNotBlank()) {
-                            Text(
-                                expense.note,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    Spacer(Modifier.size(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = amountInput,
+                            onValueChange = { amountInput = it.filter { char -> char.isDigit() || char == '.' } },
+                            label = { Text("Amount") },
+                            modifier = Modifier.weight(0.8f),
+                            singleLine = true,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = categoryInput,
+                            onValueChange = { categoryInput = it },
+                            label = { Text("Category") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                        )
                     }
-                    Text("$currency ${"%.2f".format(expense.amount)}")
-                    if (inputVisible) {
-                        IconButton(onClick = { deleteExpense(expense.id) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Delete expense")
+                    OutlinedTextField(
+                        value = noteInput,
+                        onValueChange = { noteInput = it },
+                        label = { Text("Note") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { addExpense(currentCategories) },
+                            enabled = amountInput.toDoubleOrNull() != null,
+                        ) {
+                            Text("Add")
                         }
                     }
                 }
-            }
-
-            if (unsyncedCount > 0) {
+            } else {
                 Text(
-                    text = "$unsyncedCount unsynced",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    text = "$currency ${"%.2f".format(total)}",
+                    fontFamily = DwellFonts.jetBrainsMono(),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 36.sp,
+                    color = DwellColors.TextHigh,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.Center),
                 )
             }
+
+            Text(
+                text = if (unsyncedCount > 0) "$unsyncedCount unsynced" else subtitle,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 10.sp,
+                color = if (unsyncedCount > 0) DwellColors.StatusError else DwellColors.TextMid,
+                maxLines = 2,
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
         }
     }
 
@@ -216,15 +277,6 @@ private class ExpensesWidget(
         noteInput = ""
         persist()
         queueUpsert(expenses.last())
-    }
-
-    private fun deleteExpense(id: String) {
-        expenses = expenses.filterNot { it.id == id }
-        persist()
-        scope.coroutineScope.launch {
-            syncRepository.enqueueDelete(id)
-            pushPending()
-        }
     }
 
     private fun persist() {
@@ -288,38 +340,6 @@ private class ExpensesWidget(
 
     private fun JsonObject.toExpense(): Expense {
         return json.decodeFromJsonElement(Expense.serializer(), this)
-    }
-}
-
-@Composable
-private fun ExpenseBars(expenses: List<Expense>, modifier: Modifier) {
-    val barColor = MaterialTheme.colorScheme.primary
-    val axisColor = MaterialTheme.colorScheme.outlineVariant
-    Canvas(modifier = modifier.padding(vertical = 6.dp)) {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val totals = (6 downTo 0).map { offset ->
-            val date = today.minus(offset, DateTimeUnit.DAY)
-            expenses
-                .filter { expense ->
-                    val expenseDate = kotlin.time.Instant.fromEpochMilliseconds(expense.occurredAt)
-                        .toLocalDateTime(TimeZone.currentSystemDefault())
-                        .date
-                    expenseDate == date
-                }
-                .sumOf { it.amount }
-        }
-        val maxValue = max(1.0, totals.maxOrNull() ?: 0.0)
-        val slot = size.width / totals.size
-        drawLine(axisColor, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1f)
-        totals.forEachIndexed { index, total ->
-            val height = ((total / maxValue).toFloat() * size.height).coerceAtLeast(if (total > 0) 4f else 0f)
-            val x = index * slot + slot * 0.25f
-            drawRect(
-                color = if (total > 0.0) barColor else Color.Transparent,
-                topLeft = Offset(x, size.height - height),
-                size = androidx.compose.ui.geometry.Size(slot * 0.5f, height),
-            )
-        }
     }
 }
 

@@ -22,9 +22,11 @@ import kotlinx.coroutines.delay
 class ToastState {
     var isVisible by mutableStateOf(false)
     var message by mutableStateOf("")
+    var durationMs by mutableStateOf(1500L)
 
-    fun show(msg: String) {
+    fun show(msg: String, durationMs: Long = 1500L) {
         message = msg
+        this.durationMs = durationMs
         isVisible = true
     }
 
@@ -74,10 +76,10 @@ fun ShortcutToast(
                 )
             }
 
-            // Auto-dismiss after 1.5 seconds
-            LaunchedEffect(toastState.isVisible) {
+            // Auto-dismiss after the toast's configured duration.
+            LaunchedEffect(toastState.isVisible, toastState.durationMs) {
                 if (toastState.isVisible) {
-                    delay(1500)
+                    delay(toastState.durationMs)
                     toastState.hide()
                 }
             }

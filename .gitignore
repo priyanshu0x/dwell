@@ -44,3 +44,5 @@ out/
 
 # Local Codex session notes and changelogs
 .sessions/
+.claude/
+.superpowers/

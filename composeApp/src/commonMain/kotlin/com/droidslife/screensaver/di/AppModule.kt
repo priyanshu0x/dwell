@@ -1,6 +1,5 @@
 package com.droidslife.screensaver.di
 
-import com.droidslife.screensaver.clock.ClockViewModel
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.network.KtorClient
 import com.droidslife.screensaver.network.BackendClient
@@ -12,9 +11,13 @@ import com.droidslife.screensaver.settings.StartupRegistration
 import com.droidslife.screensaver.settings.createPreferencesRepository
 import com.droidslife.screensaver.settings.createSecretStorage
 import com.droidslife.screensaver.settings.createStartupRegistration
+import com.droidslife.screensaver.widget.builtin.CalendarWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ExpensesWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
+import com.droidslife.screensaver.widget.builtin.IdleCounterWidgetFactory
+import com.droidslife.screensaver.widget.builtin.PomodoroWidgetFactory
 import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
+import com.droidslife.screensaver.widget.builtin.WeatherForecastWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherWidgetFactory
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.weather.WeatherApi
@@ -48,17 +51,23 @@ val appModule = module {
         )
     }
 
-    // Weather Repository
-    single { WeatherRepository(get(), get()) }
+    // Settings ViewModel (declared before WeatherRepository so the repo can
+    // depend on it for resolving the active provider + WeatherAPI key.)
+    single { SettingsViewModel(get(), get(), get()) }
+
+    // Weather Repository — provider-agnostic façade. Picks an adapter per call
+    // based on the user's saved widget configuration.
+    single<WeatherRepository> {
+        WeatherRepository(
+            httpClient = get(),
+            locationService = get(),
+            settingsViewModel = get(),
+            secretStorage = get(),
+        )
+    }
 
     // Weather ViewModel
     single { WeatherViewModel(get(), get(), get()) }
-
-    // Clock ViewModel
-    single { ClockViewModel() }
-
-    // Settings ViewModel
-    single { SettingsViewModel(get(), get(), get()) }
 
     // Backend sync
     single<BackendGateway> {
@@ -72,11 +81,30 @@ val appModule = module {
     }
 
     // Built-in widgets
-    single { ClockWidgetFactory(get(), get()) }
+    single { ClockWidgetFactory(get()) }
     single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
     single { ExpensesWidgetFactory(get()) }
+    single { CalendarWidgetFactory() }
+    single { IdleCounterWidgetFactory() }
+    single { WeatherForecastWidgetFactory(get(), get()) }
+    single { PomodoroWidgetFactory() }
 
     // Widget registry
-    single { WidgetRegistry(listOf(get<ClockWidgetFactory>(), get<WeatherWidgetFactory>(), get<TodosWidgetFactory>(), get<ExpensesWidgetFactory>()), get(), get()) }
+    single {
+        WidgetRegistry(
+            listOf(
+                get<ClockWidgetFactory>(),
+                get<WeatherWidgetFactory>(),
+                get<TodosWidgetFactory>(),
+                get<ExpensesWidgetFactory>(),
+                get<CalendarWidgetFactory>(),
+                get<IdleCounterWidgetFactory>(),
+                get<WeatherForecastWidgetFactory>(),
+                get<PomodoroWidgetFactory>(),
+            ),
+            get(),
+            get(),
+        )
+    }
 }

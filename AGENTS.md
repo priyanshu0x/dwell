@@ -62,3 +62,7 @@ Defined centrally in `components/KeyEventHandler.kt`, dispatched as `KeyEventAct
 
 ### Resources
 Custom fonts (Orbitron, Seven-Segment, Technology, IndieFlower) and SVG icons live under `composeApp/src/commonMain/composeResources/`. These are consumed via the Compose resources plugin's generated `Res` object.
+
+## Comments
+
+Comment **why**, not what. Skip if removing it wouldn't confuse anyone. Keep them short.
