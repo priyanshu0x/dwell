@@ -1,7 +1,6 @@
 package com.droidslife.screensaver.widget.builtin
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -93,19 +92,21 @@ private class ClockWidget(
             if (!is24Hour) append(if (now.hour < 12) " AM" else " PM")
         }
 
-        Column(
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.Start,
-        ) {
+        val city = settingsViewModel.settings.widgetConfigs[
+            "com.droidslife.screensaver.weather",
+        ]?.get("city")?.toString()?.trim('"')
+        val label = if (!city.isNullOrBlank()) "TIME · ${city.uppercase()}" else "TIME"
+
+        Box(modifier = modifier.fillMaxSize()) {
             Text(
-                text = "TIME",
+                text = label,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 9.sp,
                 letterSpacing = 2.25.sp,
                 color = DwellColors.TextLow,
                 maxLines = 1,
+                modifier = Modifier.align(Alignment.TopStart),
             )
             Text(
                 text = text,
@@ -115,6 +116,7 @@ private class ClockWidget(
                 letterSpacing = (-6.4).sp,
                 color = DwellColors.TextHigh,
                 maxLines = 1,
+                modifier = Modifier.align(Alignment.Center),
             )
             if (showDate) {
                 Text(
@@ -124,6 +126,7 @@ private class ClockWidget(
                     fontSize = 14.sp,
                     letterSpacing = 2.1.sp,
                     color = DwellColors.TextMid,
+                    modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
         }
