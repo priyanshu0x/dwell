@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberToastState
 import com.droidslife.screensaver.modes.ModeHost
-import com.droidslife.screensaver.settings.SettingsSheet
+import com.droidslife.screensaver.settings.SettingsSidebar
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.settings.ShortcutsHelpDialog
 import com.droidslife.screensaver.theme.AppTheme
@@ -91,17 +91,17 @@ internal fun App(
                     onOpenHelp = onShowHelpDialog,
                 )
                 ShortcutToast(toastState = welcomeToast)
-            }
-        }
 
-        // Settings side-sheet overlay (replaces the legacy SettingsDialog;
-        // the old file is kept on disk until Phase 13 cleanup).
-        if (settingsViewModel.isSettingsDialogOpen) {
-            SettingsSheet(
-                settingsViewModel = settingsViewModel,
-                widgetRegistry = widgetRegistry,
-                onDismiss = { settingsViewModel.closeSettingsDialog() },
-            )
+                // Settings as an in-window sidebar — the dashboard underneath
+                // stays live so toggle effects are visible immediately.
+                if (settingsViewModel.isSettingsDialogOpen) {
+                    SettingsSidebar(
+                        settingsViewModel = settingsViewModel,
+                        widgetRegistry = widgetRegistry,
+                        onDismiss = { settingsViewModel.closeSettingsDialog() },
+                    )
+                }
+            }
         }
 
         // Help dialog overlay

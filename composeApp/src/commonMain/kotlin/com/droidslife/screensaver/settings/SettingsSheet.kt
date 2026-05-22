@@ -8,9 +8,9 @@ import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,20 +18,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,12 +38,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.droidslife.screensaver.settings.sections.AboutSection
 import com.droidslife.screensaver.settings.sections.DisplaySection
 import com.droidslife.screensaver.settings.sections.SyncSection
@@ -65,45 +63,50 @@ private enum class SettingsTab(val label: String) {
 }
 
 /**
- * Full-height right-edge side-sheet for application settings. Replaces the
- * older Material-3 [SettingsDialog].
+ * Right-edge **sidebar** for application settings — renders as an in-window
+ * overlay so the dashboard behind it stays fully visible and live: as the user
+ * toggles a mode, variant, or display option, the change is reflected on the
+ * remaining dashboard area immediately.
  *
- * The outer [Dialog] is used purely as a focus / Esc-handler container — its
- * contents fill the whole screen and the visible chrome is rendered manually
- * inside (scrim + sliding panel).
+ * Earlier this was a Compose `Dialog` with a black scrim; the scrim hid the
+ * dashboard, which made the "did my toggle do anything?" feedback loop useless.
+ * The dialog also opens as a separate OS window on desktop, which clashed with
+ * the fullscreen always-on-top dashboard window.
  *
  * Dismissal:
- * - `Esc` key → routed via [DialogProperties.dismissOnBackPress] → [onDismiss]
- * - Click on scrim → handled by the scrim [Box]'s `clickable` → [onDismiss]
  * - Header `X` button → [onDismiss]
- *
- * We deliberately set [DialogProperties.dismissOnClickOutside] to `false`
- * because in this layout the whole window is "inside" the Dialog content; the
- * scrim is what intercepts outside-area clicks and we want to control that
- * ourselves so the panel itself doesn't accidentally trigger dismiss.
+ * - `Esc` (handled by the KeyEventHandler in App / main.kt)
+ * - There is intentionally **no** scrim-click dismiss — the area to the left
+ *   of the sidebar is the live dashboard.
  */
 @Composable
-fun SettingsSheet(
+fun BoxScope.SettingsSidebar(
     settingsViewModel: SettingsViewModel,
     widgetRegistry: WidgetRegistry,
     onDismiss: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        // Drive a one-shot mount animation: panel slides in from the right
-        // edge after the Dialog mounts. Visible defaults to false, then flips
-        // to true on first composition.
-        val visible = remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) { visible.value = true }
+    // Drive a one-shot mount animation: panel slides in from the right edge
+    // after mount.
+    val visible = remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { visible.value = true }
 
-        SheetScaffold(
-            visible = visible,
+    AnimatedVisibility(
+        visible = visible.value,
+        enter = slideInHorizontally(
+            animationSpec = tween(
+                durationMillis = DwellMotion.SettingsSheetSlide,
+                easing = DwellMotion.Emphasized,
+            ),
+        ) { fullWidth -> fullWidth },
+        exit = slideOutHorizontally(
+            animationSpec = tween(
+                durationMillis = DwellMotion.SettingsSheetSlide,
+                easing = DwellMotion.Emphasized,
+            ),
+        ) { fullWidth -> fullWidth },
+        modifier = Modifier.align(Alignment.CenterEnd),
+    ) {
+        SidebarPanel(
             settingsViewModel = settingsViewModel,
             widgetRegistry = widgetRegistry,
             onDismiss = onDismiss,
@@ -112,61 +115,16 @@ fun SettingsSheet(
 }
 
 @Composable
-private fun SheetScaffold(
-    visible: MutableState<Boolean>,
+private fun SidebarPanel(
     settingsViewModel: SettingsViewModel,
     widgetRegistry: WidgetRegistry,
     onDismiss: () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize()) {
-        // Scrim — fills the whole window, intercepts click-outside.
-        val scrimInteraction = remember { MutableInteractionSource() }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(
-                    interactionSource = scrimInteraction,
-                    indication = null,
-                ) { onDismiss() },
-        )
-
-        // Sliding sheet
-        AnimatedVisibility(
-            visible = visible.value,
-            enter = slideInHorizontally(
-                animationSpec = tween(
-                    durationMillis = DwellMotion.SettingsSheetSlide,
-                    easing = DwellMotion.Emphasized,
-                ),
-            ) { fullWidth -> fullWidth },
-            exit = slideOutHorizontally(
-                animationSpec = tween(
-                    durationMillis = DwellMotion.SettingsSheetSlide,
-                    easing = DwellMotion.Emphasized,
-                ),
-            ) { fullWidth -> fullWidth },
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            SheetContent(
-                settingsViewModel = settingsViewModel,
-                widgetRegistry = widgetRegistry,
-                onDismiss = onDismiss,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SheetContent(
-    settingsViewModel: SettingsViewModel,
-    widgetRegistry: WidgetRegistry,
-    onDismiss: () -> Unit,
-) {
-    // Width: min(560dp, 60% of available window width).
+    // Width: min(560dp, 40% of available window width). Slightly narrower than
+    // the dialog era (60%) so more dashboard is visible alongside.
     BoxWithConstraints(modifier = Modifier.fillMaxHeight()) {
         val maxW = maxWidth
-        val sheetWidth = min(560.dp.value, (maxW.value * 0.6f)).dp
+        val sheetWidth = min(560.dp.value, (maxW.value * 0.40f)).dp.coerceAtLeast(360.dp)
 
         val shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
 
@@ -174,8 +132,9 @@ private fun SheetContent(
             modifier = Modifier
                 .width(sheetWidth)
                 .fillMaxHeight()
+                .shadow(elevation = 24.dp, shape = shape, clip = false)
                 .clip(shape)
-                .background(DwellColors.Surface0)
+                .background(DwellColors.Surface0.copy(alpha = 0.97f))
                 .border(1.dp, DwellColors.Stroke, shape),
         ) {
             // Header
@@ -193,13 +152,7 @@ private fun SheetContent(
                     fontSize = 20.sp,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Close settings",
-                        tint = DwellColors.TextMid,
-                    )
-                }
+                CloseButton(onClick = onDismiss)
             }
 
             // Sticky tab row
@@ -243,6 +196,26 @@ private fun SheetContent(
 
             HorizontalDivider(color = DwellColors.Stroke)
         }
+    }
+}
+
+@Composable
+private fun CloseButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(DwellColors.Surface1)
+            .border(1.dp, DwellColors.Stroke, CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = "Close settings",
+            tint = DwellColors.TextMid,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

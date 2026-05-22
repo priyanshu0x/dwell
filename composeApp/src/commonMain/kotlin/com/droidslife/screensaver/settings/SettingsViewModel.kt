@@ -270,9 +270,15 @@ class SettingsViewModel(
 
     /**
      * Updates the settings in the repository.
-     * @param newSettings The new settings.
+     *
+     * Eagerly updates the in-memory [settings] state so the dashboard reflects
+     * the change on the next frame; the persistence write happens in parallel.
+     * Without the eager update, a setter triggers a coroutine launch → disk write
+     * → kstore flow re-emit → onEach callback — that round-trip is enough latency
+     * to make the UI feel like the toggle "did nothing" on faster machines.
      */
     private fun updateSettings(newSettings: SettingsModel) {
+        settings = newSettings
         viewModelScope.launch {
             preferencesRepository.updateSettings(newSettings)
         }
