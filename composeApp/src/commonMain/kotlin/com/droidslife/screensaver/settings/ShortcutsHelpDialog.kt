@@ -117,6 +117,7 @@ private fun HelpPanel(
                     "L"        to "Toggle layout edit mode (Console only)",
                     "Ctrl+R"   to "Reload widgets from ~/.screensaver/widgets/",
                 ))
+                TroubleshootingGroup()
             }
 
             Spacer(Modifier.weight(1f))
@@ -148,6 +149,33 @@ private fun HelpPanel(
                 )
             }
             @Suppress("UNUSED_PARAMETER") onExitApplication
+        }
+    }
+}
+
+@Composable
+private fun TroubleshootingGroup() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "TROUBLESHOOTING",
+            color = DwellColors.TextLow,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.sp,
+            letterSpacing = 1.6.sp,
+        )
+        listOf(
+            "Run `./scripts/dwell doctor` to diagnose JDK / settings issues.",
+            "Logs + settings live in ~/.screensaver/ (or %APPDATA%\\dwell on Windows).",
+            "Tiles won't move? Settings → Triggers → unlock the dashboard.",
+            "Weather stuck on \"—\"? Open Settings → Widgets → Weather and pick a city.",
+        ).forEach { line ->
+            Text(
+                text = "• $line",
+                color = DwellColors.TextMid,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 12.sp,
+            )
         }
     }
 }
