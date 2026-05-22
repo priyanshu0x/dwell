@@ -41,7 +41,8 @@ fun Lumen(
     modifier: Modifier = Modifier,
 ) {
     val quieter = settingsViewModel.settings.quieterLumen
-    val now by produceTickerLumen()
+    val settings = settingsViewModel.settings
+    val now by produceTickerLumen(includeSeconds = settings.showSeconds)
 
     Box(
         modifier = modifier
@@ -131,7 +132,11 @@ fun Lumen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}",
+                text = com.droidslife.screensaver.modes.cinematic.formatClock(
+                    now,
+                    is24Hour = settings.is24HourFormat,
+                    showSeconds = settings.showSeconds,
+                ),
                 fontFamily = DwellFonts.interTight(),
                 // Force ExtraLight (200) explicitly; the symbolic FontWeight.ExtraLight
                 // was rendering as Regular in some Skia builds.
@@ -139,14 +144,16 @@ fun Lumen(
                 fontSize = 152.sp,
                 color = Color(0xFFDDF0FF),
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = formatSubline(now),
-                fontFamily = DwellFonts.jetBrainsMono(),
-                fontSize = 11.sp,
-                letterSpacing = 0.4.sp,
-                color = DwellColors.LumenCyan.copy(alpha = 0.55f),
-            )
+            if (settings.showDate) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = formatSubline(now),
+                    fontFamily = DwellFonts.jetBrainsMono(),
+                    fontSize = 11.sp,
+                    letterSpacing = 0.4.sp,
+                    color = DwellColors.LumenCyan.copy(alpha = 0.55f),
+                )
+            }
         }
     }
 }
@@ -267,13 +274,16 @@ private fun formatBottomLeftTelemetry(now: LocalDateTime): String {
 private fun weatherStrip(): String = "WTH OK" // Phase 9/12 wires actual weather/sync status
 
 @Composable
-private fun produceTickerLumen(): State<LocalDateTime> {
+private fun produceTickerLumen(includeSeconds: Boolean = false): State<LocalDateTime> {
+    val tz = TimeZone.currentSystemDefault()
+    val interval = if (includeSeconds) 1_000L else 15_000L
     return produceState(
-        initialValue = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        initialValue = Clock.System.now().toLocalDateTime(tz),
+        includeSeconds,
     ) {
         while (true) {
-            value = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            delay(15_000)
+            value = Clock.System.now().toLocalDateTime(tz)
+            delay(interval)
         }
     }
 }

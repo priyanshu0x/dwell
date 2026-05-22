@@ -58,10 +58,9 @@ private fun BoxScope.CinematicForeground(
     settingsViewModel: SettingsViewModel,
     registry: WidgetRegistry,
 ) {
-    val now by produceTicker()
-    val hh = now.hour.toString().padStart(2, '0')
-    val mm = now.minute.toString().padStart(2, '0')
-    val time = "$hh:$mm"
+    val settings = settingsViewModel.settings
+    val now by produceTicker(includeSeconds = settings.showSeconds)
+    val time = formatClock(now, is24Hour = settings.is24HourFormat, showSeconds = settings.showSeconds)
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val startPad = maxWidth * 0.08f
@@ -74,14 +73,16 @@ private fun BoxScope.CinematicForeground(
                 fontSize = 280.sp,
                 color = DwellColors.TextHigh,
             )
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = formatMetaLine(now),
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.Normal,
-                fontSize = 18.sp,
-                color = DwellColors.TextHigh.copy(alpha = 0.75f),
-            )
+            if (settings.showDate) {
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = formatMetaLine(now),
+                    fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 18.sp,
+                    color = DwellColors.TextHigh.copy(alpha = 0.75f),
+                )
+            }
         }
     }
     WidgetDrawer(settingsViewModel, registry)
@@ -105,14 +106,30 @@ private fun formatMetaLine(now: LocalDateTime): String {
     return "$dow, ${now.day} $month"
 }
 
+/**
+ * Format HH:MM (or HH:MM:SS) with optional AM/PM suffix.
+ * Shared by all three modes via [DwellClock].
+ */
+internal fun formatClock(now: LocalDateTime, is24Hour: Boolean, showSeconds: Boolean): String {
+    val hour24 = now.hour
+    val hour = if (is24Hour) hour24 else (hour24 % 12).let { if (it == 0) 12 else it }
+    val hh = hour.toString().padStart(2, '0')
+    val mm = now.minute.toString().padStart(2, '0')
+    val core = if (showSeconds) "$hh:$mm:${now.second.toString().padStart(2, '0')}" else "$hh:$mm"
+    return if (is24Hour) core else "$core ${if (hour24 < 12) "AM" else "PM"}"
+}
+
 @Composable
-private fun produceTicker(): State<LocalDateTime> {
+internal fun produceTicker(includeSeconds: Boolean = false): State<LocalDateTime> {
+    val tz = TimeZone.currentSystemDefault()
+    val interval = if (includeSeconds) 1_000L else 15_000L
     return produceState(
-        initialValue = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        initialValue = Clock.System.now().toLocalDateTime(tz),
+        includeSeconds,
     ) {
         while (true) {
-            value = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            delay(15_000)
+            value = Clock.System.now().toLocalDateTime(tz)
+            delay(interval)
         }
     }
 }
