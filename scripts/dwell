@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# Dwell CLI — Linux / macOS launch helper.
+# Auto-installs Temurin JDK 21 to ~/jdks/ if missing, then runs the requested mode.
+#
+# Usage:
+#   ./scripts/dwell show       # open dashboard once
+#   ./scripts/dwell daemon     # run as tray daemon (dashboard appears after idle)
+#   ./scripts/dwell config     # open dashboard with Settings pre-opened
+#   ./scripts/dwell dev        # hot-reload dev mode
+#   ./scripts/dwell install    # symlink this script into ~/.local/bin so `dwell` works anywhere
+#   ./scripts/dwell uninstall  # remove the symlink (does not touch ~/.screensaver)
+#   ./scripts/dwell status     # show whether Dwell is running + which JDK / settings it uses
+#   ./scripts/dwell help       # show this help
+#
+# Windows: use scripts\dwell.cmd instead.
+
+set -euo pipefail
+
+# --- Resolve project root (parent of this script's directory) ----------------
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+cd "$ROOT"
+
+# --- JDK 21 detection / auto-install -----------------------------------------
+detect_java21() {
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+        local v
+        v=$("$JAVA_HOME/bin/java" -version 2>&1 | head -1 | sed -nE 's/.*version "([0-9]+)\..*/\1/p')
+        if [ "${v:-0}" -ge 21 ] 2>/dev/null; then echo "$JAVA_HOME"; return 0; fi
+    fi
+    local d
+    for d in "$HOME/jdks/jdk-21"* /usr/lib/jvm/java-21-* /usr/lib/jvm/jdk-21* /opt/jdk-21*; do
+        if [ -x "$d/bin/java" ]; then echo "$d"; return 0; fi
+    done
+    return 1
+}
+
+install_java21() {
+    local arch os
+    case "$(uname -m)" in
+        x86_64|amd64) arch="x64" ;;
+        aarch64|arm64) arch="aarch64" ;;
+        *) echo "✗ Unsupported architecture: $(uname -m)" >&2; return 1 ;;
+    esac
+    case "$(uname -s)" in
+        Linux)   os="linux" ;;
+        Darwin)  os="mac" ;;
+        *) echo "✗ Unsupported OS for auto-install: $(uname -s). Set JAVA_HOME manually." >&2; return 1 ;;
+    esac
+    local url="https://api.adoptium.net/v3/binary/latest/21/ga/${os}/${arch}/jdk/hotspot/normal/eclipse"
+    local jdks="$HOME/jdks"
+    local archive="$jdks/temurin21.tar.gz"
+    mkdir -p "$jdks"
+    echo "▶ Installing Temurin JDK 21 to $jdks (~200MB, one-time)…" >&2
+    curl -fL --progress-bar -o "$archive" "$url" >&2 || { echo "✗ Download failed." >&2; return 1; }
+    if [ "$os" = "mac" ]; then
+        tar -xzf "$archive" -C "$jdks"
+        local mac_jdk
+        mac_jdk=$(find "$jdks" -maxdepth 4 -type d -name "Home" -path "*Contents*" 2>/dev/null | head -1)
+        [ -n "$mac_jdk" ] && ln -sfn "$mac_jdk" "$jdks/jdk-21"
+    else
+        tar -xzf "$archive" -C "$jdks"
+    fi
+    rm -f "$archive"
+    local installed
+    installed=$(detect_java21) || { echo "✗ Extracted but JDK still not found under $jdks." >&2; return 1; }
+    echo "✓ JDK 21 installed at $installed" >&2
+    echo "$installed"
+}
+
+bootstrap_java() {
+    local detected
+    if detected=$(detect_java21); then
+        export JAVA_HOME="$detected"
+    else
+        detected=$(install_java21) || exit 1
+        export JAVA_HOME="$detected"
+    fi
+    export PATH="$JAVA_HOME/bin:$PATH"
+}
+
+first_build_hint() {
+    [ -d "composeApp/build/libs" ] || echo "▶ First build — fetching dependencies (~1-2 min on a fast connection)."
+}
+
+cheatsheet() {
+    cat <<'EOF'
+  M       cycle mode (Cinematic → Ambient → Console)
+  V       cycle variant
+  Esc     dismiss
+  Ctrl+,  Settings    F1 / ?  Help    Ctrl+Q  quit
+EOF
+}
+
+usage() {
+    cat <<'EOF'
+Dwell — screensaver-with-widgets
+
+Usage: ./scripts/dwell <command>
+
+Commands:
+  show       Open the dashboard once (fullscreen, exit on dismiss).
+  daemon     Run as a tray daemon (dashboard appears after idle timeout).
+  config     Open the dashboard with Settings pre-opened.
+  dev        Run with Compose Hot Reload (for development).
+  build      Compile (no launch) — handy for CI / verifying changes.
+
+  install    Symlink this script into ~/.local/bin so you can type `dwell show` anywhere.
+  uninstall  Remove the symlink (does not touch ~/.screensaver).
+  status     Show whether Dwell is running + which JDK / settings file is in use.
+  help       Show this help.
+
+First run will auto-install JDK 21 to ~/jdks/ and download Gradle dependencies.
+EOF
+}
+
+# --- Subcommand dispatch -----------------------------------------------------
+cmd="${1:-help}"
+
+case "$cmd" in
+    show)
+        bootstrap_java; first_build_hint
+        echo "Dwell — opening dashboard."
+        cheatsheet; echo
+        exec ./gradlew :composeApp:run --args="--show" --console=plain
+        ;;
+    daemon)
+        bootstrap_java; first_build_hint
+        echo "Dwell — starting tray daemon. Look for the icon in your system tray."
+        echo "  Dashboard auto-opens after the idle timeout (Settings → Triggers)."
+        echo
+        exec ./gradlew :composeApp:run --args="--daemon" --console=plain
+        ;;
+    config)
+        bootstrap_java; first_build_hint
+        echo "Dwell — opening dashboard with Settings."
+        echo "  Tip: add a WeatherAPI key to enable the weather widget."
+        echo
+        exec ./gradlew :composeApp:run --args="/c" --console=plain
+        ;;
+    dev)
+        bootstrap_java; first_build_hint
+        echo "Dwell — Compose Hot Reload dev mode."
+        echo
+        exec ./gradlew :composeApp:runHot --console=plain
+        ;;
+    build)
+        bootstrap_java; first_build_hint
+        echo "Dwell — compiling…"
+        exec ./gradlew :composeApp:compileKotlinJvm :composeApp:compileTestKotlinJvm --console=plain
+        ;;
+    install)
+        target_dir="${DWELL_BIN_DIR:-$HOME/.local/bin}"
+        mkdir -p "$target_dir"
+        target="$target_dir/dwell"
+        ln -sfn "$HERE/dwell" "$target"
+        echo "✓ Linked: $target → $HERE/dwell"
+        case ":$PATH:" in
+            *":$target_dir:"*) echo "  $target_dir is on your PATH. Try: dwell show" ;;
+            *) echo "  $target_dir is NOT on your PATH. Add this to your shell rc:"
+               echo "    export PATH=\"$target_dir:\$PATH\"" ;;
+        esac
+        ;;
+    uninstall)
+        target_dir="${DWELL_BIN_DIR:-$HOME/.local/bin}"
+        target="$target_dir/dwell"
+        if [ -L "$target" ]; then
+            rm -f "$target"
+            echo "✓ Removed: $target"
+        else
+            echo "  No symlink at $target — nothing to remove."
+        fi
+        echo "  (Your settings + widget data at ~/.screensaver remain untouched.)"
+        ;;
+    status)
+        echo "Dwell — status"
+        echo "  Project root: $ROOT"
+        if pid=$(pgrep -f 'MainKt' 2>/dev/null | head -1); then
+            echo "  Running: PID $pid"
+        else
+            echo "  Running: no"
+        fi
+        if detected=$(detect_java21 2>/dev/null); then
+            echo "  JDK 21:  $detected"
+        else
+            echo "  JDK 21:  not detected (run any command to auto-install)"
+        fi
+        if [ -f "$HOME/.screensaver/settings.json" ]; then
+            echo "  Settings: $HOME/.screensaver/settings.json"
+        else
+            echo "  Settings: not yet written (first run hasn't completed)"
+        fi
+        if [ -d "$HOME/.screensaver/widgets" ]; then
+            count=$(find "$HOME/.screensaver/widgets" -maxdepth 2 \( -name '*.jar' -o -name 'widget.yaml' \) 2>/dev/null | wc -l | tr -d ' ')
+            echo "  Third-party widgets: $count installed at ~/.screensaver/widgets/"
+        fi
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        echo "Unknown command: $cmd" >&2
+        echo
+        usage
+        exit 2
+        ;;
+esac
