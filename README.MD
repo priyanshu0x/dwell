@@ -1,203 +1,168 @@
-# Screen Saver App
+# Dwell
 
-> Dwell is the codename for this project; the product itself is called Screen Saver App. The repository name and the user-facing name will line up in a future release.
+> Dwell is the codename and primary identifier for this project. (Installer artifacts may still say *Screen Saver App* until the next release rolls.)
 
-Idle-triggered desktop dashboard and screen saver built with Kotlin, Compose Multiplatform, and a public widget API.
+A calm, three-mode desktop screensaver that fades in after the OS goes idle, then renders a clock, weather, todos, expenses, and any widgets you drop into `~/.screensaver/widgets/`. Tray daemon on Linux and Windows; Compose Multiplatform under the hood.
 
-The app runs as a tray daemon on Windows and Linux, fades in a fullscreen dashboard after the OS has been idle for a while, and renders built-in or user-installed widgets from `~/.screensaver/widgets/`.
+![Cinematic Dusk — default mode](screenshots/cinematic-dusk-thumb.png)
 
-![Dashboard with clock and weather](screenshots/Screenshot%202025-03-31%20164121.png)
-
-> The screenshots in this repository (dated 2025-03-31) may show an older UI than the current build. They are kept for reference until a fresh set is captured.
-
-## Install
-
-Prebuilt installers (MSI / EXE for Windows, DEB for Linux, plus a Windows `.scr` bundle) are published on the project releases page:
-
-- Releases: `<TODO releases URL>`
-
-After downloading:
-
-- **Windows MSI / EXE** — run the installer, then launch "Screen Saver App" from the Start menu. To register it as the system screen saver, run `install-screensaver.ps1` from the install directory (see [docs/packaging.md](docs/packaging.md)).
-- **Windows `.scr` bundle** — unzip the `ScreenSaverApp-scr-*.zip` somewhere persistent (the `.scr`, `app/`, and `runtime/` folders must stay together), then run the bundled `install-screensaver.ps1`. See [docs/packaging.md](docs/packaging.md) for details.
-- **Linux DEB** — install with `sudo apt install ./screensaver-app_<version>_amd64.deb`, then register the user daemon with `composeApp/dist/linux/install.sh` from the source tree (or the equivalent script shipped with the package).
-
-If you would rather build it yourself, jump to [Build from source](#build-from-source).
-
-## First run
-
-When the app starts in its default `--daemon` mode:
-
-1. A tray icon (Screen Saver App) appears in the system tray / notification area.
-2. The dashboard does **not** open immediately — the daemon waits for the OS to report idle time.
-3. After the configured idle threshold elapses, the fullscreen dashboard fades in and starts displaying widgets (clock, weather, todos, expenses, plus any user-installed widgets).
-4. Moving the mouse, pressing a key, or pressing Esc dismisses the dashboard and the daemon returns to waiting.
-
-You can also force the dashboard open at any time:
-
-- Tray menu → **Show** opens it on demand.
-- `--show` on the command line opens it once and exits.
-
-Settings (idle threshold, clock style, weather location, widget toggles, etc.) live in **Tray → Settings** and persist to `~/.screensaver/settings.json`.
-
-![Settings dialog](screenshots/Screenshot%202025-03-31%20163721.png)
-
-### Controls
-
-While the dashboard is visible:
-
-- **Esc** — dismiss the dashboard.
-- **Mouse movement** — dismiss the dashboard (this can be disabled in Settings).
-- **Any key** — dismiss the dashboard.
-
-To stop the daemon entirely, right-click the tray icon and choose **Quit**. If the tray icon is missing on your desktop environment, see [docs/troubleshooting.md](docs/troubleshooting.md).
-
-### Weather setup
-
-The weather widget uses [WeatherAPI.com](https://www.weatherapi.com/), which requires a **free** API key:
-
-1. Sign up at [weatherapi.com](https://www.weatherapi.com/) and copy your key from the dashboard.
-2. Open **Tray → Settings → Display → Weather** and paste the key into the field, **or** set the `WEATHERAPI` environment variable before launching the app.
-3. Optionally change the city.
-
-Without a key, the weather widget will not load. Your key is stored in the OS keychain when available (Windows Credential Manager / Linux libsecret) and falls back to an obfuscated local file otherwise.
-
-## Privacy
-
-- **No telemetry.** The app does not collect or report usage data.
-- **Network access is opt-in.** Out of the box, the only network call is to WeatherAPI.com — and only if you configure a key.
-- **Backend sync is OFF by default.** The optional todos/expenses sync foundation exists but is inert unless a backend URL is configured. **No data leaves your machine** unless you explicitly point the app at a backend.
-- **Local storage only.** Settings live at `~/.screensaver/settings.json`, widget data at `~/.screensaver/widget-data/<widget-id>/`, and installed widgets at `~/.screensaver/widgets/`.
-
-## Build from source
-
-Requirements:
-
-- **JDK 21** (this is a hard requirement — the build fails on JDK 17 or earlier). On most Linux distros the default `java` is still JDK 8/11/17, so you will need to install JDK 21 separately. Recommended sources: [Eclipse Temurin](https://adoptium.net/temurin/releases/?version=21), or `sdk install java 21-tem` if you use [SDKMAN!](https://sdkman.io/).
-- Point Gradle at JDK 21 by setting `JAVA_HOME` (e.g. `export JAVA_HOME=/path/to/jdk-21`) before invoking the wrapper. The Gradle wrapper itself will then download the rest of the toolchain.
-
-Then run the dashboard once:
-
-Windows:
-
-```powershell
-.\gradlew.bat :composeApp:run --args="--show"
-```
-
-Unix shell:
+## Quick start (from source)
 
 ```sh
-./gradlew :composeApp:run --args="--show"
+git clone https://github.com/priyanshu0x/dwell.git
+cd dwell
+./scripts/dwell show     # macOS / Linux
+scripts\dwell.cmd show   :: Windows
 ```
 
-> The first build downloads roughly a few hundred MB of dependencies and takes about 1–2 minutes on a modern machine before the window appears. Gradle does not stream much output during this — it has not hung.
->
-> Running `:composeApp:run` with no `--args` starts the default tray daemon. In daemon mode the dashboard intentionally stays hidden until the OS idle threshold is reached or the tray menu's **Show** action is used.
+The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` setup required). The first build downloads ~200MB of Gradle dependencies and takes 1–2 minutes; subsequent launches are seconds.
 
-Launch modes:
+### CLI commands
 
-```text
---daemon   default; tray daemon, no dashboard until idle/show
---show     open dashboard once
-/s         Windows screen saver show
-/p         Windows screen saver preview no-op
-/c         open dashboard with settings
-```
+| Command | What it does |
+|---|---|
+| `dwell show` | Open the dashboard once (fullscreen, exit on dismiss). |
+| `dwell daemon` | Run as a tray daemon — dashboard appears after idle timeout. |
+| `dwell config` | Open the dashboard with Settings pre-opened. |
+| `dwell dev` | Compose Hot Reload dev mode (auto-recompiles on save). |
+| `dwell build` | Compile without launching (CI / verification). |
+| `dwell install` | Symlink the CLI into `~/.local/bin` so you can type `dwell …` from anywhere. |
+| `dwell uninstall` | Remove the symlink. |
+| `dwell status` | Show whether Dwell is running + which JDK / settings file is in use. |
 
-Hot reload during development:
+> On Windows substitute `scripts\dwell.cmd` for `./scripts/dwell`. The install subcommand drops a `dwell.cmd` shim in `%USERPROFILE%\bin`.
 
-```powershell
-.\gradlew.bat :composeApp:runHot
-```
+## Three modes
 
-Tests:
+Press `M` to cycle, `1` / `2` / `3` to jump directly, `V` to cycle variants within a mode.
 
-```powershell
-.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:jvmTest
-```
+### Cinematic — default
 
-Build the sample widget:
+Animated mesh-gradient backdrop with a huge typographic clock anchored upper-left. Variants: **Dusk** (peach / violet) and **Noir** (warm-white drifting glow on near-black). Hover the bottom edge or press `W` to peek a widget drawer.
 
-```powershell
-.\gradlew.bat --no-daemon --no-configuration-cache :samples:sample-kotlin-widget:jvmJar
-```
+| Dusk | Noir |
+|---|---|
+| ![Dusk](screenshots/cinematic-dusk-thumb.png) | ![Noir](screenshots/cinematic-noir-thumb.png) |
 
-## Package
+### Ambient — calm presence
 
-Windows `.scr` bundle:
+Two variants:
 
-```powershell
-.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:packageScrZip
-```
+- **Lumen** — sci-fi HUD: cyan corner brackets, perspective grid floor, telemetry strips along three edges, an orbital dial with a pulsing current-minute tick, and a thin Inter Tight clock with a soft cyan glow. Toggle "Quieter Lumen" in Settings → Display to strip back to the clock + a single telemetry line.
+- **Borealis** — soft aurora ribbons drifting across a starlit deep-night sky with the clock floating in the middle.
 
-Native package for the current OS:
+| Lumen | Borealis |
+|---|---|
+| ![Lumen](screenshots/ambient-lumen-thumb.png) | ![Borealis](screenshots/ambient-borealis-thumb.png) |
 
-```powershell
-.\gradlew.bat --no-daemon --no-configuration-cache :composeApp:packageDistributionForCurrentOS
-```
+### Console — modular dashboard
 
-See [docs/packaging.md](docs/packaging.md) for install details.
+Every enabled widget visible at once on a 12×6 grid. Press `L` to enter **Edit Layout** mode — drag tile headers to reorder, drag corners to resize. Layout is per-widget and persists in `~/.screensaver/settings.json`. Variants change only the accent: **Standard** uses a terminal-green `#9ECDA0`, **Amber** uses a vintage-CRT `#F3B95E`.
 
-Release outputs are written under:
+| Standard | Amber |
+|---|---|
+| ![Standard](screenshots/console-standard-thumb.png) | ![Amber](screenshots/console-amber-thumb.png) |
 
-```text
-composeApp/build/compose/binaries/main/ScreenSaverApp-scr-<version>.zip
-composeApp/build/compose/binaries/main/msi/
-composeApp/build/compose/binaries/main/exe/
-composeApp/build/compose/binaries/main/deb/
-```
+## Controls
+
+| Key | Action |
+|---|---|
+| `Esc`, `Alt`, mouse-move, any key (configurable) | Dismiss dashboard |
+| `Ctrl+Q` / `Cmd+Q` | Quit application |
+| `Ctrl+,` | Open Settings sheet |
+| `F1` / `?` | Help dialog |
+| `M` | Cycle mode |
+| `1` / `2` / `3` | Jump to Cinematic / Ambient / Console |
+| `V` | Cycle variant within current mode |
+| `W` | Toggle widget drawer (Cinematic only) |
+| `L` | Toggle layout edit mode (Console only) |
+| `Ctrl+R` | Reload widgets from `~/.screensaver/widgets/` |
 
 ## Widgets
 
-Widget authoring starts in [docs/widget-authors.md](docs/widget-authors.md). Working samples are in [`samples/sample-kotlin-widget`](samples/sample-kotlin-widget) (JAR / Tier 1) and [`samples/sample-declarative-widget`](samples/sample-declarative-widget) (YAML / Tier 2).
+Built-in widgets ship with Dwell: Clock, Weather (current conditions), Weather Forecast (5-day, opt-in), Todos, Expenses, Calendar (month grid), Idle Counter (Console-only).
 
-Filesystem discovery location:
+Drop your own widgets into `~/.screensaver/widgets/`:
 
-```text
-~/.screensaver/widgets/
+- **Kotlin/JVM widgets** — implement `com.droidslife.screensaver.widget.api.WidgetFactory`, package as a JAR with a `META-INF/services/com.droidslife.screensaver.widget.api.WidgetFactory` entry, copy the JAR into `~/.screensaver/widgets/`.
+- **Declarative widgets** — drop a folder containing `widget.yaml` into the same directory.
+
+See [`docs/widget-authors.md`](docs/widget-authors.md) and the worked samples in [`samples/`](samples/) for the full guide.
+
+Reload installed widgets via the tray menu, Settings → Widgets → Reload, or `Ctrl+R` in the dashboard.
+
+## Settings
+
+Open with `Ctrl+,` (or the gear icon at the bottom-right of the dashboard). Tabs:
+
+- **Display** — Mode (Cinematic / Ambient / Console), variant picker (per mode), clock format (12/24h), show-seconds, show-date.
+- **Widgets** — enable/disable each widget, per-widget config, "Edit Console layout" entry point.
+- **Triggers** — idle timeout, start-with-system, mouse-movement dismiss, exit-on-keypress.
+- **Sync** — optional backend (off by default; nothing leaves your machine unless you turn it on).
+- **About** — version, license, links.
+
+City selection lives inside the Weather widget itself (not in global Settings).
+
+## Weather setup
+
+The Weather and Weather Forecast widgets call [WeatherAPI.com](https://www.weatherapi.com/) (free tier, ~1M calls/month). To enable:
+
+1. Sign up for a free account at <https://www.weatherapi.com/signup.aspx>.
+2. Copy your API key from the WeatherAPI dashboard.
+3. Open Dwell → Settings → Widgets → Weather → paste the key.
+
+Alternatively, export `WEATHERAPI=<your-key>` in the environment before launching.
+
+Without a key, the Weather widget shows a friendly "Add a WeatherAPI key" empty state with an Open Settings link.
+
+## Privacy
+
+Dwell does not phone home. Optional backend sync (Settings → Sync) is **off by default**. Weather requests go directly to WeatherAPI.com if you've configured a key — nothing else leaves your machine.
+
+Local data:
+
+- `~/.screensaver/settings.json` — preferences (mode, variant, idle timeout, widget enable list).
+- `~/.screensaver/widget-data/<widget-id>/` — per-widget local storage.
+- API keys are stored in the OS keychain when possible (Windows Credential Manager, Linux `secret-tool`/libsecret) or an obfuscated fallback file otherwise.
+
+## Linux notes
+
+Idle detection backends Dwell can use, in preference order:
+
+- **GNOME Wayland** — `gdbus` (already shipped with GNOME).
+- **X11** — XScreenSaver / libXss. Install: `sudo apt install libxss1`.
+- **Fallback** — `xprintidle`. Install: `sudo apt install xprintidle`.
+
+If the tray icon doesn't appear on GNOME, install the *AppIndicator and KStatusNotifierItem Support* extension — GNOME removed legacy tray support in 3.26.
+
+## Build from source
+
+```sh
+./scripts/dwell build     # compile only
+./scripts/dwell show      # compile + launch
 ```
 
-Supported widget types:
+The build is driven by Gradle. Native installers are produced by:
 
-- JAR widget implementing `com.droidslife.screensaver.widget.api.WidgetFactory`.
-- Declarative folder widget containing `widget.yaml`.
-
-Installed widgets can be reloaded from the tray menu or **Settings → Widgets**.
-
-## Project structure
-
-```text
-composeApp/                       host app
-widget-api/                       public widget API
-samples/sample-kotlin-widget/     Tier 1 sample (JAR)
-samples/sample-declarative-widget/ Tier 2 sample (YAML)
-docs/                             packaging, widget-author, troubleshooting docs
-screenshots/                      reference screenshots
+```sh
+./gradlew :composeApp:packageDistributionForCurrentOS    # MSI/EXE on Win, DEB on Linux
+./gradlew :composeApp:packageScrZip                      # Windows .scr bundle (run on Windows)
 ```
 
-## Limits / requirements
+See [`docs/packaging.md`](docs/packaging.md) for installer details and [`docs/troubleshooting.md`](docs/troubleshooting.md) for common issues.
 
-- v1 targets Windows and Linux. macOS is not supported.
-- Building from source requires **JDK 21**.
-- Third-party JAR widgets are **not** sandboxed — they run with full JVM permissions. Only install widgets from sources you trust.
-- Backend sync uses a generic JSON / bearer-token client until a concrete backend contract is supplied.
+## Repo layout
 
-### Linux idle detection
+```text
+composeApp/                       desktop application
+widget-api/                       public widget API (Render targets, WidgetSize, GridRect)
+samples/sample-kotlin-widget      JAR widget sample
+samples/sample-declarative-widget widget.yaml sample
+scripts/dwell, dwell.cmd          launch CLI (bash + Windows)
+docs/                             packaging + widget-authoring + troubleshooting docs
+plans/                            implementation plans
+```
 
-The dashboard uses external utilities to read idle time on Linux. Depending on your session, install one or more of these:
+## License
 
-- **GNOME / Wayland** — uses `gdbus` (shipped with `glib2`, usually preinstalled).
-- **X11 with XScreenSaver / libXss**:
-  - Debian / Ubuntu: `sudo apt install libxss1`
-  - Fedora / RHEL: `sudo dnf install libXScrnSaver`
-  - Arch: `sudo pacman -S libxss`
-- **`xprintidle` fallback** (any X11):
-  - Debian / Ubuntu: `sudo apt install xprintidle x11-utils`
-  - Fedora: `sudo dnf install xprintidle xorg-x11-utils`
-  - Arch: `sudo pacman -S xprintidle xorg-xprop`
-
-If none of these are present the dashboard will never fade in automatically; you can still trigger it via **Tray → Show**.
-
-## Troubleshooting
-
-If the tray icon never shows up, the dashboard never triggers, the weather is blank, or you want to reset all settings — see [docs/troubleshooting.md](docs/troubleshooting.md).
+MIT (see `LICENSE`). © 2026 DroidsLife.
