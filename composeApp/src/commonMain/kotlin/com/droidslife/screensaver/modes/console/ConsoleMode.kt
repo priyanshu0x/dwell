@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,9 +62,17 @@ fun ConsoleMode(
     // clutter the everyday view.
     val tilesEditable = !locked || editing
     val showEditChrome = locked && editing
+    // Per-tile live pixel offsets, populated by ConsoleEditOverlay while a
+    // gesture is in progress so the tile chrome (rendered by ConsoleGrid)
+    // tracks the cursor pixel-by-pixel instead of jumping cell-to-cell.
+    val liveDrags = remember { mutableStateMapOf<String, TileLiveDrag>() }
     CompositionLocalProvider(LocalConsoleAccent provides accent) {
         Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
-            ConsoleGrid(placements = placements, modifier = Modifier.fillMaxSize()) { id ->
+            ConsoleGrid(
+                placements = placements,
+                liveDrags = liveDrags,
+                modifier = Modifier.fillMaxSize(),
+            ) { id ->
                 val instance = instances[id] ?: return@ConsoleGrid
                 val borderColor = if (accent.tileBorderTint == androidx.compose.ui.graphics.Color.Transparent) {
                     DwellColors.Stroke
@@ -95,6 +104,7 @@ fun ConsoleMode(
                 ConsoleEditOverlay(
                     placements = placements,
                     sizeConstraints = sizeConstraints,
+                    liveDrags = liveDrags,
                     showBanner = showEditChrome,
                     onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },

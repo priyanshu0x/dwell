@@ -7,17 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +59,7 @@ private val HANDLE_SIZE = 16.dp
 fun ConsoleEditOverlay(
     placements: Map<String, GridRect>,
     sizeConstraints: Map<String, WidgetSize>,
+    liveDrags: SnapshotStateMap<String, TileLiveDrag>,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
     showBanner: Boolean = true,
@@ -95,12 +92,14 @@ fun ConsoleEditOverlay(
                 stepX = stepX,
                 stepY = stepY,
                 ghosts = ghosts,
+                liveDrags = liveDrags,
                 placements = placements,
                 onMove = onMove,
                 onResize = onResize,
             )
         }
 
+        val ghostDash = remember { PathEffect.dashPathEffect(floatArrayOf(6f, 5f), 0f) }
         ghosts.forEach { (_, gr) ->
             val w = gr.cols * cellW + (gr.cols - 1) * gapPx
             val h = gr.rows * cellH + (gr.rows - 1) * gapPx
@@ -113,15 +112,17 @@ fun ConsoleEditOverlay(
                         width = with(density) { w.toDp() },
                         height = with(density) { h.toDp() },
                     )
-                    .border(
-                        width = 1.dp,
-                        color = DwellColors.LumenCyan.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                    .background(
-                        color = DwellColors.LumenCyan.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(12.dp),
-                    ),
+                    .drawBehind {
+                        val sw = 1.dp.toPx()
+                        val r = 12.dp.toPx()
+                        drawRoundRect(
+                            color = DwellColors.LumenCyan.copy(alpha = 0.35f),
+                            topLeft = Offset(sw / 2, sw / 2),
+                            size = Size(size.width - sw, size.height - sw),
+                            cornerRadius = CornerRadius(r, r),
+                            style = Stroke(width = sw, pathEffect = ghostDash),
+                        )
+                    },
             )
         }
 
@@ -164,6 +165,7 @@ private fun EditTile(
     stepX: Float,
     stepY: Float,
     ghosts: SnapshotStateMap<String, GridRect>,
+    liveDrags: SnapshotStateMap<String, TileLiveDrag>,
     placements: Map<String, GridRect>,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
@@ -175,18 +177,21 @@ private fun EditTile(
     val tileX = paddingPx + rect.col * stepX
     val tileY = paddingPx + rect.row * stepY
 
-    // Track per-tile drag accumulators so we can snap cleanly to grid cells.
-    var moveAccumX by remember(id) { mutableStateOf(0f) }
-    var moveAccumY by remember(id) { mutableStateOf(0f) }
-    var resizeAccumX by remember(id) { mutableStateOf(0f) }
-    var resizeAccumY by remember(id) { mutableStateOf(0f) }
+    // Per-tile pixel offset/size delta while a gesture is running. Mirrored
+    // into [liveDrags] so ConsoleGrid moves the underlying widget chrome in
+    // sync. We snap to grid cells on drag-end (see onDragEnd below).
+    val live = liveDrags[id] ?: TileLiveDrag.Zero
+    val effectiveX = tileX + live.dx
+    val effectiveY = tileY + live.dy
+    val effectiveW = (tileW + live.dw).coerceAtLeast(1f)
+    val effectiveH = (tileH + live.dh).coerceAtLeast(1f)
 
     Box(
         modifier = Modifier
-            .offset { IntOffset(tileX.roundToInt(), tileY.roundToInt()) }
+            .offset { IntOffset(effectiveX.roundToInt(), effectiveY.roundToInt()) }
             .size(
-                width = with(density) { tileW.toDp() },
-                height = with(density) { tileH.toDp() },
+                width = with(density) { effectiveW.toDp() },
+                height = with(density) { effectiveH.toDp() },
             ),
     ) {
         val activeRectForBorder = ghosts[id]
@@ -226,26 +231,31 @@ private fun EditTile(
                 .pointerInput(id, rect, stepX, stepY) {
                     detectDragGestures(
                         onDragStart = {
-                            moveAccumX = 0f
-                            moveAccumY = 0f
                             ghosts[id] = rect
+                            liveDrags[id] = TileLiveDrag.Zero
                         },
                         onDrag = { change, drag ->
                             change.consume()
-                            moveAccumX += drag.x
-                            moveAccumY += drag.y
+                            val prev = liveDrags[id] ?: TileLiveDrag.Zero
                             val safeStepX = if (stepX > 0f) stepX else 1f
                             val safeStepY = if (stepY > 0f) stepY else 1f
-                            val dCol = (moveAccumX / safeStepX).roundToInt()
-                            val dRow = (moveAccumY / safeStepY).roundToInt()
+                            // Pixel bounds so the tile can't leave the grid.
+                            val minDx = -rect.col * stepX
+                            val maxDx = (COLS - rect.cols - rect.col) * stepX
+                            val minDy = -rect.row * stepY
+                            val maxDy = (ROWS - rect.rows - rect.row) * stepY
+                            val newDx = (prev.dx + drag.x).coerceIn(minDx, maxDx)
+                            val newDy = (prev.dy + drag.y).coerceIn(minDy, maxDy)
+                            liveDrags[id] = prev.copy(dx = newDx, dy = newDy)
+                            val dCol = (newDx / safeStepX).roundToInt()
+                            val dRow = (newDy / safeStepY).roundToInt()
                             val newCol = (rect.col + dCol).coerceIn(0, COLS - rect.cols)
                             val newRow = (rect.row + dRow).coerceIn(0, ROWS - rect.rows)
                             ghosts[id] = rect.copy(col = newCol, row = newRow)
                         },
                         onDragEnd = {
                             val finalRect = ghosts.remove(id)
-                            // Reject the move when it would land in total overlap
-                            // (>=50% of either rect's area covers another tile).
+                            liveDrags.remove(id)
                             if (finalRect != null && finalRect != rect &&
                                 !totallyOverlapsAny(id, finalRect, placements)
                             ) {
@@ -254,6 +264,7 @@ private fun EditTile(
                         },
                         onDragCancel = {
                             ghosts.remove(id)
+                            liveDrags.remove(id)
                         },
                     )
                 },
@@ -315,34 +326,35 @@ private fun EditTile(
                 .pointerInput(id, rect, stepX, stepY, constraint) {
                     detectDragGestures(
                         onDragStart = {
-                            resizeAccumX = 0f
-                            resizeAccumY = 0f
                             ghosts[id] = rect
+                            liveDrags[id] = TileLiveDrag.Zero
                         },
                         onDrag = { change, drag ->
                             change.consume()
-                            resizeAccumX += drag.x
-                            resizeAccumY += drag.y
+                            val prev = liveDrags[id] ?: TileLiveDrag.Zero
                             val safeStepX = if (stepX > 0f) stepX else 1f
                             val safeStepY = if (stepY > 0f) stepY else 1f
-                            val dCols = (resizeAccumX / safeStepX).roundToInt()
-                            val dRows = (resizeAccumY / safeStepY).roundToInt()
                             val maxColsAtPos = COLS - rect.col
+                            val maxCols = minOf(constraint.maxCols, maxColsAtPos)
                             val maxRowsAtPos = ROWS - rect.row
-                            val newCols = (rect.cols + dCols)
-                                .coerceIn(
-                                    constraint.minCols,
-                                    minOf(constraint.maxCols, maxColsAtPos),
-                                )
-                            val newRows = (rect.rows + dRows)
-                                .coerceIn(
-                                    constraint.minRows,
-                                    minOf(constraint.maxRows, maxRowsAtPos),
-                                )
+                            val maxRows = minOf(constraint.maxRows, maxRowsAtPos)
+                            // Pixel size bounds derived from cols/rows limits.
+                            val minPxW = constraint.minCols * cellW + (constraint.minCols - 1) * gapPx - tileW
+                            val maxPxW = maxCols * cellW + (maxCols - 1) * gapPx - tileW
+                            val minPxH = constraint.minRows * cellH + (constraint.minRows - 1) * gapPx - tileH
+                            val maxPxH = maxRows * cellH + (maxRows - 1) * gapPx - tileH
+                            val newDw = (prev.dw + drag.x).coerceIn(minPxW, maxPxW)
+                            val newDh = (prev.dh + drag.y).coerceIn(minPxH, maxPxH)
+                            liveDrags[id] = prev.copy(dw = newDw, dh = newDh)
+                            val dCols = (newDw / safeStepX).roundToInt()
+                            val dRows = (newDh / safeStepY).roundToInt()
+                            val newCols = (rect.cols + dCols).coerceIn(constraint.minCols, maxCols)
+                            val newRows = (rect.rows + dRows).coerceIn(constraint.minRows, maxRows)
                             ghosts[id] = rect.copy(cols = newCols, rows = newRows)
                         },
                         onDragEnd = {
                             val finalRect = ghosts.remove(id)
+                            liveDrags.remove(id)
                             if (finalRect != null && finalRect != rect &&
                                 !totallyOverlapsAny(id, finalRect, placements)
                             ) {
@@ -351,6 +363,7 @@ private fun EditTile(
                         },
                         onDragCancel = {
                             ghosts.remove(id)
+                            liveDrags.remove(id)
                         },
                     )
                 },
