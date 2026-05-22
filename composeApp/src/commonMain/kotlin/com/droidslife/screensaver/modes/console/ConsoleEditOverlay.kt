@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.ui.MovePointerIcon
+import com.droidslife.screensaver.ui.ResizeSEPointerIcon
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.api.WidgetSize
 import kotlin.math.roundToInt
@@ -199,6 +202,7 @@ private fun EditTile(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .pointerHoverIcon(MovePointerIcon)
                 .drawBehind {
                     val strokeWidth = 1.5.dp.toPx()
                     val r = 12.dp.toPx()
@@ -285,6 +289,7 @@ private fun EditTile(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .size(HANDLE_SIZE)
+                .pointerHoverIcon(ResizeSEPointerIcon)
                 .border(
                     width = 1.dp,
                     color = DwellColors.LumenCyan,
