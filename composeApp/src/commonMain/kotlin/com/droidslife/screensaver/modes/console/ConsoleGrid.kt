@@ -2,6 +2,7 @@ package com.droidslife.screensaver.modes.console
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
@@ -39,8 +40,14 @@ fun ConsoleGrid(
     Layout(
         modifier = modifier,
         content = {
+            // key(id) pins each cell's composition state to its id rather than
+            // its iteration position, so reordering placements (e.g. when
+            // ConsoleMode lifts the last-focused tile to the end of the map)
+            // doesn't reset remember state or cancel in-flight drag gestures.
             placements.forEach { (id, _) ->
-                Box(modifier = Modifier.layoutId(id)) { cell(id) }
+                key(id) {
+                    Box(modifier = Modifier.layoutId(id)) { cell(id) }
+                }
             }
         },
     ) { measurables, constraints ->

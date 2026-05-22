@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -89,27 +90,31 @@ fun ConsoleEditOverlay(
         // One ghost rect per tile being dragged/resized (null when idle).
         val ghosts = remember { mutableStateMapOf<String, GridRect>() }
 
+        // key(id) so reordering placements (focus z-lift) doesn't tear down
+        // an in-flight drag gesture by remounting EditTile from scratch.
         placements.forEach { (id, rect) ->
-            val constraint = sizeConstraints[id] ?: WidgetSize()
-            EditTile(
-                id = id,
-                rect = rect,
-                constraint = constraint,
-                paddingPx = paddingPx,
-                cellW = cellW,
-                cellH = cellH,
-                gapPx = gapPx,
-                stepX = stepX,
-                stepY = stepY,
-                ghosts = ghosts,
-                liveDrags = liveDrags,
-                placements = placements,
-                isHovered = hoveredTile == id,
-                onHover = onHover,
-                onFocus = onFocus,
-                onMove = onMove,
-                onResize = onResize,
-            )
+            key(id) {
+                val constraint = sizeConstraints[id] ?: WidgetSize()
+                EditTile(
+                    id = id,
+                    rect = rect,
+                    constraint = constraint,
+                    paddingPx = paddingPx,
+                    cellW = cellW,
+                    cellH = cellH,
+                    gapPx = gapPx,
+                    stepX = stepX,
+                    stepY = stepY,
+                    ghosts = ghosts,
+                    liveDrags = liveDrags,
+                    placements = placements,
+                    isHovered = hoveredTile == id,
+                    onHover = onHover,
+                    onFocus = onFocus,
+                    onMove = onMove,
+                    onResize = onResize,
+                )
+            }
         }
 
         val ghostDash = remember { PathEffect.dashPathEffect(floatArrayOf(6f, 5f), 0f) }
