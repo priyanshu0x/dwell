@@ -1,16 +1,31 @@
 package com.droidslife.screensaver.widget.builtin
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,11 +48,13 @@ import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.api.WidgetSummary
 
+private const val WIDGET_ID = "com.droidslife.screensaver.weather"
+
 class WeatherWidgetFactory(
     private val weatherViewModel: WeatherViewModel,
     private val settingsViewModel: SettingsViewModel,
 ) : WidgetFactory {
-    override val id: String = "com.droidslife.screensaver.weather"
+    override val id: String = WIDGET_ID
     override val displayName: String = "Weather"
     override val description: String = "Current weather for a configured city"
     override val category: WidgetCategory = WidgetCategory.INFORMATION
@@ -113,10 +130,22 @@ private class WeatherWidget(
     @Composable
     override fun Content(modifier: Modifier) {
         val configuredCity = config.string("city")
+        var pickerOpen by remember { mutableStateOf(false) }
+
         LaunchedEffect(configuredCity) {
             if (configuredCity.isNotBlank()) {
                 weatherViewModel.loadWeatherDataForCity(configuredCity)
             }
+        }
+
+        val openPicker = { pickerOpen = true }
+        val onCityPicked: (String) -> Unit = { city ->
+            val trimmed = city.trim()
+            if (trimmed.isNotBlank() && trimmed != configuredCity) {
+                val merged = config.rawJson + ("city" to JsonPrimitive(trimmed))
+                settingsViewModel.updateWidgetConfig(WIDGET_ID, JsonObject(merged))
+            }
+            pickerOpen = false
         }
 
         when (val state = weatherViewModel.state) {
@@ -125,6 +154,10 @@ private class WeatherWidget(
                 value = "—",
                 subtitle = "Loading…",
                 modifier = modifier,
+                onLabelClick = openPicker,
+                pickerOpen = pickerOpen,
+                currentCity = configuredCity,
+                onCityPicked = onCityPicked,
             )
             is WeatherState.Success -> {
                 val current = state.current
@@ -144,6 +177,10 @@ private class WeatherWidget(
                     subtitle = subtitle,
                     valueIsAccent = true,
                     modifier = modifier,
+                    onLabelClick = openPicker,
+                    pickerOpen = pickerOpen,
+                    currentCity = configuredCity,
+                    onCityPicked = onCityPicked,
                 )
             }
             is WeatherState.Unconfigured -> WeatherTile(
@@ -151,6 +188,10 @@ private class WeatherWidget(
                 value = "—",
                 subtitle = "Add a WeatherAPI key to enable",
                 modifier = modifier,
+                onLabelClick = openPicker,
+                pickerOpen = pickerOpen,
+                currentCity = configuredCity,
+                onCityPicked = onCityPicked,
                 trailing = {
                     TextButton(
                         onClick = { settingsViewModel.openSettingsDialog() },
@@ -173,6 +214,10 @@ private class WeatherWidget(
                 value = "—",
                 subtitle = "Couldn't load",
                 modifier = modifier,
+                onLabelClick = openPicker,
+                pickerOpen = pickerOpen,
+                currentCity = configuredCity,
+                onCityPicked = onCityPicked,
                 trailing = {
                     IconButton(
                         onClick = {
@@ -210,19 +255,34 @@ private fun WeatherTile(
     modifier: Modifier = Modifier,
     valueIsAccent: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    onLabelClick: (() -> Unit)? = null,
+    pickerOpen: Boolean = false,
+    currentCity: String = "",
+    onCityPicked: (String) -> Unit = {},
 ) {
     val accent = LocalConsoleAccent.current.primary
     Box(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = label,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 9.sp,
-            letterSpacing = 2.25.sp,
-            color = DwellColors.TextLow,
-            maxLines = 1,
-            modifier = Modifier.align(Alignment.TopStart),
-        )
+        Box(modifier = Modifier.align(Alignment.TopStart)) {
+            Text(
+                text = label,
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 9.sp,
+                letterSpacing = 2.25.sp,
+                color = DwellColors.TextLow,
+                maxLines = 1,
+                modifier = if (onLabelClick != null) {
+                    Modifier.clickable(onClick = onLabelClick)
+                } else Modifier,
+            )
+            if (pickerOpen) {
+                CityPickerPopup(
+                    initial = currentCity,
+                    onPick = onCityPicked,
+                    onDismiss = { onCityPicked(currentCity) },
+                )
+            }
+        }
         Text(
             text = value,
             fontFamily = DwellFonts.jetBrainsMono(),
@@ -244,6 +304,36 @@ private fun WeatherTile(
             Box(modifier = Modifier.align(Alignment.BottomEnd)) {
                 trailing()
             }
+        }
+    }
+}
+
+@Composable
+private fun CityPickerPopup(
+    initial: String,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DropdownMenu(
+        expanded = true,
+        onDismissRequest = onDismiss,
+        modifier = Modifier.background(DwellColors.Surface1),
+    ) {
+        var text by remember { mutableStateOf(initial) }
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("City") },
+            singleLine = true,
+            keyboardActions = KeyboardActions(onDone = { onPick(text) }),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(min = 200.dp),
+        )
+        listOf("Mumbai", "Delhi", "Bengaluru", "London", "New York", "Tokyo").forEach { suggestion ->
+            DropdownMenuItem(
+                text = { Text(suggestion, color = DwellColors.TextMid) },
+                onClick = { onPick(suggestion) },
+            )
         }
     }
 }
