@@ -50,14 +50,23 @@ val appModule = module {
         )
     }
 
-    // Weather Repository
-    single { WeatherRepository(get(), get()) }
+    // Settings ViewModel (declared before WeatherRepository so the repo can
+    // depend on it for resolving the active provider + WeatherAPI key.)
+    single { SettingsViewModel(get(), get(), get()) }
+
+    // Weather Repository — provider-agnostic façade. Picks an adapter per call
+    // based on the user's saved widget configuration.
+    single<WeatherRepository> {
+        WeatherRepository(
+            httpClient = get(),
+            locationService = get(),
+            settingsViewModel = get(),
+            secretStorage = get(),
+        )
+    }
 
     // Weather ViewModel
     single { WeatherViewModel(get(), get(), get()) }
-
-    // Settings ViewModel
-    single { SettingsViewModel(get(), get(), get()) }
 
     // Backend sync
     single<BackendGateway> {

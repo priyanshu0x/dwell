@@ -1,8 +1,6 @@
 package com.droidslife.screensaver.widget.builtin
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -24,6 +22,8 @@ import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.weather.WeatherState
 import com.droidslife.screensaver.weather.WeatherViewModel
+import com.droidslife.screensaver.weather.providers.WeatherApiProvider
+import com.droidslife.screensaver.weather.providers.WttrInProvider
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
@@ -47,11 +47,26 @@ class WeatherWidgetFactory(
         maxCols = 8, maxRows = 3,
     )
     override val configSchema: List<ConfigField> = listOf(
+        ConfigField.Enum(
+            key = "provider",
+            label = "Source",
+            options = listOf(
+                ConfigField.EnumOption(WttrInProvider.ID, "wttr.in (no key)"),
+                ConfigField.EnumOption(WeatherApiProvider.ID, "WeatherAPI.com"),
+            ),
+            default = WttrInProvider.ID,
+            help = "wttr.in works out of the box. WeatherAPI.com requires a free API key.",
+        ),
         ConfigField.Text(
             key = "city",
             label = "City",
             placeholder = "Mumbai",
-        )
+        ),
+        ConfigField.Secret(
+            key = "apiKey",
+            label = "WeatherAPI.com API key",
+            help = "Only needed if you pick WeatherAPI.com as the source.",
+        ),
     )
 
     override fun create(config: WidgetConfig, scope: WidgetScope): Widget {
@@ -70,11 +85,11 @@ private class WeatherWidget(
         val state = weatherViewModel.state
         return when (state) {
             is WeatherState.Success -> {
-                val data = state.weatherData
+                val current = state.current
                 WidgetSummary(
-                    primaryValue = "${data.current.tempC.toInt()}°",
+                    primaryValue = "${current.tempC.toInt()}°",
                     primaryLabel = "Weather",
-                    subtitle = "${data.current.condition.text} · ${data.location.name}",
+                    subtitle = "${current.conditionText} · ${current.city}",
                 )
             }
             is WeatherState.Loading -> WidgetSummary(
@@ -82,24 +97,16 @@ private class WeatherWidget(
                 primaryLabel = "Weather",
                 subtitle = "Loading…",
             )
-            is WeatherState.Error -> {
-                val apiKeyConfigured = settingsViewModel.isSecretSaved(
-                    settingsViewModel.settings.weatherApiKeySecretId
-                )
-                if (!apiKeyConfigured) {
-                    WidgetSummary(
-                        primaryValue = "—",
-                        primaryLabel = "Weather",
-                        subtitle = "API key needed",
-                    )
-                } else {
-                    WidgetSummary(
-                        primaryValue = "—",
-                        primaryLabel = "Weather",
-                        subtitle = "Couldn't load",
-                    )
-                }
-            }
+            is WeatherState.Unconfigured -> WidgetSummary(
+                primaryValue = "—",
+                primaryLabel = "Weather",
+                subtitle = "API key needed",
+            )
+            is WeatherState.Error -> WidgetSummary(
+                primaryValue = "—",
+                primaryLabel = "Weather",
+                subtitle = "Couldn't load",
+            )
         }
     }
 
@@ -112,12 +119,7 @@ private class WeatherWidget(
             }
         }
 
-        val state = weatherViewModel.state
-        val apiKeyConfigured = settingsViewModel.isSecretSaved(
-            settingsViewModel.settings.weatherApiKeySecretId
-        )
-
-        when (state) {
+        when (val state = weatherViewModel.state) {
             is WeatherState.Loading -> WeatherTile(
                 label = "WEATHER",
                 value = "—",
@@ -125,76 +127,81 @@ private class WeatherWidget(
                 modifier = modifier,
             )
             is WeatherState.Success -> {
-                val data = state.weatherData
-                val cityName = data.location.name.ifBlank { configuredCity }
+                val current = state.current
+                val cityName = current.city.ifBlank { configuredCity }
                 val subtitle = buildString {
-                    append(data.current.condition.text)
-                    append(" · feels ${data.current.feelslikeC.toInt()}°")
-                    append(" · humidity ${data.current.humidity}%")
+                    if (current.conditionText.isNotBlank()) {
+                        append(current.conditionText)
+                    } else {
+                        append("—")
+                    }
+                    current.feelsLikeC?.let { append(" · feels ${it.toInt()}°") }
+                    current.humidity?.let { append(" · humidity ${it}%") }
                 }
                 WeatherTile(
                     label = if (cityName.isNotBlank()) "WEATHER · ${cityName.uppercase()}" else "WEATHER",
-                    value = "${data.current.tempC.toInt()}°",
+                    value = "${current.tempC.toInt()}°",
                     subtitle = subtitle,
                     valueIsAccent = true,
                     modifier = modifier,
                 )
             }
-            is WeatherState.Error -> {
-                if (!apiKeyConfigured) {
-                    WeatherTile(
-                        label = "WEATHER",
-                        value = "—",
-                        subtitle = "Add a WeatherAPI key to enable",
-                        modifier = modifier,
-                        trailing = {
-                            TextButton(
-                                onClick = { settingsViewModel.openSettingsDialog() },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                    horizontal = 0.dp,
-                                    vertical = 0.dp,
-                                ),
-                            ) {
-                                Text(
-                                    "Open Settings",
-                                    fontSize = 11.sp,
-                                    color = DwellColors.StatusAccent,
-                                    fontFamily = DwellFonts.interTight(),
-                                )
+            is WeatherState.Unconfigured -> WeatherTile(
+                label = "WEATHER",
+                value = "—",
+                subtitle = "Add a WeatherAPI key to enable",
+                modifier = modifier,
+                trailing = {
+                    TextButton(
+                        onClick = { settingsViewModel.openSettingsDialog() },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 0.dp,
+                            vertical = 0.dp,
+                        ),
+                    ) {
+                        Text(
+                            "Open Settings",
+                            fontSize = 11.sp,
+                            color = DwellColors.StatusAccent,
+                            fontFamily = DwellFonts.interTight(),
+                        )
+                    }
+                },
+            )
+            is WeatherState.Error -> WeatherTile(
+                label = "WEATHER",
+                value = "—",
+                subtitle = "Couldn't load",
+                modifier = modifier,
+                trailing = {
+                    IconButton(
+                        onClick = {
+                            if (configuredCity.isNotBlank()) {
+                                weatherViewModel.loadWeatherDataForCity(configuredCity)
+                            } else {
+                                weatherViewModel.loadWeatherData()
                             }
                         },
-                    )
-                } else {
-                    WeatherTile(
-                        label = "WEATHER",
-                        value = "—",
-                        subtitle = "Couldn't load",
-                        modifier = modifier,
-                        trailing = {
-                            IconButton(
-                                onClick = {
-                                    if (configuredCity.isNotBlank()) {
-                                        weatherViewModel.loadWeatherDataForCity(configuredCity)
-                                    } else {
-                                        weatherViewModel.loadWeatherData()
-                                    }
-                                },
-                                modifier = Modifier.padding(0.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Refresh,
-                                    contentDescription = "Retry",
-                                    tint = DwellColors.TextMid,
-                                )
-                            }
-                        },
-                    )
-                }
-            }
+                        modifier = Modifier.padding(0.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Retry",
+                            tint = DwellColors.TextMid,
+                        )
+                    }
+                },
+            )
         }
     }
 }
 
+/**
+ * Console-style tile layout: label pinned top-start, big temperature centered
+ * (so it reads at a glance from across the room), subtitle pinned bottom-start.
+ * Mirrors the mockup at
+ * `.superpowers/brainstorm/1398003-1779392791/content/mode-mockups.html`.
+ */
 @Composable
 private fun WeatherTile(
     label: String,
@@ -205,10 +212,7 @@ private fun WeatherTile(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val accent = LocalConsoleAccent.current.primary
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         Text(
             text = label,
             fontFamily = DwellFonts.interTight(),
@@ -217,6 +221,7 @@ private fun WeatherTile(
             letterSpacing = 2.25.sp,
             color = DwellColors.TextLow,
             maxLines = 1,
+            modifier = Modifier.align(Alignment.TopStart),
         )
         Text(
             text = value,
@@ -225,17 +230,20 @@ private fun WeatherTile(
             fontSize = 44.sp,
             color = if (valueIsAccent) accent else DwellColors.TextHigh,
             maxLines = 1,
+            modifier = Modifier.align(Alignment.Center),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = subtitle,
-                fontFamily = DwellFonts.interTight(),
-                fontSize = 10.sp,
-                color = DwellColors.TextMid,
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-            )
-            if (trailing != null) trailing()
+        Text(
+            text = subtitle,
+            fontFamily = DwellFonts.interTight(),
+            fontSize = 10.sp,
+            color = DwellColors.TextMid,
+            maxLines = 2,
+            modifier = Modifier.align(Alignment.BottomStart),
+        )
+        if (trailing != null) {
+            Box(modifier = Modifier.align(Alignment.BottomEnd)) {
+                trailing()
+            }
         }
     }
 }
