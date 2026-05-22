@@ -3,10 +3,8 @@ package com.droidslife.screensaver.modes.console
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -88,7 +86,6 @@ fun ConsoleMode(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
-                    if (showEditChrome) TileResizeCorner()
                 }
             }
             if (tilesEditable) {
@@ -113,29 +110,3 @@ fun ConsoleMode(
     }
 }
 
-@Composable
-private fun BoxScope.TileResizeCorner() {
-    androidx.compose.foundation.Canvas(
-        modifier = Modifier
-            .align(androidx.compose.ui.Alignment.BottomEnd)
-            .padding(end = 6.dp, bottom = 6.dp)
-            .size(14.dp),
-    ) {
-        val s = 2.dp.toPx()
-        val color = DwellColors.LumenCyan.copy(alpha = 0.7f)
-        // Right edge stroke (top-half hidden — only the lower portion forms the L)
-        drawLine(
-            color,
-            androidx.compose.ui.geometry.Offset(size.width - s / 2, 0f),
-            androidx.compose.ui.geometry.Offset(size.width - s / 2, size.height),
-            s,
-        )
-        // Bottom edge stroke
-        drawLine(
-            color,
-            androidx.compose.ui.geometry.Offset(0f, size.height - s / 2),
-            androidx.compose.ui.geometry.Offset(size.width, size.height - s / 2),
-            s,
-        )
-    }
-}

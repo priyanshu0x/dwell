@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +28,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -289,21 +293,44 @@ private fun EditTile(
             }
         }
 
-        // Bottom-right resize handle. Sits on top of the move surface so it wins gestures.
+        // Bottom-right resize handle — L-bracket per mode-mockups-v2.html:
+        // 16×16, inset 4px from the tile edge, 2px LumenCyan strokes on the
+        // right + bottom edges only, joined by an 8px arc. 0.5 alpha at rest,
+        // 1.0 while actively dragging.
+        val handlePath = remember { Path() }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .offset(x = (-4).dp, y = (-4).dp)
                 .size(HANDLE_SIZE)
                 .pointerHoverIcon(ResizeSEPointerIcon)
-                .border(
-                    width = 1.dp,
-                    color = DwellColors.LumenCyan,
-                    shape = RoundedCornerShape(topStart = 6.dp, bottomEnd = 12.dp),
-                )
-                .background(
-                    color = DwellColors.LumenCyan.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(topStart = 6.dp, bottomEnd = 12.dp),
-                )
+                .drawBehind {
+                    val sw = 2.dp.toPx()
+                    val r = 8.dp.toPx()
+                    val color = DwellColors.LumenCyan.copy(
+                        alpha = if (isActive) 1f else 0.5f,
+                    )
+                    handlePath.reset()
+                    handlePath.moveTo(size.width - sw / 2, 0f)
+                    handlePath.lineTo(size.width - sw / 2, size.height - r)
+                    handlePath.arcTo(
+                        rect = Rect(
+                            left = size.width - 2 * r + sw / 2,
+                            top = size.height - 2 * r + sw / 2,
+                            right = size.width - sw / 2,
+                            bottom = size.height - sw / 2,
+                        ),
+                        startAngleDegrees = 0f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false,
+                    )
+                    handlePath.lineTo(0f, size.height - sw / 2)
+                    drawPath(
+                        path = handlePath,
+                        color = color,
+                        style = Stroke(width = sw, cap = StrokeCap.Round),
+                    )
+                }
                 .pointerInput(id, rect, stepX, stepY, constraint) {
                     detectDragGestures(
                         onDragStart = {
