@@ -104,8 +104,11 @@ class WidgetRegistry(
     }
 
     fun syncWithSettings(settings: SettingsModel) {
-        // WeatherForecast is opt-in per spec § 6.4 / Section 10.
-        val offByDefault = setOf("com.droidslife.screensaver.weatherforecast")
+        // WeatherForecast and Pomodoro are opt-in per spec § 6.4 / Section 10.
+        val offByDefault = setOf(
+            "com.droidslife.screensaver.weatherforecast",
+            "com.droidslife.screensaver.pomodoro",
+        )
         val defaultEnabledIds = builtInDescriptors.map { it.id }.toSet() - offByDefault
         val enabledIds = settings.enabledWidgetIds.ifEmpty { defaultEnabledIds }
 

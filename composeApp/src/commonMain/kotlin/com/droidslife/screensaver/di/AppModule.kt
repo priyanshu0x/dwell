@@ -15,6 +15,7 @@ import com.droidslife.screensaver.widget.builtin.CalendarWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ExpensesWidgetFactory
 import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
 import com.droidslife.screensaver.widget.builtin.IdleCounterWidgetFactory
+import com.droidslife.screensaver.widget.builtin.PomodoroWidgetFactory
 import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherForecastWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherWidgetFactory
@@ -87,6 +88,7 @@ val appModule = module {
     single { CalendarWidgetFactory() }
     single { IdleCounterWidgetFactory() }
     single { WeatherForecastWidgetFactory(get(), get()) }
+    single { PomodoroWidgetFactory() }
 
     // Widget registry
     single {
@@ -99,6 +101,7 @@ val appModule = module {
                 get<CalendarWidgetFactory>(),
                 get<IdleCounterWidgetFactory>(),
                 get<WeatherForecastWidgetFactory>(),
+                get<PomodoroWidgetFactory>(),
             ),
             get(),
             get(),
