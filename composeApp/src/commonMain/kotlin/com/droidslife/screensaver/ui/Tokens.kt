@@ -65,6 +65,7 @@ object DwellMotion {
     const val CornerHover = 180
     const val ToastFade = 200
     const val TileReflow = 200
+    const val TileHover = 2000
 
     /** M3 standard easing. */
     val Standard = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
