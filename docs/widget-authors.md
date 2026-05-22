@@ -37,7 +37,7 @@ The fastest path is to copy `samples/sample-kotlin-widget` and rename it.
      src/jvmMain/resources/META-INF/services/com.droidslife.screensaver.widget.api.WidgetFactory
    ```
 
-2. **Implement `WidgetFactory`.** The sample's `RandomQuoteWidgetFactory.kt` is ~50 lines and covers the whole surface. The essentials:
+2. **Implement `WidgetFactory`.** The sample's `RandomQuoteWidgetFactory.kt` is ~80 lines and covers the whole surface. The essentials:
 
    ```kotlin
    class MyWidgetFactory : WidgetFactory {
@@ -46,16 +46,32 @@ The fastest path is to copy `samples/sample-kotlin-widget` and rename it.
        override val description: String = "Says hello."
        override val category: WidgetCategory = WidgetCategory.INFORMATION
 
+       // Console-grid bounds. Drop or accept defaults (4×2 / clamped 2×1…12×6).
+       override val preferredSize = WidgetSize(
+           minCols = 3, minRows = 1,
+           defaultCols = 4, defaultRows = 2,
+           maxCols = 8, maxRows = 4,
+       )
+
        override fun create(config: WidgetConfig, scope: WidgetScope): Widget = MyWidget
    }
 
    private object MyWidget : Widget {
+       // summary() feeds Cinematic-drawer chips and Ambient minimal lines.
+       // Cheap, no IO — read in-memory snapshots only.
+       override fun summary(): WidgetSummary = WidgetSummary(
+           primaryValue = "Hello",
+           primaryLabel = "My Widget",
+       )
+
        @Composable
        override fun Content(modifier: Modifier) {
            Text("Hello, dashboard.", modifier = modifier)
        }
    }
    ```
+
+   The host's `Widget.Render(target, scope, modifier)` default forwards every target to `Content(modifier)`. Override `Render` only when you want a different layout per target — for most widgets the defaults plus a good `summary()` are enough.
 
 3. **Register the factory** with Java `ServiceLoader` by listing it in:
 
