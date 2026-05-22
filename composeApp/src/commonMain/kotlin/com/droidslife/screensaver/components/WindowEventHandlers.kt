@@ -7,17 +7,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.droidslife.screensaver.clock.ClockViewModel
+import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
 
 data class WindowEventHandlers(
     val keyEventHandler: KeyEventHandler,
     val mouseEventModifier: Modifier,
     val toastState: ToastState,
-    val showCitySelectionDialog: Boolean,
-    val onCityDialogDismiss: () -> Unit,
-    val onShowCityDialog: () -> Unit,
     val exitOnMouseMovementEnabled: Boolean,
     val showHelpDialog: Boolean,
     val onHelpDialogDismiss: () -> Unit,
@@ -29,11 +27,10 @@ fun rememberWindowEventHandlers(
     onExitApplication: () -> Unit,
     openSettingsOnStart: Boolean = false,
 ): WindowEventHandlers {
-    val clockViewModel = koinInject<ClockViewModel>()
     val settingsViewModel = koinInject<SettingsViewModel>()
+    val widgetRegistry = koinInject<WidgetRegistry>()
 
-    var showCitySelectionDialog by remember { mutableStateOf(false) }
-    var exitOnMouseMovementEnabled by remember { mutableStateOf(true) }
+    val exitOnMouseMovementEnabled = settingsViewModel.settings.dismissOnMouseMovement
     var showHelpDialog by remember { mutableStateOf(false) }
     val toastState = rememberToastState()
 
@@ -48,18 +45,6 @@ fun rememberWindowEventHandlers(
     )
     val onAction: (KeyEventAction) -> Unit = { action ->
         when (action) {
-            is KeyEventAction.CycleClockDesign -> {
-                clockViewModel.cycleClockDesign()
-            }
-            is KeyEventAction.ToggleAutoChange -> {
-                clockViewModel.toggleAutoChange()
-            }
-            is KeyEventAction.ToggleShuffle -> {
-                clockViewModel.toggleShuffleMode()
-            }
-            is KeyEventAction.ShowCityDialog -> {
-                showCitySelectionDialog = true
-            }
             is KeyEventAction.ExitApplication -> {
                 onExitApplication()
             }
@@ -67,7 +52,7 @@ fun rememberWindowEventHandlers(
                 onExitApplication()
             }
             is KeyEventAction.ToggleExitOnMouseMovement -> {
-                exitOnMouseMovementEnabled = !exitOnMouseMovementEnabled
+                settingsViewModel.setDismissOnMouseMovement(!settingsViewModel.settings.dismissOnMouseMovement)
             }
             is KeyEventAction.OpenSettings -> {
                 settingsViewModel.openSettingsDialog()
@@ -81,6 +66,40 @@ fun rememberWindowEventHandlers(
             is KeyEventAction.ShowToast -> {
                 toastState.show(action.message)
             }
+            is KeyEventAction.CycleMode -> {
+                settingsViewModel.cycleMode()
+            }
+            is KeyEventAction.JumpCinematic -> {
+                settingsViewModel.setMode(Mode.Cinematic)
+            }
+            is KeyEventAction.JumpAmbient -> {
+                settingsViewModel.setMode(Mode.Ambient)
+            }
+            is KeyEventAction.JumpConsole -> {
+                settingsViewModel.setMode(Mode.Console)
+            }
+            is KeyEventAction.CycleVariant -> {
+                settingsViewModel.cycleVariant()
+            }
+            is KeyEventAction.ToggleDrawer -> {
+                if (settingsViewModel.settings.mode == Mode.Cinematic) {
+                    settingsViewModel.toggleDrawer()
+                }
+            }
+            is KeyEventAction.ToggleConsoleEdit -> {
+                // L is meaningful only when the dashboard is locked. When
+                // unlocked, tiles are always editable so the banner toggle is
+                // a no-op.
+                if (settingsViewModel.settings.mode == Mode.Console &&
+                    settingsViewModel.settings.dashboardLocked
+                ) {
+                    settingsViewModel.toggleConsoleEditMode()
+                }
+            }
+            is KeyEventAction.ReloadWidgets -> {
+                widgetRegistry.reload()
+                widgetRegistry.syncWithSettings(settingsViewModel.settings)
+            }
         }
     }
     val keyEventHandler = rememberKeyEventHandler(
@@ -92,9 +111,6 @@ fun rememberWindowEventHandlers(
         keyEventHandler = keyEventHandler,
         mouseEventModifier = Modifier,
         toastState = toastState,
-        showCitySelectionDialog = showCitySelectionDialog,
-        onCityDialogDismiss = { showCitySelectionDialog = false },
-        onShowCityDialog = { showCitySelectionDialog = true },
         exitOnMouseMovementEnabled = exitOnMouseMovementEnabled,
         showHelpDialog = showHelpDialog,
         onHelpDialogDismiss = { showHelpDialog = false },

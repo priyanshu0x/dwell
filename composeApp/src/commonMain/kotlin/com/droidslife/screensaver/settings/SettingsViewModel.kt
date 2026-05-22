@@ -3,7 +3,6 @@ package com.droidslife.screensaver.settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.droidslife.screensaver.clock.ClockViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +38,38 @@ class SettingsViewModel(
 
     var savedSecretIds by mutableStateOf<Set<String>>(emptySet())
         private set
+
+    /**
+     * Runtime-only flag for Console layout edit mode. Not persisted.
+     */
+    // Runtime-only: shows the EDIT LAYOUT banner + size badges. Meaningful only
+    // when dashboardLocked is true (toggles via `L`). When unlocked, tiles are
+    // always editable but this stays false so no banner / badges clutter.
+    var consoleEditMode by mutableStateOf(false)
+        private set
+
+    fun toggleConsoleEditMode() {
+        consoleEditMode = !consoleEditMode
+    }
+
+    fun updateConsoleEditMode(on: Boolean) {
+        consoleEditMode = on
+    }
+
+    /**
+     * Runtime-only flag that forces the Cinematic widget drawer visible (e.g. from the W
+     * keyboard shortcut). The drawer's hover/auto-hide logic still applies on top.
+     */
+    var drawerVisible by mutableStateOf(false)
+        private set
+
+    fun toggleDrawer() {
+        drawerVisible = !drawerVisible
+    }
+
+    fun updateDrawerVisible(on: Boolean) {
+        drawerVisible = on
+    }
 
     init {
         // Load settings from the repository
@@ -84,60 +115,6 @@ class SettingsViewModel(
      */
     fun setClockFormat(is24Hour: Boolean) {
         updateSettings(settings.copy(is24HourFormat = is24Hour))
-    }
-
-    /**
-     * Sets the current city for weather display.
-     * @param city The city name.
-     */
-    fun setCurrentCity(city: String) {
-        updateSettings(settings.copy(currentCity = city))
-    }
-
-    /**
-     * Toggles the auto play status.
-     * @return The new auto play status.
-     */
-    fun toggleAutoPlay(): Boolean {
-        val newSettings = settings.copy(autoPlayEnabled = !settings.autoPlayEnabled)
-        updateSettings(newSettings)
-        return newSettings.autoPlayEnabled
-    }
-
-    /**
-     * Sets the auto play status.
-     * @param enabled Whether auto play should be enabled.
-     */
-    fun setAutoPlay(enabled: Boolean) {
-        updateSettings(settings.copy(autoPlayEnabled = enabled))
-    }
-
-    /**
-     * Toggles the shuffle status.
-     * @return The new shuffle status.
-     */
-    fun toggleShuffle(): Boolean {
-        val newSettings = settings.copy(shuffleEnabled = !settings.shuffleEnabled)
-        updateSettings(newSettings)
-        return newSettings.shuffleEnabled
-    }
-
-    /**
-     * Sets the shuffle status.
-     * @param enabled Whether shuffle should be enabled.
-     */
-    fun setShuffle(enabled: Boolean) {
-        updateSettings(settings.copy(shuffleEnabled = enabled))
-    }
-
-    /**
-     * Sets the currently selected design.
-     * @param designId The design ID.
-     */
-    fun setSelectedDesign(designId: Int) {
-        if (designId in 1..ClockViewModel.DESIGN_COUNT) {
-            updateSettings(settings.copy(selectedDesignId = designId))
-        }
     }
 
     fun setWidgetEnabled(widgetId: String, enabled: Boolean) {
@@ -218,11 +195,98 @@ class SettingsViewModel(
         return settings.enabledWidgetIds.ifEmpty { defaultIds }
     }
 
+    fun setMode(mode: Mode) {
+        updateSettings(settings.copy(mode = mode))
+    }
+
+    fun setCinematicVariant(variant: CinematicVariant) {
+        updateSettings(settings.copy(cinematicVariant = variant))
+    }
+
+    fun setAmbientVariant(variant: AmbientVariant) {
+        updateSettings(settings.copy(ambientVariant = variant))
+    }
+
+    fun setConsoleVariant(variant: ConsoleVariant) {
+        updateSettings(settings.copy(consoleVariant = variant))
+    }
+
+    fun setQuieterLumen(enabled: Boolean) {
+        updateSettings(settings.copy(quieterLumen = enabled))
+    }
+
+    fun setShowSeconds(enabled: Boolean) {
+        updateSettings(settings.copy(showSeconds = enabled))
+    }
+
+    fun setShowDate(enabled: Boolean) {
+        updateSettings(settings.copy(showDate = enabled))
+    }
+
+    fun setExitOnKeypress(enabled: Boolean) {
+        updateSettings(settings.copy(exitOnKeypress = enabled))
+    }
+
+    fun setDismissOnMouseMovement(enabled: Boolean) {
+        updateSettings(settings.copy(dismissOnMouseMovement = enabled))
+    }
+
+    fun setDashboardLocked(locked: Boolean) {
+        updateSettings(settings.copy(dashboardLocked = locked))
+        if (!locked) consoleEditMode = false
+    }
+
+    /** Mark the first-run welcome toast as shown so it doesn't repeat. */
+    fun markWelcomeShown() {
+        if (!settings.welcomeShown) updateSettings(settings.copy(welcomeShown = true))
+    }
+
+    fun setWidgetLayout(widgetId: String, rect: com.droidslife.screensaver.widget.api.GridRect) {
+        updateSettings(settings.copy(widgetLayouts = settings.widgetLayouts + (widgetId to rect)))
+    }
+
+    fun resetWidgetLayouts() {
+        updateSettings(settings.copy(widgetLayouts = emptyMap()))
+    }
+
+    fun cycleMode() {
+        val modes = Mode.entries
+        val next = modes[(modes.indexOf(settings.mode) + 1) % modes.size]
+        setMode(next)
+    }
+
+    fun cycleVariant() {
+        val newSettings = when (settings.mode) {
+            Mode.Cinematic -> {
+                val variants = CinematicVariant.entries
+                val next = variants[(variants.indexOf(settings.cinematicVariant) + 1) % variants.size]
+                settings.copy(cinematicVariant = next)
+            }
+            Mode.Ambient -> {
+                val variants = AmbientVariant.entries
+                val next = variants[(variants.indexOf(settings.ambientVariant) + 1) % variants.size]
+                settings.copy(ambientVariant = next)
+            }
+            Mode.Console -> {
+                val variants = ConsoleVariant.entries
+                val next = variants[(variants.indexOf(settings.consoleVariant) + 1) % variants.size]
+                settings.copy(consoleVariant = next)
+            }
+        }
+        updateSettings(newSettings)
+    }
+
     /**
      * Updates the settings in the repository.
-     * @param newSettings The new settings.
+     *
+     * Eagerly updates the in-memory [settings] state so the dashboard reflects
+     * the change on the next frame; the persistence write happens in parallel.
+     * Without the eager update, a setter triggers a coroutine launch → disk write
+     * → kstore flow re-emit → onEach callback — that round-trip is enough latency
+     * to make the UI feel like the toggle "did nothing" on faster machines.
      */
     private fun updateSettings(newSettings: SettingsModel) {
+        settings = newSettings
         viewModelScope.launch {
             preferencesRepository.updateSettings(newSettings)
         }

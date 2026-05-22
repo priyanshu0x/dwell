@@ -3,23 +3,28 @@ package com.droidslife.screensaver.weather
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.droidslife.screensaver.location.Location
 import com.droidslife.screensaver.location.TimeZoneUtils
 import com.droidslife.screensaver.settings.PreferencesRepository
+import com.droidslife.screensaver.weather.providers.WeatherProviderUnconfigured
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
  * View model for weather data.
- * @param weatherRepository The weather repository.
- * @param weatherApi The weather API client.
- * @param preferencesRepository The preferences repository.
+ *
+ * Loads current weather + forecast through the provider-agnostic
+ * [WeatherRepository]. The optional [weatherApi] dependency is retained so the
+ * legacy WeatherAPI.com-only `searchCity` autocomplete keeps working when the
+ * user has configured that provider.
  */
 class WeatherViewModel(
     private val weatherRepository: WeatherRepository,
@@ -46,6 +51,15 @@ class WeatherViewModel(
     var selectedCity by mutableStateOf<String?>(null)
         private set
 
+    private val _forecast = MutableStateFlow<ForecastState>(ForecastState.Loading)
+
+    /**
+     * 5-day forecast state. Tied to whichever city is currently selected by
+     * the user; [refreshForecast] is invoked whenever the current weather is
+     * (re)loaded.
+     */
+    val forecast: StateFlow<ForecastState> = _forecast.asStateFlow()
+
     init {
         viewModelScope.launch {
             // Check if there's a stored city preference
@@ -69,7 +83,8 @@ class WeatherViewModel(
     }
 
     /**
-     * Loads weather data for the current location.
+     * Loads weather data for the device's resolved location through the
+     * configured provider.
      */
     fun loadWeatherData() {
         weatherRepository.getWeatherData()
@@ -78,34 +93,61 @@ class WeatherViewModel(
     }
 
     /**
-     * Loads weather data for the specified city.
-     * @param cityName The name of the city.
+     * Loads weather data for the specified city through the configured
+     * provider.
      */
     fun loadWeatherDataForCity(cityName: String) {
         viewModelScope.launch {
             state = WeatherState.Loading
-            try {
-                val weatherData = weatherApi.getWeatherDataByCity(cityName)
-                state = WeatherState.Success(
-                    weatherData = weatherData,
-                    location = com.droidslife.screensaver.location.Location(
-                        latitude = weatherData.location.lat,
-                        longitude = weatherData.location.lon,
-                        city = weatherData.location.name,
-                        country = weatherData.location.country
+            val result = weatherRepository.current(cityName)
+            state = result.fold(
+                onSuccess = { current ->
+                    WeatherState.Success(
+                        current = current,
+                        location = Location(
+                            latitude = 0.0,
+                            longitude = 0.0,
+                            city = current.city.ifBlank { cityName },
+                            country = "",
+                        ),
                     )
-                )
-                selectedCity = cityName
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                state = WeatherState.Error(e.message ?: "Unknown error")
-            }
+                },
+                onFailure = { err ->
+                    if (err is WeatherProviderUnconfigured) WeatherState.Unconfigured
+                    else WeatherState.Error(err.message ?: "Unknown error")
+                },
+            )
+            selectedCity = cityName
+        }
+        refreshForecast(cityName)
+    }
+
+    /**
+     * Refreshes the multi-day forecast for the given city. Marks state
+     * [ForecastState.Unconfigured] when the active provider requires a key the
+     * host has not configured.
+     */
+    fun refreshForecast(cityName: String) {
+        if (cityName.isBlank()) return
+        viewModelScope.launch {
+            _forecast.value = ForecastState.Loading
+            val result = weatherRepository.forecast(cityName, days = 5)
+            _forecast.value = result.fold(
+                onSuccess = { ForecastState.Loaded(it) },
+                onFailure = { err ->
+                    if (err is WeatherProviderUnconfigured) ForecastState.Unconfigured
+                    else ForecastState.Failed
+                },
+            )
         }
     }
 
     /**
      * Searches for cities matching the given query.
-     * @param query The search query.
+     *
+     * Backed by WeatherAPI.com — only available when the user has configured
+     * a valid WeatherAPI key. Surfaces an error state otherwise (the
+     * upstream client throws `WeatherApiException` when the secret is missing).
      */
     fun searchCities(query: String) {
         if (query.isBlank()) {
@@ -149,15 +191,20 @@ class WeatherViewModel(
      */
     fun getWeatherIconUrl(): String? {
         return when (val currentState = state) {
-            is WeatherState.Success -> {
-                val icon = currentState.weatherData.current.condition.icon
-                // The icon URL from the API starts with // which is protocol-relative
-                // We need to add https: to make it a valid URL
-                if (icon.startsWith("//")) "https:$icon" else icon
-            }
+            is WeatherState.Success -> currentState.current.iconUrl
             else -> null
         }
     }
+}
+
+/**
+ * State of the multi-day forecast fetch.
+ */
+sealed interface ForecastState {
+    object Loading : ForecastState
+    data class Loaded(val days: List<DayForecast>) : ForecastState
+    object Failed : ForecastState
+    object Unconfigured : ForecastState
 }
 
 /**

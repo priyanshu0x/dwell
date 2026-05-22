@@ -12,14 +12,33 @@ import androidx.compose.ui.Modifier
  */
 interface Widget {
     /**
-     * Renders the widget body inside a host-provided card.
+     * Optional legacy single-slot renderer.
      *
-     * The host owns dashboard chrome, card padding, and the optional header. The
-     * supplied [modifier] must be applied to the root composable so the host can
-     * size and place the widget correctly.
+     * Kept as an optional default for widgets that pre-date the per-target
+     * [Render] contract. New widgets should override [Render] instead; the
+     * default [Render] implementation forwards to [Content] for the [Tile]
+     * target and produces a host-default text summary for [Chip] / [Minimal].
      */
     @Composable
-    fun Content(modifier: Modifier)
+    fun Content(modifier: Modifier) {
+        // Empty default. Widgets that only override Render(target) never see this.
+    }
+
+    /**
+     * Per-target render. Default forwards to [Content] for every target so
+     * widgets that pre-date the per-target contract keep working. Hosts that
+     * need per-target chrome should override this method and dispatch on
+     * [target]; the [DefaultTileRender] / [DefaultChipRender] /
+     * [DefaultMinimalRender] helpers in the host module render summaries when
+     * a widget has nothing specific to draw.
+     */
+    @Composable
+    fun Render(target: WidgetRenderTarget, scope: WidgetScope, modifier: Modifier = Modifier) {
+        Content(modifier)
+    }
+
+    /** At-a-glance summary. Required for non-Console renderers. */
+    fun summary(): WidgetSummary = WidgetSummary(primaryValue = "—")
 
     /**
      * Optional card header override.

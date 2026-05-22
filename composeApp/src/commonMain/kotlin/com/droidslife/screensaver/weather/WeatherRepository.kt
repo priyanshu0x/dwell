@@ -1,58 +1,133 @@
 package com.droidslife.screensaver.weather
 
 import com.droidslife.screensaver.location.LocationService
+import com.droidslife.screensaver.settings.SecretStorage
+import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.weather.providers.CurrentWeather
+import com.droidslife.screensaver.weather.providers.WeatherApiProvider
+import com.droidslife.screensaver.weather.providers.WeatherProvider
+import com.droidslife.screensaver.weather.providers.WeatherProviderUnconfigured
+import com.droidslife.screensaver.weather.providers.WttrInProvider
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * Repository for weather data.
- * @param weatherApi The weather API client.
- * @param locationService The location service.
+ * Thin façade over the configurable set of [WeatherProvider] adapters.
+ *
+ * The repository picks a provider per call using the user's saved widget
+ * configuration so swapping providers (Settings → Widgets → Weather → Source)
+ * doesn't require restarting the dashboard.
+ *
+ * @param httpClient        Shared Ktor client used by all provider adapters.
+ * @param locationService   Geo helper used by the legacy [getWeatherData] path.
+ * @param settingsViewModel Read-only access to widget configs + the saved
+ *                          WeatherAPI key (still surfaced through the existing
+ *                          secret store).
+ * @param secretStorage     Backing store the repository reads the WeatherAPI
+ *                          key from when the user selects that provider.
  */
 class WeatherRepository(
-    private val weatherApi: WeatherApi,
-    private val locationService: LocationService
+    private val httpClient: HttpClient,
+    private val locationService: LocationService,
+    private val settingsViewModel: SettingsViewModel,
+    private val secretStorage: SecretStorage,
 ) {
     /**
-     * Gets the weather data for the current location.
-     * @return A flow of weather data.
+     * Resolves the active provider from settings. Returns wttr.in by default so
+     * the widget works out of the box without any user configuration.
+     */
+    private suspend fun activeProvider(): WeatherProvider {
+        val providerId = providerIdFromSettings()
+        return when (providerId) {
+            WeatherApiProvider.ID -> {
+                val key = secretStorage
+                    .read(settingsViewModel.settings.weatherApiKeySecretId)
+                    ?.trim()
+                    .orEmpty()
+                WeatherApiProvider(httpClient, key)
+            }
+            else -> WttrInProvider(httpClient)
+        }
+    }
+
+    private fun providerIdFromSettings(): String {
+        val widgetConfig = settingsViewModel.settings.widgetConfigs[WEATHER_WIDGET_ID]
+            ?: return WttrInProvider.ID
+        return widgetConfig["provider"]?.let { element ->
+            (element as? kotlinx.serialization.json.JsonPrimitive)?.content
+        } ?: WttrInProvider.ID
+    }
+
+    /**
+     * Streams current weather using the device location and the configured
+     * provider. Kept for callers that pre-date city-driven loads.
      */
     fun getWeatherData(): Flow<WeatherState> = flow {
         emit(WeatherState.Loading)
         try {
             val location = locationService.getCurrentLocation()
-            val weatherData = weatherApi.getWeatherData(location.latitude, location.longitude)
-            emit(WeatherState.Success(weatherData, location))
+            val provider = activeProvider()
+            val current = provider.current(location.city.ifBlank { "Mumbai" })
+            emit(WeatherState.Success(current, location))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: WeatherProviderUnconfigured) {
+            emit(WeatherState.Unconfigured)
         } catch (e: Exception) {
-            if (e is CancellationException) throw e
             emit(WeatherState.Error(e.message ?: "Unknown error"))
         }
+    }
+
+    /**
+     * Fetches current weather for an explicit [city] through the configured
+     * provider.
+     */
+    suspend fun current(city: String): Result<CurrentWeather> = try {
+        Result.success(activeProvider().current(city))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    /**
+     * Fetches a multi-day forecast for [city] through the configured provider.
+     */
+    suspend fun forecast(city: String, days: Int = 5): Result<List<DayForecast>> = try {
+        Result.success(activeProvider().forecast(city, days))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    companion object {
+        const val WEATHER_WIDGET_ID: String = "com.droidslife.screensaver.weather"
     }
 }
 
 /**
- * Sealed class representing the state of weather data.
+ * UI-facing state for the current-weather fetch. Provider-agnostic — the
+ * underlying transport (wttr.in vs WeatherAPI.com) is intentionally hidden.
  */
 sealed class WeatherState {
-    /**
-     * Loading state.
-     */
+    /** Initial / in-flight state. */
     object Loading : WeatherState()
 
-    /**
-     * Success state.
-     * @param weatherData The weather data.
-     * @param location The location.
-     */
+    /** Successful fetch carrying the provider-agnostic [CurrentWeather]. */
     data class Success(
-        val weatherData: WeatherData,
-        val location: com.droidslife.screensaver.location.Location
+        val current: CurrentWeather,
+        val location: com.droidslife.screensaver.location.Location,
     ) : WeatherState()
 
-    /**
-     * Error state.
-     * @param message The error message.
-     */
+    /** Generic failure (network, parse, upstream 5xx). */
     data class Error(val message: String) : WeatherState()
+
+    /**
+     * The active provider requires credentials the host hasn't configured. The
+     * UI surfaces this with an actionable "Add an API key" affordance.
+     */
+    object Unconfigured : WeatherState()
 }

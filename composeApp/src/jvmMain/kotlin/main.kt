@@ -5,7 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.*
+import javax.imageio.ImageIO
 import com.droidslife.screensaver.App
 import com.droidslife.screensaver.Args
 import com.droidslife.screensaver.LaunchMode
@@ -52,26 +56,52 @@ fun main(args: Array<String>) = application {
     }
 
     val tray = remember { TrayDaemon() }
+
+    val onShow = { dashboardVisible = true; exitRequested = false }
+    val onSettings = {
+        dashboardVisible = true
+        exitRequested = false
+        settingsViewModel.openSettingsDialog()
+    }
+    val onReloadWidgets = {
+        widgetRegistry.reload()
+        widgetRegistry.syncWithSettings(settingsViewModel.settings)
+    }
+
     DisposableEffect(launchArgs.mode, settings.trayIconEnabled) {
         if (launchArgs.mode == LaunchMode.Daemon && settings.trayIconEnabled) {
             tray.install(
-                onShow = {
-                    dashboardVisible = true
-                    exitRequested = false
-                },
-                onSettings = {
-                    dashboardVisible = true
-                    exitRequested = false
-                    settingsViewModel.openSettingsDialog()
-                },
-                onReloadWidgets = {
-                    widgetRegistry.reload()
-                    widgetRegistry.syncWithSettings(settingsViewModel.settings)
-                },
+                getSettings = { settingsViewModel.settings },
+                onShow = { onShow() },
+                onSettings = { onSettings() },
+                onSetMode = { settingsViewModel.setMode(it) },
+                onSetCinematicVariant = { settingsViewModel.setCinematicVariant(it) },
+                onSetAmbientVariant = { settingsViewModel.setAmbientVariant(it) },
+                onSetConsoleVariant = { settingsViewModel.setConsoleVariant(it) },
+                onSetStartWithSystem = { settingsViewModel.setStartWithSystem(it) },
+                onReloadWidgets = { onReloadWidgets() },
                 onQuit = { exitApplication() },
             )
         }
         onDispose { tray.remove() }
+    }
+
+    // Keep tray checkmarks in sync when settings change (from dashboard or another tray click).
+    LaunchedEffect(settings.mode, settings.cinematicVariant, settings.ambientVariant, settings.consoleVariant, settings.startWithSystem) {
+        if (launchArgs.mode == LaunchMode.Daemon && settings.trayIconEnabled) {
+            tray.refresh(
+                getSettings = { settingsViewModel.settings },
+                onShow = { onShow() },
+                onSettings = { onSettings() },
+                onSetMode = { settingsViewModel.setMode(it) },
+                onSetCinematicVariant = { settingsViewModel.setCinematicVariant(it) },
+                onSetAmbientVariant = { settingsViewModel.setAmbientVariant(it) },
+                onSetConsoleVariant = { settingsViewModel.setConsoleVariant(it) },
+                onSetStartWithSystem = { settingsViewModel.setStartWithSystem(it) },
+                onReloadWidgets = { onReloadWidgets() },
+                onQuit = { exitApplication() },
+            )
+        }
     }
 
     LaunchedEffect(launchArgs.mode, settings.idleTimeoutMinutes) {
@@ -97,8 +127,10 @@ fun main(args: Array<String>) = application {
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
         )
 
+        val dwellWindowIcon = remember { loadDwellWindowIcon() }
         Window(
             title = "Dwell",
+            icon = dwellWindowIcon,
             state = rememberWindowState(
                 placement = WindowPlacement.Fullscreen,
                 position = WindowPosition(Alignment.Center),
@@ -113,9 +145,6 @@ fun main(args: Array<String>) = application {
             ShortcutToast(toastState = windowEvents.toastState)
 
             App(
-                showCitySelectionDialog = windowEvents.showCitySelectionDialog,
-                onCityDialogDismiss = windowEvents.onCityDialogDismiss,
-                onShowCityDialog = windowEvents.onShowCityDialog,
                 exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
                 onExitApplication = requestDashboardExit,
                 exitRequested = exitRequested,
@@ -134,4 +163,20 @@ fun main(args: Array<String>) = application {
             )
         }
     }
+}
+
+/**
+ * Load the bundled brand icon for the OS taskbar / Alt-Tab. Falls back to
+ * the JVM default if the file isn't present (e.g. during a partial build).
+ */
+private fun loadDwellWindowIcon(): Painter? {
+    val candidates = listOf(
+        java.io.File("composeApp/desktopAppIcons/LinuxIcon.png"),
+        java.io.File("desktopAppIcons/LinuxIcon.png"),
+    )
+    val source = candidates.firstOrNull { it.exists() } ?: return null
+    return runCatching {
+        val image = ImageIO.read(source) ?: return null
+        BitmapPainter(image.toComposeImageBitmap())
+    }.getOrNull()
 }
