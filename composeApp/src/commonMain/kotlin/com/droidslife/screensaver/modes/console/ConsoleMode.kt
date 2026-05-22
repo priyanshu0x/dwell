@@ -1,6 +1,6 @@
 package com.droidslife.screensaver.modes.console
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -117,16 +118,25 @@ fun ConsoleMode(
                     // tween reads as motion instead of a single-frame state flip.
                     Color.White.copy(alpha = 0.10f).compositeOver(DwellColors.Surface1)
                 } else DwellColors.Surface1
-                val borderColor by animateColorAsState(
-                    targetValue = targetBorder,
-                    animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
-                    label = "tile-border",
-                )
-                val backgroundColor by animateColorAsState(
-                    targetValue = targetBg,
-                    animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
-                    label = "tile-bg",
-                )
+                // Explicit Animatable so the tween definitely runs — the
+                // wrapping animateColorAsState was being silently skipped on
+                // some recompositions, making hover look like a state flip.
+                val bgAnim = remember(id) { Animatable(DwellColors.Surface1) }
+                val borderAnim = remember(id) { Animatable(baseBorder) }
+                LaunchedEffect(targetBg) {
+                    bgAnim.animateTo(
+                        targetValue = targetBg,
+                        animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
+                    )
+                }
+                LaunchedEffect(targetBorder) {
+                    borderAnim.animateTo(
+                        targetValue = targetBorder,
+                        animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
+                    )
+                }
+                val backgroundColor = bgAnim.value
+                val borderColor = borderAnim.value
                 // Clickable adds its own instant Material highlight on hover;
                 // disable it so only our tweened backgroundColor shows.
                 val interactionSource = remember { MutableInteractionSource() }
