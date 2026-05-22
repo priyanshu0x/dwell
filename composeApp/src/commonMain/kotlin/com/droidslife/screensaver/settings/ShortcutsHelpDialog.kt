@@ -100,7 +100,7 @@ private fun HelpPanel(
                     "Esc"             to "Dismiss dashboard",
                     "Alt"             to "Dismiss dashboard",
                     "Ctrl+Q · Cmd+Q"  to "Quit Dwell",
-                    "Ctrl+,"          to "Open Settings",
+                    "S · Ctrl+,"      to "Open Settings",
                     "F1 · ?"          to "Show this help",
                 ))
                 ShortcutGroup("Mode", listOf(
