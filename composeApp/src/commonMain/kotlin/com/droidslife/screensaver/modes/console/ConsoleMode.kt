@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -124,6 +125,9 @@ fun ConsoleMode(
                     animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
                     label = "tile-bg",
                 )
+                // Clickable adds its own instant Material highlight on hover;
+                // disable it so only our tweened backgroundColor shows.
+                val interactionSource = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -134,7 +138,10 @@ fun ConsoleMode(
                         .onPointerEvent(PointerEventType.Exit) {
                             if (hoveredTile == id) hoveredTile = null
                         }
-                        .clickable { lastFocused = id },
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { lastFocused = id },
                 ) {
                     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
                         instance.widget.Render(
