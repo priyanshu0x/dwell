@@ -47,8 +47,12 @@ private val starAlphas: List<Float> = listOf(
 )
 
 @Composable
-fun Borealis(modifier: Modifier = Modifier) {
-    val now by produceTickerBorealis()
+fun Borealis(
+    settingsViewModel: com.droidslife.screensaver.settings.SettingsViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val settings = settingsViewModel.settings
+    val now by produceTickerBorealis(includeSeconds = settings.showSeconds)
 
     Box(
         modifier = modifier
@@ -103,33 +107,36 @@ fun Borealis(modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}",
+                text = com.droidslife.screensaver.modes.cinematic.formatClock(
+                    now,
+                    is24Hour = settings.is24HourFormat,
+                    showSeconds = settings.showSeconds,
+                ),
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.Light,
                 fontSize = 158.sp,
                 color = Color(0xEAFFFFFF),
             )
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = formatBorealisDate(now),
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.Light,
-                fontSize = 14.sp,
-                letterSpacing = 0.3.sp,
-                color = Color(0x8CFFFFFF),
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Mumbai", // Phase 9/12 wires actual city from Weather widget config
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.Light,
-                fontSize = 12.sp,
-                letterSpacing = 0.2.sp,
-                // Spec asked for rgba(255,255,255,0.32) but at 12sp against the deep-night
-                // backdrop the place line vanished. Lift to ~50% so it reads as quiet but
-                // present, matching the visual weight in the mockup.
-                color = Color(0x80FFFFFF),
-            )
+            if (settings.showDate) {
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = formatBorealisDate(now),
+                    fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.Light,
+                    fontSize = 14.sp,
+                    letterSpacing = 0.3.sp,
+                    color = Color(0x8CFFFFFF),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Mumbai", // Phase 9/12 wires actual city from Weather widget config
+                    fontFamily = DwellFonts.interTight(),
+                    fontWeight = FontWeight.Light,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.2.sp,
+                    color = Color(0x80FFFFFF),
+                )
+            }
         }
     }
 }
@@ -141,13 +148,16 @@ private fun formatBorealisDate(now: LocalDateTime): String {
 }
 
 @Composable
-private fun produceTickerBorealis(): State<LocalDateTime> {
+private fun produceTickerBorealis(includeSeconds: Boolean = false): State<LocalDateTime> {
+    val tz = TimeZone.currentSystemDefault()
+    val interval = if (includeSeconds) 1_000L else 15_000L
     return produceState(
-        initialValue = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        initialValue = Clock.System.now().toLocalDateTime(tz),
+        includeSeconds,
     ) {
         while (true) {
-            value = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            delay(15_000)
+            value = Clock.System.now().toLocalDateTime(tz)
+            delay(interval)
         }
     }
 }

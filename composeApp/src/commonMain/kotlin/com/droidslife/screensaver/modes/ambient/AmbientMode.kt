@@ -19,7 +19,7 @@ fun AmbientMode(
     Box(modifier = modifier.fillMaxSize()) {
         when (settingsViewModel.settings.ambientVariant) {
             AmbientVariant.Lumen -> Lumen(settingsViewModel)
-            AmbientVariant.Borealis -> Borealis()
+            AmbientVariant.Borealis -> Borealis(settingsViewModel)
         }
         CornerButtons(
             onSettings = onOpenSettings,
