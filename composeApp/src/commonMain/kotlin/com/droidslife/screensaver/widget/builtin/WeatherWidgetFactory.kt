@@ -23,6 +23,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.input.ImeAction
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -272,7 +274,9 @@ private fun WeatherTile(
                 color = DwellColors.TextLow,
                 maxLines = 1,
                 modifier = if (onLabelClick != null) {
-                    Modifier.clickable(onClick = onLabelClick)
+                    Modifier
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .clickable(onClick = onLabelClick)
                 } else Modifier,
             )
             if (pickerOpen) {

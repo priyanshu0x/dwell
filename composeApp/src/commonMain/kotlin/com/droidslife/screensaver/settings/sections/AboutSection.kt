@@ -24,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -194,7 +196,10 @@ private fun TextChip(label: String, enabled: Boolean = true, onClick: () -> Unit
             .clip(RoundedCornerShape(8.dp))
             .background(DwellColors.Surface1)
             .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
-            .let { if (enabled) it.clickable(onClick = onClick) else it }
+            .let {
+                if (enabled) it.pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)
+                else it
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
