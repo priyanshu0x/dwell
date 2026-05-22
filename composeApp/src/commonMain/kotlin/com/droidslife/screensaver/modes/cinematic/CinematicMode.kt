@@ -3,10 +3,7 @@ package com.droidslife.screensaver.modes.cinematic
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -73,34 +70,34 @@ private fun BoxScope.CinematicForeground(
     val now by produceTicker(includeSeconds = settings.showSeconds)
     val weatherViewModel = koinInject<WeatherViewModel>()
 
+    // Position/size constants come from mode-mockups.html (.cine-clock / .cine-meta).
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val startPad = maxWidth * 0.08f
-        val topPad = maxHeight * 0.26f
-        Column(modifier = Modifier.padding(start = startPad, top = topPad)) {
-            // lineHeight = fontSize keeps the clock from carrying its full
-            // line-box descent area into the layout — without this, the
-            // 280 sp Bold Inter Tight added ~80 px of empty space below the
-            // visible glyphs and pushed the date / subtitle way down.
-            ClockText(
+        val clockStartPad = maxWidth * 0.08f
+        val clockTopPad = maxHeight * 0.26f
+        val metaStartPad = maxWidth * 0.085f
+        val metaBottomPad = maxHeight * 0.28f
+        ClockText(
+            now = now,
+            is24Hour = settings.is24HourFormat,
+            showSeconds = settings.showSeconds,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.Bold,
+            fontSize = 200.sp,
+            color = DwellColors.TextHigh,
+            lineHeight = (200f * 0.85f).sp,
+            letterSpacing = (-0.06).em,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = clockStartPad, top = clockTopPad),
+        )
+        if (settings.showDate) {
+            CinematicMetaLine(
                 now = now,
-                is24Hour = settings.is24HourFormat,
-                showSeconds = settings.showSeconds,
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.Bold,
-                fontSize = 280.sp,
-                color = DwellColors.TextHigh,
-                tightLineHeight = true,
+                weatherViewModel = weatherViewModel,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = metaStartPad, bottom = metaBottomPad),
             )
-            if (settings.showDate) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = cinematicSubtitle(now, weatherViewModel),
-                    fontFamily = DwellFonts.interTight(),
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 18.sp,
-                    color = DwellColors.TextHigh.copy(alpha = 0.75f),
-                )
-            }
         }
     }
     WidgetDrawer(settingsViewModel, registry)
@@ -113,8 +110,55 @@ private fun BoxScope.CinematicForeground(
             fontSize = 9.sp,
             letterSpacing = 2.7.sp,
             color = DwellColors.TextHigh.copy(alpha = 0.32f),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
         )
+    }
+}
+
+// Row with explicit · spans so we can apply the mockup's 12 dp padding +
+// 0.4 opacity around each separator (joinToString gives only one space).
+@Composable
+private fun CinematicMetaLine(
+    now: LocalDateTime,
+    weatherViewModel: WeatherViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val segments = buildList {
+        add(formatMetaLine(now))
+        val state = weatherViewModel.state
+        if (state is WeatherState.Success) {
+            val current = state.current
+            val condition = current.conditionText.takeIf { it.isNotBlank() }
+            add(buildString {
+                append("${current.tempC.toInt()}°")
+                if (condition != null) append(" $condition")
+            })
+        }
+        val city = weatherViewModel.selectedCity?.ifBlank { null }
+        if (city != null) add(city)
+    }
+    val metaColor = DwellColors.TextHigh.copy(alpha = 0.78f)
+    val dotColor = DwellColors.TextHigh.copy(alpha = 0.4f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        segments.forEachIndexed { index, segment ->
+            if (index > 0) {
+                Text(
+                    text = "·",
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 16.sp,
+                    color = dotColor,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+            Text(
+                text = segment,
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                letterSpacing = 0.06.em,
+                color = metaColor,
+            )
+        }
     }
 }
 
@@ -122,28 +166,6 @@ private fun formatMetaLine(now: LocalDateTime): String {
     val dow = now.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
     val month = now.month.name.lowercase().replaceFirstChar { it.uppercase() }
     return "$dow, ${now.day} $month"
-}
-
-/**
- * "Friday, 22 May · 21° Cloudy · Rewari" when weather is loaded; falls back
- * to just the date if the provider hasn't responded yet. Reads city + temp
- * + condition from the shared WeatherViewModel — no hard-coded strings.
- */
-private fun cinematicSubtitle(now: LocalDateTime, vm: WeatherViewModel): String {
-    val parts = mutableListOf(formatMetaLine(now))
-    val state = vm.state
-    if (state is WeatherState.Success) {
-        val current = state.current
-        val condition = current.conditionText.takeIf { it.isNotBlank() }
-        val tempCondition = buildString {
-            append("${current.tempC.toInt()}°")
-            if (condition != null) append(" $condition")
-        }
-        parts += tempCondition
-    }
-    val city = (vm.selectedCity ?: "").ifBlank { null }
-    if (city != null) parts += city
-    return parts.joinToString(" · ")
 }
 
 /**
@@ -166,6 +188,8 @@ internal fun ClockText(
     color: Color,
     modifier: Modifier = Modifier,
     tightLineHeight: Boolean = false,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    lineHeight: TextUnit = TextUnit.Unspecified,
 ) {
     val hour24 = now.hour
     val hour = if (is24Hour) hour24 else (hour24 % 12).let { if (it == 0) 12 else it }
@@ -186,7 +210,11 @@ internal fun ClockText(
     // primary's cap-line (looks tucked next to HH:MM rather than dropped under).
     val secondaryBottomPad = (fontSize.value * 0.20f).dp
 
-    val primaryLineHeight = if (tightLineHeight) fontSize else TextUnit.Unspecified
+    val primaryLineHeight = when {
+        lineHeight != TextUnit.Unspecified -> lineHeight
+        tightLineHeight -> fontSize
+        else -> TextUnit.Unspecified
+    }
     val secondaryLineHeight = if (tightLineHeight) secondaryFontSize else TextUnit.Unspecified
     Row(
         modifier = modifier,
@@ -198,6 +226,7 @@ internal fun ClockText(
             fontWeight = fontWeight,
             fontSize = fontSize,
             lineHeight = primaryLineHeight,
+            letterSpacing = letterSpacing,
             color = color,
         )
         if (showSeconds) {
