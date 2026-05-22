@@ -55,6 +55,7 @@ fun ConsoleEditOverlay(
     sizeConstraints: Map<String, WidgetSize>,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
+    showBanner: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -114,28 +115,29 @@ fun ConsoleEditOverlay(
             )
         }
 
-        // Top banner.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(DwellColors.LumenCyan.copy(alpha = 0.14f))
-                .border(
-                    width = 1.dp,
-                    color = DwellColors.LumenCyan.copy(alpha = 0.45f),
-                    shape = RoundedCornerShape(999.dp),
+        if (showBanner) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(DwellColors.LumenCyan.copy(alpha = 0.14f))
+                    .border(
+                        width = 1.dp,
+                        color = DwellColors.LumenCyan.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(999.dp),
+                    )
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = "EDIT LAYOUT  ·  L to exit  ·  drag to move  ·  ⌥ drag to resize",
+                    fontSize = 10.sp,
+                    letterSpacing = 0.25.sp,
+                    color = DwellColors.LumenCyan,
+                    fontFamily = DwellFonts.jetBrainsMono(),
+                    fontWeight = FontWeight.Medium,
                 )
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-        ) {
-            Text(
-                text = "EDIT LAYOUT  ·  L to exit  ·  drag to move  ·  ⌥ drag to resize",
-                fontSize = 10.sp,
-                letterSpacing = 0.25.sp,
-                color = DwellColors.LumenCyan,
-                fontFamily = DwellFonts.jetBrainsMono(),
-                fontWeight = FontWeight.Medium,
-            )
+            }
         }
     }
 }

@@ -87,7 +87,12 @@ fun rememberWindowEventHandlers(
                 }
             }
             is KeyEventAction.ToggleConsoleEdit -> {
-                if (settingsViewModel.settings.mode == Mode.Console) {
+                // L is meaningful only when the dashboard is locked. When
+                // unlocked, tiles are always editable so the banner toggle is
+                // a no-op.
+                if (settingsViewModel.settings.mode == Mode.Console &&
+                    settingsViewModel.settings.dashboardLocked
+                ) {
                     settingsViewModel.toggleConsoleEditMode()
                 }
             }
