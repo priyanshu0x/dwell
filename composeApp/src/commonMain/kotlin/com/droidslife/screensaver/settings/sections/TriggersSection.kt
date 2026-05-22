@@ -54,6 +54,12 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
                 onCheckedChange = settingsViewModel::setExitOnKeypress,
                 description = "Any key (besides shortcuts) dismisses the dashboard",
             )
+            ToggleRow(
+                label = "Lock dashboard layout",
+                checked = settings.dashboardLocked,
+                onCheckedChange = settingsViewModel::setDashboardLocked,
+                description = "Tiles ignore drag/resize until you press L to enter Edit Layout",
+            )
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

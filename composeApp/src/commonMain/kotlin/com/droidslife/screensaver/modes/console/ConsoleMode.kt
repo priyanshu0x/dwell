@@ -53,6 +53,14 @@ fun ConsoleMode(
     }
 
     val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
+    val locked = settingsViewModel.settings.dashboardLocked
+    val editing = settingsViewModel.consoleEditMode
+    // Tiles are editable when the dashboard is unlocked, OR when the user has
+    // explicitly entered edit mode while locked. The visible EDIT LAYOUT banner
+    // and size badges only show in the locked-and-editing case so they don't
+    // clutter the everyday view.
+    val tilesEditable = !locked || editing
+    val showEditChrome = locked && editing
     CompositionLocalProvider(LocalConsoleAccent provides accent) {
         Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
             ConsoleGrid(placements = placements, modifier = Modifier.fillMaxSize()) { id ->
@@ -78,16 +86,17 @@ fun ConsoleMode(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
-                    TileResizeCorner()
+                    if (showEditChrome) TileResizeCorner()
                 }
             }
-            if (settingsViewModel.consoleEditMode) {
+            if (tilesEditable) {
                 val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
                     instances.mapValues { it.value.descriptor.factory.preferredSize }
                 }
                 ConsoleEditOverlay(
                     placements = placements,
                     sizeConstraints = sizeConstraints,
+                    showBanner = showEditChrome,
                     onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     modifier = Modifier.fillMaxSize(),
@@ -104,30 +113,27 @@ fun ConsoleMode(
 
 @Composable
 private fun BoxScope.TileResizeCorner() {
-    // L-shape inset from the bottom-right corner. Brand cyan at low alpha so it
-    // reads across both Console accents (Standard green, Amber) without
-    // clashing. Purely decorative outside Edit Layout — a hint that the tile
-    // is resizable.
     androidx.compose.foundation.Canvas(
         modifier = Modifier
             .align(androidx.compose.ui.Alignment.BottomEnd)
-            .padding(end = 10.dp, bottom = 10.dp)
-            .size(18.dp),
+            .padding(end = 6.dp, bottom = 6.dp)
+            .size(14.dp),
     ) {
-        val stroke = 2f
-        val color = DwellColors.LumenCyan.copy(alpha = 0.55f)
-        val end = size.width - stroke / 2
+        val s = 2.dp.toPx()
+        val color = DwellColors.LumenCyan.copy(alpha = 0.7f)
+        // Right edge stroke (top-half hidden — only the lower portion forms the L)
         drawLine(
             color,
-            androidx.compose.ui.geometry.Offset(end, size.height * 0.35f),
-            androidx.compose.ui.geometry.Offset(end, size.height),
-            stroke,
+            androidx.compose.ui.geometry.Offset(size.width - s / 2, 0f),
+            androidx.compose.ui.geometry.Offset(size.width - s / 2, size.height),
+            s,
         )
+        // Bottom edge stroke
         drawLine(
             color,
-            androidx.compose.ui.geometry.Offset(size.width * 0.35f, end),
-            androidx.compose.ui.geometry.Offset(size.width, end),
-            stroke,
+            androidx.compose.ui.geometry.Offset(0f, size.height - s / 2),
+            androidx.compose.ui.geometry.Offset(size.width, size.height - s / 2),
+            s,
         )
     }
 }

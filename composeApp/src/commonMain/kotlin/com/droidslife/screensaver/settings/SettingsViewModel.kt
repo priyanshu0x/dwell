@@ -42,9 +42,10 @@ class SettingsViewModel(
     /**
      * Runtime-only flag for Console layout edit mode. Not persisted.
      */
-    // Always on — Console layout is freely editable; the resize-corner mark on
-    // each tile is the visual affordance. `L` toggles the EDIT LAYOUT banner.
-    var consoleEditMode by mutableStateOf(true)
+    // Runtime-only: shows the EDIT LAYOUT banner + size badges. Meaningful only
+    // when dashboardLocked is true (toggles via `L`). When unlocked, tiles are
+    // always editable but this stays false so no banner / badges clutter.
+    var consoleEditMode by mutableStateOf(false)
         private set
 
     fun toggleConsoleEditMode() {
@@ -228,6 +229,11 @@ class SettingsViewModel(
 
     fun setDismissOnMouseMovement(enabled: Boolean) {
         updateSettings(settings.copy(dismissOnMouseMovement = enabled))
+    }
+
+    fun setDashboardLocked(locked: Boolean) {
+        updateSettings(settings.copy(dashboardLocked = locked))
+        if (!locked) consoleEditMode = false
     }
 
     /** Mark the first-run welcome toast as shown so it doesn't repeat. */

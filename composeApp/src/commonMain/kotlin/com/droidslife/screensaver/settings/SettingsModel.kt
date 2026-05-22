@@ -85,6 +85,13 @@ data class SettingsModel(
     /** Dismiss the dashboard when the mouse moves (true) or only on key/tap (false). */
     val dismissOnMouseMovement: Boolean = true,
 
+    /**
+     * When true, Console tiles ignore drag / resize gestures until the user
+     * explicitly enters edit mode (press `L`). When false (default), tiles are
+     * always editable; the edit-mode banner and size badges stay hidden.
+     */
+    val dashboardLocked: Boolean = false,
+
     /** Flipped after the first-run welcome toast is shown so we don't repeat it. */
     val welcomeShown: Boolean = false,
 )
