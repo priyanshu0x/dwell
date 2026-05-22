@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +22,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -140,39 +140,52 @@ internal fun ClockText(
     val hh = hour.toString().padStart(2, '0')
     val mm = now.minute.toString().padStart(2, '0')
     val ss = now.second.toString().padStart(2, '0')
-    val primary = "$hh:$mm"
     val ampm = if (!is24Hour) (if (hour24 < 12) "AM" else "PM") else null
 
-    // Secondary style: ~36 % of the primary size, 55 % alpha, same family + weight.
-    // Both seconds and AM/PM use the *same* SpanStyle so they read as a pair of
-    // equal-weight subordinate glyphs. Seconds are superscript-aligned (no colon
-    // separator — the visual size drop is the separator) and AM/PM trails on the
-    // regular baseline.
-    val secondary = SpanStyle(
-        fontSize = 0.36.em,
-        color = color.copy(alpha = 0.55f),
-    )
-    val secondsStyle = secondary.copy(baselineShift = BaselineShift(0.55f))
+    // Render primary + seconds + AM/PM as separate Text composables in a Row
+    // so the secondary parts are guaranteed to share the *same* fontSize. An
+    // earlier AnnotatedString approach used a single Text with em-relative
+    // sub-spans; that rendered "35" smaller than "PM" because Inter Tight's
+    // lining-digit cap-height is ~70% of its letter cap-height, so the same
+    // em produced different visual sizes for digits vs letters.
+    val secondaryFontSize = (fontSize.value * 0.36f).sp
+    val secondaryColor = color.copy(alpha = 0.55f)
+    // Lift the small text off the baseline so its cap-line lands near the
+    // primary's cap-line (looks tucked next to HH:MM rather than dropped under).
+    val secondaryBottomPad = (fontSize.value * 0.20f).dp
 
-    val annotated = buildAnnotatedString {
-        append(primary)
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = "$hh:$mm",
+            fontFamily = fontFamily,
+            fontWeight = fontWeight,
+            fontSize = fontSize,
+            color = color,
+        )
         if (showSeconds) {
-            // thin space + superscript seconds, no preceding colon
-            withStyle(secondsStyle) { append(" $ss") }
+            Text(
+                text = ss,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                fontSize = secondaryFontSize,
+                color = secondaryColor,
+                modifier = Modifier.padding(start = 12.dp, bottom = secondaryBottomPad),
+            )
         }
         if (ampm != null) {
-            withStyle(secondary) { append(" $ampm") }
+            Text(
+                text = ampm,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                fontSize = secondaryFontSize,
+                color = secondaryColor,
+                modifier = Modifier.padding(start = 12.dp, bottom = secondaryBottomPad),
+            )
         }
     }
-
-    Text(
-        text = annotated,
-        fontFamily = fontFamily,
-        fontWeight = fontWeight,
-        fontSize = fontSize,
-        color = color,
-        modifier = modifier,
-    )
 }
 
 @Composable
