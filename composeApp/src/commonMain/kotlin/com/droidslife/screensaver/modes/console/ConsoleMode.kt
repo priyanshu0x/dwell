@@ -118,18 +118,20 @@ fun ConsoleMode(
                     // tween reads as motion instead of a single-frame state flip.
                     Color.White.copy(alpha = 0.10f).compositeOver(DwellColors.Surface1)
                 } else DwellColors.Surface1
-                // Explicit Animatable so the tween definitely runs — the
-                // wrapping animateColorAsState was being silently skipped on
-                // some recompositions, making hover look like a state flip.
+                // Key the LaunchedEffect on a stable Boolean, NOT the target
+                // Color. Color is a value class backed by ULong; passing it to
+                // LaunchedEffect boxes it into a fresh Object each composition,
+                // making the effect relaunch (and cancel the tween) every frame
+                // — which is exactly what made hover feel instant.
                 val bgAnim = remember(id) { Animatable(DwellColors.Surface1) }
                 val borderAnim = remember(id) { Animatable(baseBorder) }
-                LaunchedEffect(targetBg) {
+                LaunchedEffect(isHovered) {
                     bgAnim.animateTo(
                         targetValue = targetBg,
                         animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
                     )
                 }
-                LaunchedEffect(targetBorder) {
+                LaunchedEffect(isHovered) {
                     borderAnim.animateTo(
                         targetValue = targetBorder,
                         animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
