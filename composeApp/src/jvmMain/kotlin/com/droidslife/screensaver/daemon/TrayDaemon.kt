@@ -139,11 +139,73 @@ class TrayDaemon {
                 it.addItemListener { e -> onSetStartWithSystem(e.stateChange == java.awt.event.ItemEvent.SELECTED) }
             })
             add(MenuItem("Reload widgets").also { it.addActionListener { onReloadWidgets() } })
+            add(MenuItem("Run doctor…").also { it.addActionListener { runDoctorInBackground() } })
+            add(MenuItem("About Dwell…").also { it.addActionListener { showAboutDialog() } })
 
             addSeparator()
             add(MenuItem("Quit Dwell").also { it.addActionListener { onQuit() } })
         }
     }
+
+    /**
+     * Invokes the bundled `dwell doctor` CLI and shows its output in a Swing
+     * dialog so non-CLI users can run the same diagnostic the docs reference.
+     */
+    private fun runDoctorInBackground() {
+        Thread {
+            val cmd = if (isWindows()) {
+                listOf("cmd.exe", "/c", "scripts\\dwell.cmd", "doctor")
+            } else {
+                listOf("sh", "./scripts/dwell", "doctor")
+            }
+            val output = runCatching {
+                val process = ProcessBuilder(cmd)
+                    .redirectErrorStream(true)
+                    .start()
+                process.inputStream.bufferedReader().use { it.readText() }
+                    .also { process.waitFor() }
+            }.getOrElse { e -> "Couldn't run dwell doctor: ${e.message}" }
+
+            javax.swing.SwingUtilities.invokeLater {
+                val textArea = javax.swing.JTextArea(output).apply {
+                    isEditable = false
+                    font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12)
+                }
+                val scroll = javax.swing.JScrollPane(textArea).apply {
+                    preferredSize = java.awt.Dimension(640, 360)
+                }
+                javax.swing.JOptionPane.showMessageDialog(
+                    null, scroll, "Dwell doctor", javax.swing.JOptionPane.PLAIN_MESSAGE,
+                )
+            }
+        }.also { it.isDaemon = true }.start()
+    }
+
+    private fun showAboutDialog() {
+        val version = runCatching {
+            Class.forName("com.droidslife.screensaver.BuildInfo")
+                .getField("VERSION").get(null) as? String
+        }.getOrNull().orEmpty()
+        val commit = runCatching {
+            Class.forName("com.droidslife.screensaver.BuildInfo")
+                .getField("COMMIT").get(null) as? String
+        }.getOrNull().orEmpty()
+        val message = buildString {
+            appendLine("Dwell — a calm three-mode dashboard for the screensaver hour.")
+            appendLine()
+            if (version.isNotBlank()) appendLine("Version: $version")
+            if (commit.isNotBlank()) appendLine("Build:   $commit")
+            appendLine("License: MIT")
+        }
+        javax.swing.SwingUtilities.invokeLater {
+            javax.swing.JOptionPane.showMessageDialog(
+                null, message, "About Dwell", javax.swing.JOptionPane.INFORMATION_MESSAGE,
+            )
+        }
+    }
+
+    private fun isWindows(): Boolean =
+        System.getProperty("os.name").orEmpty().lowercase().contains("win")
 
     private fun loadIcon(): Image {
         // Prefer the bundled brand icon; fall back to the dot-glyph if unavailable.
