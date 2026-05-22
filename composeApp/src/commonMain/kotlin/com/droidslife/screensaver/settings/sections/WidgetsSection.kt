@@ -166,6 +166,21 @@ fun WidgetsSection(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeader("Installed widgets")
+            BodyText(
+                "Drop JARs or YAML folders into ~/.screensaver/widgets/, then reload.",
+                dim = true,
+            )
+            PillButton(
+                label = "Reload widgets from disk",
+                onClick = {
+                    widgetRegistry.reload()
+                    widgetRegistry.syncWithSettings(settingsViewModel.settings)
+                },
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Console layout")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PillButton(
