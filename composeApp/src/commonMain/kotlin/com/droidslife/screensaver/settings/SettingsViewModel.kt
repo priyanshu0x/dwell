@@ -224,6 +224,11 @@ class SettingsViewModel(
         updateSettings(settings.copy(exitOnKeypress = enabled))
     }
 
+    /** Mark the first-run welcome toast as shown so it doesn't repeat. */
+    fun markWelcomeShown() {
+        if (!settings.welcomeShown) updateSettings(settings.copy(welcomeShown = true))
+    }
+
     fun setWidgetLayout(widgetId: String, rect: com.droidslife.screensaver.widget.api.GridRect) {
         updateSettings(settings.copy(widgetLayouts = settings.widgetLayouts + (widgetId to rect)))
     }

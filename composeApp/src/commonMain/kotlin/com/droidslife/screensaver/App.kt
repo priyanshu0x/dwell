@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.droidslife.screensaver.components.ShortcutToast
+import com.droidslife.screensaver.components.rememberToastState
 import com.droidslife.screensaver.modes.ModeHost
 import com.droidslife.screensaver.settings.SettingsSheet
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -59,6 +61,19 @@ internal fun App(
         }
     }
 
+    val welcomeToast = rememberToastState()
+    LaunchedEffect(visible, settingsViewModel.settings.welcomeShown) {
+        if (visible && !settingsViewModel.settings.welcomeShown) {
+            // Give the fade-in time to settle, then greet the user once.
+            kotlinx.coroutines.delay(900)
+            welcomeToast.show(
+                "Welcome to Dwell — press M to switch modes · V for variants · F1 for help",
+                durationMs = 4500L,
+            )
+            settingsViewModel.markWelcomeShown()
+        }
+    }
+
     AppTheme(isDark = settingsViewModel.settings.isDarkTheme) {
         AnimatedVisibility(
             visible = visible,
@@ -75,6 +90,7 @@ internal fun App(
                     onOpenSettings = { settingsViewModel.openSettingsDialog() },
                     onOpenHelp = onShowHelpDialog,
                 )
+                ShortcutToast(toastState = welcomeToast)
             }
         }
 
