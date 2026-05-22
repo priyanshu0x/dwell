@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.weather
 
+import com.droidslife.screensaver.location.FALLBACK_CITY
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -69,7 +70,7 @@ class WeatherRepository(
         try {
             val location = locationService.getCurrentLocation()
             val provider = activeProvider()
-            val current = provider.current(location.city.ifBlank { "Mumbai" })
+            val current = provider.current(location.city.ifBlank { FALLBACK_CITY })
             emit(WeatherState.Success(current, location))
         } catch (e: CancellationException) {
             throw e

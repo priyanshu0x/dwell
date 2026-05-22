@@ -18,11 +18,15 @@ class LocationService {
         // Get the current timezone to determine an appropriate default location
         val timezone = TimeZone.currentSystemDefault().id
 
+        // Lat/lng aren't used downstream — providers fetch by city name —
+        // so we leave them 0/0 and only carry the city string. That keeps
+        // FALLBACK_CITY the single source of truth without baking coords
+        // for each new fallback location into the codebase.
         if (timezone == "Asia/Kolkata") {
-            return@withContext Location(19.0760, 72.8777, "Mumbai", "IN")
+            return@withContext Location(0.0, 0.0, FALLBACK_CITY, "IN")
         }
 
-        return@withContext Location(40.7128, -74.0060, "New York", "US")
+        return@withContext Location(0.0, 0.0, "New York", "US")
     }
 }
 
