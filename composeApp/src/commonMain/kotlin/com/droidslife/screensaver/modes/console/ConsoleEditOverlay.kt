@@ -218,7 +218,9 @@ private fun EditTile(
                     )
                 },
         ) {
-            // Top row: size badge (left) + drag handle (right).
+            // Top row: size badge (left, only while actively dragging/resizing) +
+            // persistent drag handle (right).
+            val activeRect = ghosts[id]
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -227,13 +229,18 @@ private fun EditTile(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = "${rect.cols}×${rect.rows}",
-                    fontSize = 9.sp,
-                    color = DwellColors.LumenCyan,
-                    fontFamily = DwellFonts.jetBrainsMono(),
-                    fontWeight = FontWeight.Medium,
-                )
+                if (activeRect != null) {
+                    Text(
+                        text = "${activeRect.cols}×${activeRect.rows}",
+                        fontSize = 9.sp,
+                        color = DwellColors.LumenCyan,
+                        fontFamily = DwellFonts.jetBrainsMono(),
+                        fontWeight = FontWeight.Medium,
+                    )
+                } else {
+                    // Placeholder keeps the drag handle anchored to the right edge.
+                    Box(Modifier)
+                }
                 Text(
                     text = "⋮⋮",
                     fontSize = 10.sp,
