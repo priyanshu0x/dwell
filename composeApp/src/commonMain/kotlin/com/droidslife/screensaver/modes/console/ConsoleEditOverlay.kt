@@ -23,7 +23,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -85,17 +91,19 @@ fun ConsoleEditOverlay(
                 stepX = stepX,
                 stepY = stepY,
                 ghosts = ghosts,
+                placements = placements,
                 onMove = onMove,
                 onResize = onResize,
             )
         }
 
-        // Ghost rectangles for in-progress drags.
-        ghosts.forEach { (_, gr) ->
+        ghosts.forEach { (gid, gr) ->
             val w = gr.cols * cellW + (gr.cols - 1) * gapPx
             val h = gr.rows * cellH + (gr.rows - 1) * gapPx
             val x = paddingPx + gr.col * stepX
             val y = paddingPx + gr.row * stepY
+            val collides = overlapsAny(gid, gr, placements)
+            val border = if (collides) DwellColors.StatusError else DwellColors.LumenCyan
             Box(
                 modifier = Modifier
                     .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
@@ -105,11 +113,11 @@ fun ConsoleEditOverlay(
                     )
                     .border(
                         width = 1.dp,
-                        color = DwellColors.LumenCyan.copy(alpha = 0.7f),
+                        color = border.copy(alpha = 0.7f),
                         shape = RoundedCornerShape(12.dp),
                     )
                     .background(
-                        color = DwellColors.LumenCyan.copy(alpha = 0.08f),
+                        color = border.copy(alpha = 0.08f),
                         shape = RoundedCornerShape(12.dp),
                     ),
             )
@@ -154,6 +162,7 @@ private fun EditTile(
     stepX: Float,
     stepY: Float,
     ghosts: SnapshotStateMap<String, GridRect>,
+    placements: Map<String, GridRect>,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
 ) {
@@ -178,15 +187,32 @@ private fun EditTile(
                 height = with(density) { tileH.toDp() },
             ),
     ) {
-        // Drag-to-move surface (covers tile, excluding the bottom-right resize handle).
+        val activeRectForBorder = ghosts[id]
+        val isActive = activeRectForBorder != null
+        val collides = activeRectForBorder != null && overlapsAny(id, activeRectForBorder, placements)
+        val borderColor = when {
+            collides -> DwellColors.StatusError
+            isActive -> DwellColors.LumenCyan
+            else -> DwellColors.LumenCyan.copy(alpha = 0.35f)
+        }
+        val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .border(
-                    width = 1.dp,
-                    color = DwellColors.LumenCyan.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(12.dp),
-                )
+                .drawBehind {
+                    val strokeWidth = 1.5.dp.toPx()
+                    val r = 12.dp.toPx()
+                    drawRoundRect(
+                        color = borderColor,
+                        topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                        size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                        cornerRadius = CornerRadius(r, r),
+                        style = Stroke(
+                            width = strokeWidth,
+                            pathEffect = if (isActive) dashEffect else null,
+                        ),
+                    )
+                }
                 .pointerInput(id, rect, stepX, stepY) {
                     detectDragGestures(
                         onDragStart = {
@@ -208,7 +234,11 @@ private fun EditTile(
                         },
                         onDragEnd = {
                             val finalRect = ghosts.remove(id)
-                            if (finalRect != null && finalRect != rect) {
+                            // Reject the move when it would land in total overlap
+                            // (>=50% of either rect's area covers another tile).
+                            if (finalRect != null && finalRect != rect &&
+                                !totallyOverlapsAny(id, finalRect, placements)
+                            ) {
                                 onMove(id, finalRect)
                             }
                         },
@@ -295,7 +325,9 @@ private fun EditTile(
                         },
                         onDragEnd = {
                             val finalRect = ghosts.remove(id)
-                            if (finalRect != null && finalRect != rect) {
+                            if (finalRect != null && finalRect != rect &&
+                                !totallyOverlapsAny(id, finalRect, placements)
+                            ) {
                                 onResize(id, finalRect)
                             }
                         },
@@ -306,4 +338,30 @@ private fun EditTile(
                 },
         )
     }
+}
+
+private fun GridRect.intersects(other: GridRect): Boolean =
+    col < other.col + other.cols && other.col < col + cols &&
+        row < other.row + other.rows && other.row < row + rows
+
+private fun GridRect.intersectionArea(other: GridRect): Int {
+    if (!intersects(other)) return 0
+    val ox = minOf(col + cols, other.col + other.cols) - maxOf(col, other.col)
+    val oy = minOf(row + rows, other.row + other.rows) - maxOf(row, other.row)
+    return ox * oy
+}
+
+private fun overlapsAny(selfId: String, rect: GridRect, placements: Map<String, GridRect>): Boolean =
+    placements.any { (otherId, other) -> otherId != selfId && rect.intersects(other) }
+
+/** Treat ≥50% area overlap with any other tile as a "total" overlap. */
+private fun totallyOverlapsAny(
+    selfId: String,
+    rect: GridRect,
+    placements: Map<String, GridRect>,
+): Boolean = placements.any { (otherId, other) ->
+    if (otherId == selfId) return@any false
+    val area = rect.intersectionArea(other)
+    val threshold = 0.5 * minOf(rect.cols * rect.rows, other.cols * other.rows)
+    area >= threshold
 }
