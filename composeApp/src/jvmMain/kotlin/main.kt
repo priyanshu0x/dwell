@@ -52,26 +52,52 @@ fun main(args: Array<String>) = application {
     }
 
     val tray = remember { TrayDaemon() }
+
+    val onShow = { dashboardVisible = true; exitRequested = false }
+    val onSettings = {
+        dashboardVisible = true
+        exitRequested = false
+        settingsViewModel.openSettingsDialog()
+    }
+    val onReloadWidgets = {
+        widgetRegistry.reload()
+        widgetRegistry.syncWithSettings(settingsViewModel.settings)
+    }
+
     DisposableEffect(launchArgs.mode, settings.trayIconEnabled) {
         if (launchArgs.mode == LaunchMode.Daemon && settings.trayIconEnabled) {
             tray.install(
-                onShow = {
-                    dashboardVisible = true
-                    exitRequested = false
-                },
-                onSettings = {
-                    dashboardVisible = true
-                    exitRequested = false
-                    settingsViewModel.openSettingsDialog()
-                },
-                onReloadWidgets = {
-                    widgetRegistry.reload()
-                    widgetRegistry.syncWithSettings(settingsViewModel.settings)
-                },
+                getSettings = { settingsViewModel.settings },
+                onShow = { onShow() },
+                onSettings = { onSettings() },
+                onSetMode = { settingsViewModel.setMode(it) },
+                onSetCinematicVariant = { settingsViewModel.setCinematicVariant(it) },
+                onSetAmbientVariant = { settingsViewModel.setAmbientVariant(it) },
+                onSetConsoleVariant = { settingsViewModel.setConsoleVariant(it) },
+                onSetStartWithSystem = { settingsViewModel.setStartWithSystem(it) },
+                onReloadWidgets = { onReloadWidgets() },
                 onQuit = { exitApplication() },
             )
         }
         onDispose { tray.remove() }
+    }
+
+    // Keep tray checkmarks in sync when settings change (from dashboard or another tray click).
+    LaunchedEffect(settings.mode, settings.cinematicVariant, settings.ambientVariant, settings.consoleVariant, settings.startWithSystem) {
+        if (launchArgs.mode == LaunchMode.Daemon && settings.trayIconEnabled) {
+            tray.refresh(
+                getSettings = { settingsViewModel.settings },
+                onShow = { onShow() },
+                onSettings = { onSettings() },
+                onSetMode = { settingsViewModel.setMode(it) },
+                onSetCinematicVariant = { settingsViewModel.setCinematicVariant(it) },
+                onSetAmbientVariant = { settingsViewModel.setAmbientVariant(it) },
+                onSetConsoleVariant = { settingsViewModel.setConsoleVariant(it) },
+                onSetStartWithSystem = { settingsViewModel.setStartWithSystem(it) },
+                onReloadWidgets = { onReloadWidgets() },
+                onQuit = { exitApplication() },
+            )
+        }
     }
 
     LaunchedEffect(launchArgs.mode, settings.idleTimeoutMinutes) {
