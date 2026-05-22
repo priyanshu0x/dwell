@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
-import com.droidslife.screensaver.ui.MovePointerIcon
+import com.droidslife.screensaver.ui.GrabbingPointerIcon
 import com.droidslife.screensaver.ui.ResizeSEPointerIcon
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.api.WidgetSize
@@ -202,7 +202,12 @@ private fun EditTile(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerHoverIcon(MovePointerIcon)
+                // Hover stays default — only the active drag swaps in the
+                // grabbing fist so the user sees they've grabbed the tile.
+                .then(
+                    if (isActive) Modifier.pointerHoverIcon(GrabbingPointerIcon)
+                    else Modifier,
+                )
                 .drawBehind {
                     val strokeWidth = 1.5.dp.toPx()
                     val r = 12.dp.toPx()
