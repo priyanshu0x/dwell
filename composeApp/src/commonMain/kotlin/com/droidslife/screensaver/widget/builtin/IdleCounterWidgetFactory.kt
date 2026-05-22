@@ -1,13 +1,12 @@
 package com.droidslife.screensaver.widget.builtin
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -84,10 +83,7 @@ private fun IdleTile(mountTime: Instant, modifier: Modifier) {
     val mountStamp = "${mountLocal.hour.toString().padStart(2, '0')}:" +
         mountLocal.minute.toString().padStart(2, '0')
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         Text(
             text = "IDLE",
             fontSize = 9.sp,
@@ -95,19 +91,22 @@ private fun IdleTile(mountTime: Instant, modifier: Modifier) {
             color = DwellColors.TextLow,
             fontFamily = DwellFonts.interTight(),
             fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.TopStart),
         )
         Text(
             text = elapsedText,
-            fontSize = 28.sp,
+            fontSize = 36.sp,
             color = DwellColors.TextHigh,
             fontFamily = DwellFonts.jetBrainsMono(),
             fontWeight = FontWeight.Medium,
+            modifier = Modifier.align(Alignment.Center),
         )
         Text(
             text = "screensaver since $mountStamp",
             fontSize = 10.sp,
             color = DwellColors.TextMid,
             fontFamily = DwellFonts.interTight(),
+            modifier = Modifier.align(Alignment.BottomStart),
         )
     }
 }

@@ -1,12 +1,12 @@
 package com.droidslife.screensaver.widget.builtin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -167,13 +167,9 @@ private class ExpensesWidget(
             }
         }
 
-        Column(
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            // Header: label + add toggle
+        Box(modifier = modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -199,7 +195,13 @@ private class ExpensesWidget(
             }
 
             if (inputVisible) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Add form covers the tile while open; collapses back to the
+                // big-value layout on close.
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize().align(Alignment.Center),
+                ) {
+                    Spacer(Modifier.size(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = amountInput,
@@ -234,25 +236,25 @@ private class ExpensesWidget(
                         }
                     }
                 }
+            } else {
+                Text(
+                    text = "$currency ${"%.2f".format(total)}",
+                    fontFamily = DwellFonts.jetBrainsMono(),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 36.sp,
+                    color = DwellColors.TextHigh,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.Center),
+                )
             }
 
-            // Big value
-            Text(
-                text = "$currency ${"%.2f".format(total)}",
-                fontFamily = DwellFonts.jetBrainsMono(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 36.sp,
-                color = DwellColors.TextHigh,
-                maxLines = 1,
-            )
-
-            // Subtitle: top categories or unsynced indicator
             Text(
                 text = if (unsyncedCount > 0) "$unsyncedCount unsynced" else subtitle,
                 fontFamily = DwellFonts.interTight(),
                 fontSize = 10.sp,
                 color = if (unsyncedCount > 0) DwellColors.StatusError else DwellColors.TextMid,
                 maxLines = 2,
+                modifier = Modifier.align(Alignment.BottomStart),
             )
         }
     }
