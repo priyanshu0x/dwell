@@ -8,7 +8,7 @@
 ::   scripts\dwell.cmd config   -- open dashboard with Settings pre-opened
 ::   scripts\dwell.cmd dev      -- hot-reload dev mode
 ::   scripts\dwell.cmd help     -- show this help
-setlocal enableextensions
+setlocal enableextensions enabledelayedexpansion
 
 set "HERE=%~dp0"
 set "ROOT=%HERE%.."
@@ -130,16 +130,25 @@ goto :usage
 :: Try JAVA_HOME first
 if defined JAVA_HOME (
     if exist "%JAVA_HOME%\bin\java.exe" (
+        set "JVER="
+        set "JMAJ="
         for /f "tokens=3 delims= " %%v in ('"%JAVA_HOME%\bin\java.exe" -version 2^>^&1 ^| findstr /R "version"') do (
             set "JVER=%%v"
         )
         :: JVER looks like "21.0.1" or "21" — extract major version
-        for /f "tokens=1 delims=." %%m in ("%JVER:"=%") do set "JMAJ=%%m"
-        if %JMAJ% GEQ 21 goto :have_java
+        set "JVER=!JVER:"=!"
+        for /f "tokens=1 delims=." %%m in ("!JVER!") do set "JMAJ=%%m"
+        if defined JMAJ if !JMAJ! GEQ 21 goto :have_java
     )
 )
 :: Look under %USERPROFILE%\jdks\jdk-21*
 for /d %%d in ("%USERPROFILE%\jdks\jdk-21*") do (
+    if exist "%%d\bin\java.exe" (
+        set "JAVA_HOME=%%d"
+        goto :have_java
+    )
+)
+for /d %%d in ("%USERPROFILE%\.jdks\*21*") do (
     if exist "%%d\bin\java.exe" (
         set "JAVA_HOME=%%d"
         goto :have_java
