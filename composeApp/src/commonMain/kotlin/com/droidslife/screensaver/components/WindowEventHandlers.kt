@@ -87,13 +87,24 @@ fun rememberWindowEventHandlers(
                 }
             }
             is KeyEventAction.ToggleConsoleEdit -> {
-                // L is meaningful only when the dashboard is locked. When
-                // unlocked, tiles are always editable so the banner toggle is
-                // a no-op.
+                // Meaningful only when the dashboard is locked. When unlocked,
+                // tiles are always editable so the banner toggle is a no-op.
                 if (settingsViewModel.settings.mode == Mode.Console &&
                     settingsViewModel.settings.dashboardLocked
                 ) {
                     settingsViewModel.toggleConsoleEditMode()
+                }
+            }
+            is KeyEventAction.ToggleDashboardLock -> {
+                // Lock gates widget interaction in Console: locked hides the edit
+                // overlay so tiles are tappable, unlocked enables drag-to-arrange.
+                if (settingsViewModel.settings.mode == Mode.Console) {
+                    val nowLocked = !settingsViewModel.settings.dashboardLocked
+                    settingsViewModel.setDashboardLocked(nowLocked)
+                    toastState.show(
+                        if (nowLocked) "Dashboard locked — tap to use widgets"
+                        else "Dashboard unlocked — drag to arrange",
+                    )
                 }
             }
             is KeyEventAction.ReloadWidgets -> {
