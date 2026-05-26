@@ -1,41 +1,30 @@
 package com.droidslife.screensaver.widget.builtin
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.droidslife.screensaver.modes.console.LocalConsoleAccent
-import com.droidslife.screensaver.ui.DwellColors
-import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
 import com.droidslife.screensaver.widget.api.WidgetConfig
 import com.droidslife.screensaver.widget.api.WidgetFactory
+import com.droidslife.screensaver.widget.api.WidgetRenderTarget
 import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.api.WidgetSummary
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.math.ceil
+import kotlin.time.Clock
 
 private const val WIDGET_ID = "com.droidslife.screensaver.pomodoro"
 
@@ -95,13 +84,11 @@ class PomodoroWidgetFactory : WidgetFactory {
     }
 }
 
-/** Serialized snapshot persisted between runs. */
+/** Snapshot persisted between runs: logical state plus the wall-clock end time. */
 @Serializable
 private data class PomodoroSnapshot(
-    val phase: String,
-    val remainingSeconds: Int,
-    val paused: Boolean,
-    val completedWorkCycles: Int,
+    val state: PomodoroState,
+    val endEpochMillis: Long?,
 )
 
 private class PomodoroWidget(
@@ -110,246 +97,207 @@ private class PomodoroWidget(
 ) : Widget {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    private var phase by mutableStateOf(PomodoroPhase.Idle)
-    private var remainingSeconds by mutableStateOf(0)
-    private var paused by mutableStateOf(false)
-    private var completedWorkCycles by mutableStateOf(0)
-    private var loaded by mutableStateOf(false)
+    var state by mutableStateOf(PomodoroState())
+        private set
+    var history by mutableStateOf(PomodoroHistory())
+        private set
 
-    private val workSeconds: Int get() = config.int("workMinutes", 25).coerceAtLeast(1) * 60
-    private val shortBreakSeconds: Int get() = config.int("shortBreakMinutes", 5).coerceAtLeast(1) * 60
-    private val longBreakSeconds: Int get() = config.int("longBreakMinutes", 15).coerceAtLeast(1) * 60
-    private val cyclesUntilLongBreak: Int get() = config.int("cyclesUntilLongBreak", 4).coerceAtLeast(2)
+    private var endEpochMillis: Long? = null
+    private var loaded = false
+    private var tickerJob: Job? = null
 
-    override fun summary(): WidgetSummary {
-        return WidgetSummary(
-            primaryValue = if (phase == PomodoroPhase.Idle) "--:--" else formatTime(remainingSeconds),
-            primaryLabel = "Pomodoro",
-            subtitle = "${phaseLabel()} · ${displayCycle()}/$cyclesUntilLongBreak",
+    override val rendersOwnChip: Boolean = true
+    override val rendersOwnMinimal: Boolean = true
+
+    private val settings: PomodoroSettings
+        get() = PomodoroSettings(
+            workSeconds = config.int("workMinutes", 25).coerceAtLeast(1) * 60,
+            shortBreakSeconds = config.int("shortBreakMinutes", 5).coerceAtLeast(1) * 60,
+            longBreakSeconds = config.int("longBreakMinutes", 15).coerceAtLeast(1) * 60,
+            cyclesUntilLongBreak = config.int("cyclesUntilLongBreak", 4).coerceAtLeast(2),
         )
-    }
+
+    private val soundEnabled: Boolean get() = config.bool("enableSound", true)
+    private val notificationsEnabled: Boolean get() = config.bool("enableNotifications", true)
+
+    override fun summary(): WidgetSummary = WidgetSummary(
+        primaryValue = if (state.phase == PomodoroPhase.Idle) "--:--" else formatTime(state.remainingSeconds),
+        primaryLabel = "Pomodoro",
+        subtitle = phaseLabel(state.phase),
+    )
 
     override fun onResume() {
         if (loaded) return
         scope.coroutineScope.launch {
-            val raw = runCatching {
-                scope.storage.read("pomodoro.json", String::class.java)
-            }.getOrNull()
-            val snap = raw?.let {
-                runCatching { json.decodeFromString(PomodoroSnapshot.serializer(), it) }.getOrNull()
-            }
+            val snap = runCatching { scope.storage.read("pomodoro.json", String::class.java) }.getOrNull()
+                ?.let { runCatching { json.decodeFromString(PomodoroSnapshot.serializer(), it) }.getOrNull() }
             if (snap != null) {
-                phase = parsePhase(snap.phase)
-                remainingSeconds = snap.remainingSeconds.coerceAtLeast(0)
-                paused = snap.paused
-                completedWorkCycles = snap.completedWorkCycles.coerceAtLeast(0)
+                state = snap.state
+                endEpochMillis = snap.endEpochMillis
             }
+            val hist = runCatching { scope.storage.read("pomodoro-history.json", String::class.java) }.getOrNull()
+                ?.let { runCatching { json.decodeFromString(PomodoroHistory.serializer(), it) }.getOrNull() }
+            if (hist != null) history = hist
             loaded = true
+            reconcileAfterLoad()
         }
+    }
+
+    override fun onDispose() {
+        tickerJob?.cancel()
+        persist()
     }
 
     @Composable
-    override fun Content(modifier: Modifier) {
-        val accent = LocalConsoleAccent.current.primary
-        val isRunning = phase != PomodoroPhase.Idle && !paused
-
-        // Ticker lives here so it's automatically cancelled when the widget
-        // leaves composition (drawer closes, settings toggle off, etc.).
-        LaunchedEffect(phase, paused, loaded) {
-            if (!loaded) return@LaunchedEffect
-            if (phase == PomodoroPhase.Idle || paused) return@LaunchedEffect
-            while (remainingSeconds > 0) {
-                delay(1000)
-                remainingSeconds -= 1
-                if (remainingSeconds <= 0) {
-                    advancePhase()
-                    persist()
-                    break
-                }
-                // Persist every 15s so a crash mid-phase doesn't lose much.
-                if (remainingSeconds % 15 == 0) persist()
-            }
-        }
-
-        Box(modifier = modifier.fillMaxSize()) {
-            WidgetHeader(
-                label = "POMODORO · ${displayCycle()}/$cyclesUntilLongBreak",
-                settingsId = WIDGET_ID,
-                modifier = Modifier.align(Alignment.TopStart),
+    override fun Render(target: WidgetRenderTarget, scope: WidgetScope, modifier: Modifier) {
+        when (target) {
+            WidgetRenderTarget.Tile -> PomodoroTile(
+                state = state,
+                history = history,
+                cyclesUntilLongBreak = settings.cyclesUntilLongBreak,
+                onStart = ::start,
+                onPauseResume = ::togglePause,
+                onSkip = ::skip,
+                onReset = ::reset,
+                onLabelChange = ::setFocusLabel,
+                modifier = modifier,
             )
-
-            // Center: big MM:SS or READY
-            val centerText = if (phase == PomodoroPhase.Idle) "READY" else formatTime(remainingSeconds)
-            Text(
-                text = centerText,
-                fontFamily = DwellFonts.jetBrainsMono(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 64.sp,
-                color = if (isRunning) accent else DwellColors.TextHigh,
-                maxLines = 1,
-                modifier = Modifier.align(Alignment.Center),
-            )
-
-            // Bottom-left: phase + controls
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.align(Alignment.BottomStart),
-            ) {
-                PhaseTag(text = phaseLabel().uppercase())
-                when (phase) {
-                    PomodoroPhase.Idle -> ControlChip("Start", accent) { start() }
-                    else -> {
-                        ControlChip(if (paused) "Resume" else "Pause", accent) {
-                            paused = !paused
-                            persist()
-                        }
-                        ControlChip("Skip", DwellColors.TextMid) { skip() }
-                        ControlChip("Reset", DwellColors.TextMid) { reset() }
-                    }
-                }
-            }
+            WidgetRenderTarget.Chip -> PomodoroChip(state, modifier)
+            WidgetRenderTarget.Minimal -> PomodoroMinimalLine(state, modifier)
         }
     }
 
-    // ── State transitions ─────────────────────────────────────────────
+    // ── Controls ──────────────────────────────────────────────────────
 
-    private fun start() {
-        phase = PomodoroPhase.Work
-        remainingSeconds = workSeconds
-        paused = false
+    private fun start() { state = PomodoroEngine.start(state, settings); enterRunning() }
+
+    private fun togglePause() {
+        state = PomodoroEngine.pauseResume(state)
+        if (state.paused) {
+            endEpochMillis = null
+            tickerJob?.cancel()
+        } else {
+            endEpochMillis = nowMs() + state.remainingSeconds * 1000L
+            restartTicker()
+        }
         persist()
     }
 
-    private fun skip() {
-        // Skip behaves like the phase elapsed naturally (no bell, no count if
-        // the user is bailing early — only completed natural cycles count
-        // toward the long-break ledger).
-        when (phase) {
-            PomodoroPhase.Idle -> Unit
-            PomodoroPhase.Work -> beginBreak()
-            PomodoroPhase.ShortBreak, PomodoroPhase.LongBreak -> beginWork()
-        }
-        paused = false
-        persist()
-    }
+    private fun skip() { state = PomodoroEngine.skip(state, settings).state; enterRunning() }
 
     private fun reset() {
-        phase = PomodoroPhase.Idle
-        remainingSeconds = 0
-        paused = false
-        completedWorkCycles = 0
+        state = PomodoroEngine.reset(state)
+        endEpochMillis = null
+        tickerJob?.cancel()
         persist()
     }
 
-    private fun advancePhase() {
-        when (phase) {
-            PomodoroPhase.Idle -> Unit
-            PomodoroPhase.Work -> {
-                completedWorkCycles += 1
-                beginBreak()
-                playPomodoroBell()
+    private fun setFocusLabel(label: String) {
+        state = state.copy(focusLabel = label.take(40))
+        persist()
+    }
+
+    /** Common path after a control puts us into a fresh running phase. */
+    private fun enterRunning() {
+        endEpochMillis = nowMs() + state.remainingSeconds * 1000L
+        persist()
+        restartTicker()
+    }
+
+    // ── Ticker (drift-free, lifecycle-bound) ──────────────────────────
+
+    private fun restartTicker() {
+        tickerJob?.cancel()
+        if (state.phase == PomodoroPhase.Idle || state.paused) return
+        tickerJob = scope.coroutineScope.launch {
+            while (isActive) {
+                val end = endEpochMillis ?: break
+                val remaining = ceil((end - nowMs()) / 1000.0).toInt().coerceAtLeast(0)
+                if (remaining <= 0) { onPhaseElapsed(); break }
+                if (remaining != state.remainingSeconds) {
+                    state = state.copy(remainingSeconds = remaining)
+                    if (remaining % 15 == 0) persist()
+                }
+                delay(200)
             }
-            PomodoroPhase.ShortBreak, PomodoroPhase.LongBreak -> {
-                beginWork()
-                playPomodoroBell()
-            }
         }
-        paused = false
     }
 
-    private fun beginBreak() {
-        phase = if (completedWorkCycles > 0 && completedWorkCycles % cyclesUntilLongBreak == 0) {
-            PomodoroPhase.LongBreak
-        } else {
-            PomodoroPhase.ShortBreak
-        }
-        remainingSeconds = if (phase == PomodoroPhase.LongBreak) longBreakSeconds else shortBreakSeconds
+    private fun onPhaseElapsed() {
+        val before = state
+        val transition = PomodoroEngine.complete(before, settings)
+        state = transition.state
+        if (transition.workCycleCompleted) recordSession(before)
+        transition.alert?.let { fire(it) }
+        endEpochMillis = nowMs() + state.remainingSeconds * 1000L
+        persist()
+        restartTicker()
     }
 
-    private fun beginWork() {
-        phase = PomodoroPhase.Work
-        remainingSeconds = workSeconds
+    /**
+     * After loading a snapshot, fast-forward a single elapsed phase if the timer
+     * ran out while the app was closed, then resume ticking.
+     */
+    private fun reconcileAfterLoad() {
+        if (state.phase == PomodoroPhase.Idle || state.paused) return
+        val end = endEpochMillis ?: return
+        if (nowMs() >= end) onPhaseElapsed() else restartTicker()
     }
 
-    // ── Display helpers ───────────────────────────────────────────────
+    // ── Side effects ──────────────────────────────────────────────────
 
-    private fun phaseLabel(): String = when (phase) {
-        PomodoroPhase.Idle -> "Idle"
-        PomodoroPhase.Work -> "Work"
-        PomodoroPhase.ShortBreak -> "Break"
-        PomodoroPhase.LongBreak -> "Long Break"
+    private fun recordSession(completed: PomodoroState) {
+        val today = today()
+        history = history.record(
+            today,
+            PomodoroSession(nowMs(), completed.focusLabel, settings.workSeconds),
+        )
+        persistHistory()
     }
 
-    /** Position in the current "block" of N work cycles, 1-indexed. */
-    private fun displayCycle(): Int {
-        val ledger = completedWorkCycles % cyclesUntilLongBreak
-        return when (phase) {
-            // When working, show "this is cycle N+1 of the block".
-            PomodoroPhase.Work -> ledger + 1
-            // On break, the just-completed cycle is what we count from.
-            PomodoroPhase.ShortBreak, PomodoroPhase.LongBreak ->
-                if (ledger == 0) cyclesUntilLongBreak else ledger
-            PomodoroPhase.Idle -> ledger.coerceAtLeast(1).coerceAtMost(cyclesUntilLongBreak)
-        }
+    private fun fire(alert: PhaseAlert) {
+        firePomodoroAlert(
+            PomodoroAlert(
+                title = alert.title,
+                message = alert.message,
+                playSound = soundEnabled,
+                showNotification = notificationsEnabled,
+            ),
+        )
     }
 
     // ── Persistence ───────────────────────────────────────────────────
 
     private fun persist() {
-        val snapshot = PomodoroSnapshot(
-            phase = phase.name,
-            remainingSeconds = remainingSeconds,
-            paused = paused,
-            completedWorkCycles = completedWorkCycles,
-        )
-        val encoded = json.encodeToString(PomodoroSnapshot.serializer(), snapshot)
+        val encoded = json.encodeToString(PomodoroSnapshot.serializer(), PomodoroSnapshot(state, endEpochMillis))
         scope.coroutineScope.launch {
             runCatching { scope.storage.write("pomodoro.json", encoded) }
                 .onFailure { scope.log.warn("Pomodoro persist failed", it) }
         }
     }
 
-    private fun parsePhase(name: String): PomodoroPhase = runCatching {
-        PomodoroPhase.valueOf(name)
-    }.getOrDefault(PomodoroPhase.Idle)
-}
-
-private fun formatTime(totalSeconds: Int): String {
-    val s = totalSeconds.coerceAtLeast(0)
-    val m = s / 60
-    val r = s % 60
-    return "${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}"
-}
-
-@Composable
-private fun PhaseTag(text: String) {
-    Text(
-        text = text,
-        fontFamily = DwellFonts.interTight(),
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 9.sp,
-        letterSpacing = 2.25.sp,
-        color = DwellColors.TextLow,
-    )
-}
-
-@Composable
-private fun ControlChip(label: String, tint: Color, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(tint.copy(alpha = 0.10f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = label,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 9.sp,
-            letterSpacing = 1.5.sp,
-            color = tint,
-        )
+    private fun persistHistory() {
+        val encoded = json.encodeToString(PomodoroHistory.serializer(), history)
+        scope.coroutineScope.launch {
+            runCatching { scope.storage.write("pomodoro-history.json", encoded) }
+                .onFailure { scope.log.warn("Pomodoro history persist failed", it) }
+        }
     }
+
+    private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
+
+    private fun today(): LocalDate =
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+}
+
+internal fun formatTime(totalSeconds: Int): String {
+    val s = totalSeconds.coerceAtLeast(0)
+    return "${(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}"
+}
+
+internal fun phaseLabel(phase: PomodoroPhase): String = when (phase) {
+    PomodoroPhase.Idle -> "Idle"
+    PomodoroPhase.Work -> "Work"
+    PomodoroPhase.ShortBreak -> "Break"
+    PomodoroPhase.LongBreak -> "Long Break"
 }
