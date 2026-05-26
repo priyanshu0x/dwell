@@ -96,9 +96,9 @@ class KeyEventHandler(
                     return true
                 }
                 Key.L -> {
-                    // Toggles the dashboard lock; the handler emits a descriptive
-                    // toast since "locked"/"unlocked" is more useful than the keycap.
-                    onAction(KeyEventAction.ToggleDashboardLock)
+                    // Toggles Console arrange mode (drag/resize overlay). The
+                    // handler emits a descriptive toast.
+                    onAction(KeyEventAction.ToggleConsoleEdit)
                     return true
                 }
                 Key.S -> {
