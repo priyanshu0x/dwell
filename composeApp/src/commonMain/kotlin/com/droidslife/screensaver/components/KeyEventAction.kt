@@ -62,6 +62,13 @@ sealed class KeyEventAction {
     /** Toggle Console layout edit mode. */
     object ToggleConsoleEdit : KeyEventAction()
 
+    /**
+     * Toggle the dashboard lock. Locking removes the Console edit overlay so
+     * widget controls (e.g. Pomodoro Start) become tappable; unlocking returns
+     * to drag-to-arrange.
+     */
+    object ToggleDashboardLock : KeyEventAction()
+
     /** Reload widgets (factories + instances) from disk. */
     object ReloadWidgets : KeyEventAction()
 }
