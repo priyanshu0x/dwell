@@ -34,7 +34,7 @@ class PomodoroLedgerTest {
         val h = PomodoroHistory()
             .record(today, session())
             .record(today, session())
-            .record(today.minus(2, kotlinx.datetime.DateTimeUnit.DAY), session())
+            .record(today.minus(2, DateTimeUnit.DAY), session())
         val series = h.last7(today)
         assertEquals(7, series.size)
         assertEquals(2, series.last())            // today
@@ -47,19 +47,31 @@ class PomodoroLedgerTest {
         val today = LocalDate(2026, 5, 26)
         val h = PomodoroHistory()
             .record(today, session())
-            .record(today.minus(6, kotlinx.datetime.DateTimeUnit.DAY), session())
-            .record(today.minus(10, kotlinx.datetime.DateTimeUnit.DAY), session())
+            .record(today.minus(6, DateTimeUnit.DAY), session())
+            .record(today.minus(10, DateTimeUnit.DAY), session())
         assertEquals(2, h.countInLastDays(today, 7))
     }
 
     @Test
     fun pruningDropsDaysOlderThanRetention() {
         val today = LocalDate(2026, 5, 26)
-        val old = today.minus(40, kotlinx.datetime.DateTimeUnit.DAY)
+        val old = today.minus(40, DateTimeUnit.DAY)
         val h = PomodoroHistory()
             .record(old, session())
             .record(today, session(), retainDays = 30)
         assertEquals(0, h.countOn(old))
+        assertEquals(1, h.countOn(today))
+    }
+
+    @Test
+    fun pruningBoundaryIsExclusive() {
+        // A day exactly retainDays old falls outside the retained window.
+        val today = LocalDate(2026, 5, 26)
+        val edge = today.minus(30, DateTimeUnit.DAY)
+        val h = PomodoroHistory()
+            .record(edge, session())
+            .record(today, session(), retainDays = 30)
+        assertEquals(0, h.countOn(edge))
         assertEquals(1, h.countOn(today))
     }
 }
