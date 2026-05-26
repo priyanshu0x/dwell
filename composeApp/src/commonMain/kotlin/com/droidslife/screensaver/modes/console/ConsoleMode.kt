@@ -68,12 +68,12 @@ fun ConsoleMode(
     val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
     val locked = settingsViewModel.settings.dashboardLocked
     val editing = settingsViewModel.consoleEditMode
-    // Tiles are editable when the dashboard is unlocked, OR when the user has
-    // explicitly entered edit mode while locked. The visible EDIT LAYOUT banner
-    // and size badges only show in the locked-and-editing case so they don't
-    // clutter the everyday view.
-    val tilesEditable = !locked || editing
-    val showEditChrome = locked && editing
+    // Widget controls stay interactive in the normal view; the drag/resize
+    // overlay (which captures taps) appears only in explicit arrange mode,
+    // toggled by `L` and disabled while the layout is locked. This keeps tiles
+    // tappable regardless of lock state.
+    val tilesEditable = editing && !locked
+    val showEditChrome = tilesEditable
     // Per-tile live pixel offsets, populated by ConsoleEditOverlay while a
     // gesture is in progress so the tile chrome (rendered by ConsoleGrid)
     // tracks the cursor pixel-by-pixel instead of jumping cell-to-cell.
