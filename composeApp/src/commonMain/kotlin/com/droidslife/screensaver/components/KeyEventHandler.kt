@@ -17,6 +17,11 @@ class KeyEventHandler(
      */
     @OptIn(ExperimentalComposeUiApi::class)
     fun handleWindowKeyEvent(event: KeyEvent): Boolean {
+        // While the user is typing in a text field, stand down completely so the
+        // field receives plain keys and edit chords (Ctrl+C/X/A) instead of us
+        // hijacking them as app shortcuts.
+        if (TextInputFocus.isActive) return false
+
         if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
             onAction(KeyEventAction.RequestExit)
             return true

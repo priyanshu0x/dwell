@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.todos.providers.LocalTodosProvider
 import com.droidslife.screensaver.todos.providers.Todo
@@ -226,7 +227,7 @@ private class TodosWidget(
                         value = input,
                         onValueChange = { input = it },
                         label = { Text("Task") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).pausesShortcutsWhileFocused(),
                         singleLine = true,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
