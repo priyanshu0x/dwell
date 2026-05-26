@@ -46,7 +46,8 @@ private fun SourceDataLine.writeTone(frequencyHz: Double, seconds: Double, gain:
     val buffer = ByteArray(sampleCount * 2)
     for (i in 0 until sampleCount) {
         val t = i / SAMPLE_RATE.toDouble()
-        val envelope = exp(-3.0 * t / seconds) // fast attack, smooth decay
+        // Decay envelope so the tone rings out like a bell instead of clicking.
+        val envelope = exp(-3.0 * t / seconds)
         val sample = sin(2.0 * PI * frequencyHz * t) * envelope * gain
         val value = (sample * Short.MAX_VALUE).toInt().coerceIn(-32768, 32767)
         buffer[i * 2] = (value and 0xFF).toByte()
@@ -55,18 +56,22 @@ private fun SourceDataLine.writeTone(frequencyHz: Double, seconds: Double, gain:
     write(buffer, 0, buffer.size)
 }
 
-// Reused across alerts so we don't accrue tray icons. Lazily added on first use.
+// Reused across alerts so we don't accrue tray icons. Alerts fire on separate
+// daemon threads, so create-once is guarded to avoid adding two icons in a race.
+@Volatile
 private var notifierIcon: TrayIcon? = null
+private val notifierLock = Any()
 
 private fun showNotification(title: String, message: String) {
     if (!SystemTray.isSupported()) return
-    val tray = SystemTray.getSystemTray()
-    val icon = notifierIcon ?: run {
-        val image = Toolkit.getDefaultToolkit().createImage(ByteArray(0))
-        TrayIcon(image, "Dwell Pomodoro").apply {
-            isImageAutoSize = true
-            tray.add(this)
-            notifierIcon = this
+    val icon = notifierIcon ?: synchronized(notifierLock) {
+        notifierIcon ?: run {
+            val image = Toolkit.getDefaultToolkit().createImage(ByteArray(0))
+            TrayIcon(image, "Dwell Pomodoro").apply {
+                isImageAutoSize = true
+                SystemTray.getSystemTray().add(this)
+                notifierIcon = this
+            }
         }
     }
     icon.displayMessage(title, message, TrayIcon.MessageType.INFO)

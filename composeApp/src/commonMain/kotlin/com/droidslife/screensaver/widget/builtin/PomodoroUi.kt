@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -144,6 +148,11 @@ private fun FocusLabel(label: String, onChange: (String) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     if (editing) {
         var text by remember { mutableStateOf(label) }
+        // Track gained-focus so the first (unfocused) onFocusChanged callback,
+        // which fires before requestFocus lands, doesn't close the field early.
+        var hadFocus by remember { mutableStateOf(false) }
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
         BasicTextField(
             value = text,
             onValueChange = { text = it.take(40) },
@@ -157,7 +166,11 @@ private fun FocusLabel(label: String, onChange: (String) -> Unit) {
             ),
             modifier = Modifier
                 .padding(top = 2.dp)
-                .clickable(enabled = false) {}
+                .focusRequester(focusRequester)
+                .onFocusChanged { focus ->
+                    if (focus.isFocused) hadFocus = true
+                    else if (hadFocus) { editing = false; onChange(text) }
+                }
                 .onPreviewKeyClose { editing = false; onChange(text) },
         )
     } else {
@@ -308,7 +321,8 @@ private fun Modifier.onPreviewKeyClose(onClose: () -> Unit): Modifier = this.onP
     }
 }
 
-private fun todayLocalDate(): kotlinx.datetime.LocalDate =
+/** Local calendar date "now" — shared by the tile stats and the widget's ledger. */
+internal fun todayLocalDate(): kotlinx.datetime.LocalDate =
     kotlin.time.Clock.System.now()
         .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
         .date

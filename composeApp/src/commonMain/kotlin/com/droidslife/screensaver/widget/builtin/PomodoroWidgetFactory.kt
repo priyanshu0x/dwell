@@ -18,9 +18,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.ceil
@@ -126,8 +123,18 @@ private class PomodoroWidget(
         subtitle = phaseLabel(state.phase),
     )
 
-    override fun onResume() {
+    init {
+        // The host doesn't drive onResume(), and the timer must keep running for
+        // as long as the instance is enabled — regardless of which mode is
+        // visible — so load persisted state and resume as soon as we're created.
+        ensureLoaded()
+    }
+
+    override fun onResume() = ensureLoaded()
+
+    private fun ensureLoaded() {
         if (loaded) return
+        loaded = true // set synchronously so a second call can't launch a duplicate load
         scope.coroutineScope.launch {
             val snap = runCatching { scope.storage.read("pomodoro.json", String::class.java) }.getOrNull()
                 ?.let { runCatching { json.decodeFromString(PomodoroSnapshot.serializer(), it) }.getOrNull() }
@@ -138,7 +145,6 @@ private class PomodoroWidget(
             val hist = runCatching { scope.storage.read("pomodoro-history.json", String::class.java) }.getOrNull()
                 ?.let { runCatching { json.decodeFromString(PomodoroHistory.serializer(), it) }.getOrNull() }
             if (hist != null) history = hist
-            loaded = true
             reconcileAfterLoad()
         }
     }
@@ -247,9 +253,8 @@ private class PomodoroWidget(
     // ── Side effects ──────────────────────────────────────────────────
 
     private fun recordSession(completed: PomodoroState) {
-        val today = today()
         history = history.record(
-            today,
+            todayLocalDate(),
             PomodoroSession(nowMs(), completed.focusLabel, settings.workSeconds),
         )
         persistHistory()
@@ -285,9 +290,6 @@ private class PomodoroWidget(
     }
 
     private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
-
-    private fun today(): LocalDate =
-        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 }
 
 internal fun formatTime(totalSeconds: Int): String {
