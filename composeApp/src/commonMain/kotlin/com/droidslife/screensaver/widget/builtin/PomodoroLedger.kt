@@ -13,12 +13,13 @@ data class PomodoroSession(
     val durationSeconds: Int,
 )
 
-/** A single calendar day's tally. */
+/** A single calendar day's tally. [count] is derived so it can't drift from [sessions]. */
 @Serializable
 data class PomodoroDay(
-    val count: Int = 0,
     val sessions: List<PomodoroSession> = emptyList(),
-)
+) {
+    val count: Int get() = sessions.size
+}
 
 /**
  * Per-day completed-session history. Pure and clock-free: every query takes the
@@ -33,9 +34,13 @@ data class PomodoroHistory(
     fun record(date: LocalDate, session: PomodoroSession, retainDays: Int = 30): PomodoroHistory {
         val key = date.toString()
         val existing = days[key] ?: PomodoroDay()
-        val updated = existing.copy(count = existing.count + 1, sessions = existing.sessions + session)
+        val updated = existing.copy(sessions = existing.sessions + session)
+        // Keep only the most recent [retainDays] days. Corrupt or migrated keys
+        // that don't parse are treated as expired rather than crashing the filter.
         val cutoff = date.minus(retainDays, DateTimeUnit.DAY)
-        val pruned = (days + (key to updated)).filterKeys { runCatching { LocalDate.parse(it) >= cutoff }.getOrDefault(false) }
+        val pruned = (days + (key to updated)).filterKeys {
+            runCatching { LocalDate.parse(it) > cutoff }.getOrDefault(false)
+        }
         return PomodoroHistory(pruned)
     }
 
