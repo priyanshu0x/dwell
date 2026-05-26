@@ -55,6 +55,7 @@ private fun renderMode(
         )
         Mode.Ambient -> AmbientMode(
             settingsViewModel = settingsViewModel,
+            registry = registry,
             onOpenSettings = onOpenSettings,
             onOpenHelp = onOpenHelp,
         )
