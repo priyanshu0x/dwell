@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.network.BackendResult
 import com.droidslife.screensaver.storage.SyncRepository
@@ -200,7 +201,7 @@ private class ExpensesWidget(
                             value = amountInput,
                             onValueChange = { amountInput = it.filter { char -> char.isDigit() || char == '.' } },
                             label = { Text("Amount") },
-                            modifier = Modifier.weight(0.8f),
+                            modifier = Modifier.weight(0.8f).pausesShortcutsWhileFocused(),
                             singleLine = true,
                         )
                         Spacer(Modifier.width(8.dp))
@@ -208,7 +209,7 @@ private class ExpensesWidget(
                             value = categoryInput,
                             onValueChange = { categoryInput = it },
                             label = { Text("Category") },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).pausesShortcutsWhileFocused(),
                             singleLine = true,
                         )
                     }
@@ -216,7 +217,7 @@ private class ExpensesWidget(
                         value = noteInput,
                         onValueChange = { noteInput = it },
                         label = { Text("Note") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
                         singleLine = true,
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {

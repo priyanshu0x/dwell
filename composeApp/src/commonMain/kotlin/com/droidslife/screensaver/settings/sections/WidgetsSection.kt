@@ -51,6 +51,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -518,7 +519,8 @@ private fun DwellOutlinedTextField(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                    .padding(horizontal = 12.dp, vertical = 11.dp)
+                    .pausesShortcutsWhileFocused(),
                 decorationBox = { inner ->
                     if (value.isEmpty() && !placeholder.isNullOrBlank()) {
                         Text(
