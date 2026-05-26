@@ -98,14 +98,8 @@ private class ClockWidget(
         val label = if (!city.isNullOrBlank()) "TIME · ${city.uppercase()}" else "TIME"
 
         Box(modifier = modifier.fillMaxSize()) {
-            Text(
-                text = label,
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 9.sp,
-                letterSpacing = 2.25.sp,
-                color = DwellColors.TextLow,
-                maxLines = 1,
+            WidgetHeader(
+                label = label,
                 modifier = Modifier.align(Alignment.TopStart),
             )
             Text(

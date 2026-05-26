@@ -20,6 +20,7 @@ import com.droidslife.screensaver.modes.ModeHost
 import com.droidslife.screensaver.settings.SettingsSidebar
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.settings.ShortcutsHelpDialog
+import com.droidslife.screensaver.settings.WidgetConfigDialog
 import com.droidslife.screensaver.theme.AppTheme
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
@@ -99,6 +100,15 @@ internal fun App(
                         settingsViewModel = settingsViewModel,
                         widgetRegistry = widgetRegistry,
                         onDismiss = { settingsViewModel.closeSettingsDialog() },
+                    )
+                }
+
+                settingsViewModel.openWidgetConfigId?.let { widgetId ->
+                    WidgetConfigDialog(
+                        widgetId = widgetId,
+                        settingsViewModel = settingsViewModel,
+                        widgetRegistry = widgetRegistry,
+                        onDismiss = { settingsViewModel.closeWidgetConfig() },
                     )
                 }
             }

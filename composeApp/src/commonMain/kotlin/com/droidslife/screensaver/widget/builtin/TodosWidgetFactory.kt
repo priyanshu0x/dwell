@@ -49,10 +49,12 @@ import com.droidslife.screensaver.widget.api.WidgetSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
+private const val WIDGET_ID = "com.droidslife.screensaver.todos"
+
 class TodosWidgetFactory(
     private val backendGateway: BackendGateway,
 ) : WidgetFactory {
-    override val id: String = "com.droidslife.screensaver.todos"
+    override val id: String = WIDGET_ID
     override val displayName: String = "Todos"
     override val description: String = "Quick task capture with pluggable providers (local / Todoist)"
     override val category: WidgetCategory = WidgetCategory.PRODUCTIVITY
@@ -184,21 +186,11 @@ private class TodosWidget(
         // bottom-start. Mirrors the Console mockup at
         // `.superpowers/brainstorm/1398003-1779392791/content/mode-mockups.html`.
         Box(modifier = modifier.fillMaxSize()) {
-            // Top-start: label + tiny add toggle on the right.
-            Row(
-                modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
-                verticalAlignment = Alignment.CenterVertically,
+            WidgetHeader(
+                label = if (openCount > 0) "TODOS · $openCount OPEN" else "TODOS",
+                settingsId = WIDGET_ID,
+                modifier = Modifier.align(Alignment.TopStart),
             ) {
-                Text(
-                    text = if (openCount > 0) "TODOS · $openCount OPEN" else "TODOS",
-                    fontFamily = DwellFonts.interTight(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 9.sp,
-                    letterSpacing = 2.25.sp,
-                    color = DwellColors.TextLow,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
                 IconButton(
                     onClick = { inputVisible = !inputVisible },
                     modifier = Modifier.size(20.dp),

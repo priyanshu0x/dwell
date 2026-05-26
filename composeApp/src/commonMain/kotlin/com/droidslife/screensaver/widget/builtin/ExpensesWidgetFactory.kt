@@ -51,10 +51,12 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.time.Clock
 
+private const val WIDGET_ID = "com.droidslife.screensaver.expenses"
+
 class ExpensesWidgetFactory(
     private val backendGateway: BackendGateway,
 ) : WidgetFactory {
-    override val id: String = "com.droidslife.screensaver.expenses"
+    override val id: String = WIDGET_ID
     override val displayName: String = "Expenses"
     override val description: String = "Current-month expense tracking with local storage"
     override val category: WidgetCategory = WidgetCategory.FINANCE
@@ -168,20 +170,11 @@ private class ExpensesWidget(
         }
 
         Box(modifier = modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().align(Alignment.TopStart),
-                verticalAlignment = Alignment.CenterVertically,
+            WidgetHeader(
+                label = "SPEND · $monthLabel",
+                settingsId = WIDGET_ID,
+                modifier = Modifier.align(Alignment.TopStart),
             ) {
-                Text(
-                    text = "SPEND · $monthLabel",
-                    fontFamily = DwellFonts.interTight(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 9.sp,
-                    letterSpacing = 2.25.sp,
-                    color = DwellColors.TextLow,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
                 IconButton(
                     onClick = { inputVisible = !inputVisible },
                     modifier = Modifier.size(20.dp),

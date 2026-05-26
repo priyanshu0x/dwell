@@ -84,13 +84,8 @@ private fun IdleTile(mountTime: Instant, modifier: Modifier) {
         mountLocal.minute.toString().padStart(2, '0')
 
     Box(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "IDLE",
-            fontSize = 9.sp,
-            letterSpacing = 2.25.sp,
-            color = DwellColors.TextLow,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.SemiBold,
+        WidgetHeader(
+            label = "IDLE",
             modifier = Modifier.align(Alignment.TopStart),
         )
         Text(

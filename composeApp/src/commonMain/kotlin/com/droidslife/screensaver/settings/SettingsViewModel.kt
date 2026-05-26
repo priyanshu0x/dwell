@@ -36,6 +36,13 @@ class SettingsViewModel(
     var isSettingsDialogOpen by mutableStateOf(false)
         private set
 
+    /**
+     * Id of the widget whose dedicated config dialog is open, or null when no
+     * per-widget dialog is showing. Driven by the gear icon in [WidgetHeader].
+     */
+    var openWidgetConfigId by mutableStateOf<String?>(null)
+        private set
+
     var savedSecretIds by mutableStateOf<Set<String>>(emptySet())
         private set
 
@@ -304,6 +311,14 @@ class SettingsViewModel(
      */
     fun closeSettingsDialog() {
         isSettingsDialogOpen = false
+    }
+
+    fun openWidgetConfig(widgetId: String) {
+        openWidgetConfigId = widgetId
+    }
+
+    fun closeWidgetConfig() {
+        openWidgetConfigId = null
     }
 
     private suspend fun refreshSecretStatuses(currentSettings: SettingsModel) {

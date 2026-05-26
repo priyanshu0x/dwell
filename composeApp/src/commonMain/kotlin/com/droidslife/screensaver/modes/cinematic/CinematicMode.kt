@@ -2,8 +2,12 @@ package com.droidslife.screensaver.modes.cinematic
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -70,34 +74,38 @@ private fun BoxScope.CinematicForeground(
     val now by produceTicker(includeSeconds = settings.showSeconds)
     val weatherViewModel = koinInject<WeatherViewModel>()
 
-    // Position/size constants come from mode-mockups.html (.cine-clock / .cine-meta).
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val clockStartPad = maxWidth * 0.08f
-        val clockTopPad = maxHeight * 0.26f
-        val metaStartPad = maxWidth * 0.085f
-        val metaBottomPad = maxHeight * 0.28f
-        ClockText(
-            now = now,
-            is24Hour = settings.is24HourFormat,
-            showSeconds = settings.showSeconds,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.Bold,
-            fontSize = 200.sp,
-            color = DwellColors.TextHigh,
-            lineHeight = (200f * 0.85f).sp,
-            letterSpacing = (-0.06).em,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = clockStartPad, top = clockTopPad),
-        )
-        if (settings.showDate) {
-            CinematicMetaLine(
+    // Clock band at 26 % top, meta band trailing under it. Both pinned to the
+    // same 8 % left gutter so the meta optically lines up with the clock —
+    // the mockup's 8.5 % offset reads as misalignment on the actual viewport.
+    // Anchoring each row with its own fractional Spacer is more robust than
+    // BoxScope.align inside BoxWithConstraints, which produced a top-pinned
+    // meta line in practice.
+    val gutter = 0.08f
+    Column(modifier = Modifier.fillMaxSize()) {
+        Spacer(Modifier.fillMaxHeight(0.26f))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.fillMaxWidth(gutter))
+            ClockText(
                 now = now,
-                weatherViewModel = weatherViewModel,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = metaStartPad, bottom = metaBottomPad),
+                is24Hour = settings.is24HourFormat,
+                showSeconds = settings.showSeconds,
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 200.sp,
+                color = DwellColors.TextHigh,
+                lineHeight = (200f * 0.85f).sp,
+                letterSpacing = (-0.06).em,
             )
+        }
+        if (settings.showDate) {
+            Spacer(Modifier.height(40.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.fillMaxWidth(gutter))
+                CinematicMetaLine(
+                    now = now,
+                    weatherViewModel = weatherViewModel,
+                )
+            }
         }
     }
     WidgetDrawer(settingsViewModel, registry)
