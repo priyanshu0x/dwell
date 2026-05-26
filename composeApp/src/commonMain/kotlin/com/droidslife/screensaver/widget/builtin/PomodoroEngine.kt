@@ -2,10 +2,9 @@ package com.droidslife.screensaver.widget.builtin
 
 import kotlinx.serialization.Serializable
 
-/** Phase the timer is currently in. */
 enum class PomodoroPhase { Idle, Work, ShortBreak, LongBreak }
 
-/** Immutable phase/cycle state. Persisted via [PomodoroSnapshot]. */
+/** Immutable phase/cycle state. `@Serializable` so the widget can persist it. */
 @Serializable
 data class PomodoroState(
     val phase: PomodoroPhase = PomodoroPhase.Idle,
@@ -24,7 +23,6 @@ data class PomodoroSettings(
     val cyclesUntilLongBreak: Int,
 )
 
-/** Title/body for the phase-change alert. */
 data class PhaseAlert(val title: String, val message: String)
 
 /**
@@ -81,7 +79,7 @@ object PomodoroEngine {
                     completedWorkCycles = cycles,
                 )
                 val alert = if (natural) {
-                    val minutes = if (longBreak) s.longBreakSeconds / 60 else s.shortBreakSeconds / 60
+                    val minutes = duration / 60
                     PhaseAlert(
                         title = if (longBreak) "Long break" else "Break time",
                         message = "Nice work — step away for $minutes min.",
