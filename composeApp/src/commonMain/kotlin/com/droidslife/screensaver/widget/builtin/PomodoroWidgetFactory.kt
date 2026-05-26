@@ -37,8 +37,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+private const val WIDGET_ID = "com.droidslife.screensaver.pomodoro"
+
 class PomodoroWidgetFactory : WidgetFactory {
-    override val id: String = "com.droidslife.screensaver.pomodoro"
+    override val id: String = WIDGET_ID
     override val displayName: String = "Pomodoro"
     override val description: String = "Local 25/5/15 pomodoro timer with cycle tracking"
     override val category: WidgetCategory = WidgetCategory.PRODUCTIVITY
@@ -163,15 +165,9 @@ private class PomodoroWidget(
         }
 
         Box(modifier = modifier.fillMaxSize()) {
-            // Top-left: POMODORO · cycle/total
-            Text(
-                text = "POMODORO · ${displayCycle()}/$cyclesUntilLongBreak",
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 9.sp,
-                letterSpacing = 2.25.sp,
-                color = DwellColors.TextLow,
-                maxLines = 1,
+            WidgetHeader(
+                label = "POMODORO · ${displayCycle()}/$cyclesUntilLongBreak",
+                settingsId = WIDGET_ID,
                 modifier = Modifier.align(Alignment.TopStart),
             )
 

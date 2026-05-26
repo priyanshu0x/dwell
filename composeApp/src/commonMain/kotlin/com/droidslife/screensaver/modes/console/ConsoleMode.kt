@@ -180,6 +180,15 @@ fun ConsoleMode(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            // Per-widget config gears: rendered AFTER the edit overlay so the
+            // clicks reach the IconButton instead of being swallowed by
+            // ConsoleEditOverlay's per-tile drag detector.
+            TileGearsOverlay(
+                placements = orderedPlacements,
+                instances = instances,
+                onGearClick = { id -> settingsViewModel.openWidgetConfig(id) },
+                modifier = Modifier.fillMaxSize(),
+            )
             CornerButtons(
                 onSettings = onOpenSettings,
                 onHelp = onOpenHelp,
