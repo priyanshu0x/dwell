@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 
 /**
  * View model for weather data.
@@ -32,7 +33,8 @@ import kotlinx.coroutines.launch
 class WeatherViewModel(
     private val weatherRepository: WeatherRepository,
     private val weatherApi: WeatherApi,
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val cacheStore: WeatherCacheStore,
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -78,6 +80,11 @@ class WeatherViewModel(
     private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
     init {
+        // Hydrate from disk synchronously so the first widget render hits the
+        // in-memory cache instead of a network round-trip. Done in `init` (not
+        // inside the coroutine below) so the cache is ready before any caller
+        // can invoke `loadWeatherDataForCity`.
+        hydrateCacheFromDisk()
         viewModelScope.launch {
             // Check if there's a stored city preference
             val storedCity = preferencesRepository.getCurrentCity()
@@ -158,6 +165,7 @@ class WeatherViewModel(
                 )
                 currentCache[key] = CurrentEntry(current, location, nowMs())
                 state = WeatherState.Success(current, location)
+                persistCache()
             },
             onFailure = { err ->
                 // Background refresh failure: keep showing the cached payload.
@@ -202,6 +210,7 @@ class WeatherViewModel(
             onSuccess = { days ->
                 forecastCache[key] = ForecastEntry(days, nowMs())
                 _forecast.value = ForecastState.Loaded(days)
+                persistCache()
             },
             onFailure = { err ->
                 if (forecastCache[key] != null) return@fold
@@ -262,6 +271,91 @@ class WeatherViewModel(
         return when (val currentState = state) {
             is WeatherState.Success -> currentState.current.iconUrl
             else -> null
+        }
+    }
+
+    private fun hydrateCacheFromDisk() {
+        val snapshot = cacheStore.loadSync()
+        snapshot.entries.forEach { entry ->
+            val key = CacheKey(entry.providerId, entry.city)
+            if (entry.current != null && entry.currentFetchedAtMs != null) {
+                val current = CurrentWeather(
+                    tempC = entry.current.tempC,
+                    feelsLikeC = entry.current.feelsLikeC,
+                    humidity = entry.current.humidity,
+                    conditionCode = entry.current.conditionCode,
+                    conditionText = entry.current.conditionText,
+                    city = entry.current.city,
+                    iconUrl = entry.current.iconUrl,
+                )
+                val location = Location(
+                    latitude = 0.0,
+                    longitude = 0.0,
+                    city = entry.current.city.ifBlank { entry.city },
+                    country = "",
+                )
+                currentCache[key] = CurrentEntry(current, location, entry.currentFetchedAtMs)
+            }
+            if (entry.forecast != null && entry.forecastFetchedAtMs != null) {
+                val days = entry.forecast.mapNotNull { day ->
+                    runCatching {
+                        DayForecast(
+                            date = LocalDate.parse(day.dateIso),
+                            high = day.high,
+                            low = day.low,
+                            conditionCode = day.conditionCode,
+                            conditionText = day.conditionText,
+                            iconUrl = day.iconUrl,
+                        )
+                    }.getOrNull()
+                }
+                if (days.isNotEmpty()) {
+                    forecastCache[key] = ForecastEntry(days, entry.forecastFetchedAtMs)
+                }
+            }
+        }
+    }
+
+    /**
+     * Snapshot both in-memory caches into one file. Called after every
+     * successful network fetch — the cost is one small JSON write per refresh,
+     * which is well below the cache TTL granularity we care about.
+     */
+    private fun persistCache() {
+        val keys = currentCache.keys + forecastCache.keys
+        val entries = keys.map { key ->
+            val cur = currentCache[key]
+            val fc = forecastCache[key]
+            WeatherCacheEntry(
+                providerId = key.providerId,
+                city = key.city,
+                current = cur?.let {
+                    WeatherCacheCurrent(
+                        tempC = it.data.tempC,
+                        feelsLikeC = it.data.feelsLikeC,
+                        humidity = it.data.humidity,
+                        conditionCode = it.data.conditionCode,
+                        conditionText = it.data.conditionText,
+                        city = it.data.city,
+                        iconUrl = it.data.iconUrl,
+                    )
+                },
+                currentFetchedAtMs = cur?.fetchedAtMs,
+                forecast = fc?.days?.map { day ->
+                    WeatherCacheDay(
+                        dateIso = day.date.toString(),
+                        high = day.high,
+                        low = day.low,
+                        conditionCode = day.conditionCode,
+                        conditionText = day.conditionText,
+                        iconUrl = day.iconUrl,
+                    )
+                },
+                forecastFetchedAtMs = fc?.fetchedAtMs,
+            )
+        }
+        viewModelScope.launch {
+            cacheStore.save(WeatherCacheSnapshot(entries))
         }
     }
 

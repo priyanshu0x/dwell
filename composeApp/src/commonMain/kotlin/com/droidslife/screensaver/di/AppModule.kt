@@ -20,8 +20,10 @@ import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherWidgetFactory
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.weather.WeatherApi
+import com.droidslife.screensaver.weather.WeatherCacheStore
 import com.droidslife.screensaver.weather.WeatherRepository
 import com.droidslife.screensaver.weather.WeatherViewModel
+import com.droidslife.screensaver.weather.createWeatherCacheStore
 import io.ktor.client.HttpClient
 import org.koin.dsl.module
 
@@ -66,7 +68,8 @@ val appModule = module {
     }
 
     // Weather ViewModel
-    single { WeatherViewModel(get(), get(), get()) }
+    single<WeatherCacheStore> { createWeatherCacheStore() }
+    single { WeatherViewModel(get(), get(), get(), get()) }
 
     // Backend sync
     single<BackendGateway> {
