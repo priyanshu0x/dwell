@@ -78,6 +78,16 @@ class PomodoroWidgetFactory : WidgetFactory {
             min = 2,
             max = 12,
         ),
+        ConfigField.Bool(
+            key = "enableSound",
+            label = "Play a chime when a phase ends",
+            default = true,
+        ),
+        ConfigField.Bool(
+            key = "enableNotifications",
+            label = "Show a desktop notification when a phase ends",
+            default = true,
+        ),
     )
 
     override fun create(config: WidgetConfig, scope: WidgetScope): Widget {
