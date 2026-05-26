@@ -85,9 +85,6 @@ class PomodoroWidgetFactory : WidgetFactory {
     }
 }
 
-/** Phase the timer is currently in. */
-private enum class PomodoroPhase { Idle, Work, ShortBreak, LongBreak }
-
 /** Serialized snapshot persisted between runs. */
 @Serializable
 private data class PomodoroSnapshot(
