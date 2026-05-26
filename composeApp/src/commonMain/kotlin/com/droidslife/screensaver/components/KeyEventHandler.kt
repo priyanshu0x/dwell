@@ -96,8 +96,9 @@ class KeyEventHandler(
                     return true
                 }
                 Key.L -> {
-                    onAction(KeyEventAction.ToggleConsoleEdit)
-                    onAction(KeyEventAction.ShowToast("L"))
+                    // Toggles the dashboard lock; the handler emits a descriptive
+                    // toast since "locked"/"unlocked" is more useful than the keycap.
+                    onAction(KeyEventAction.ToggleDashboardLock)
                     return true
                 }
                 Key.S -> {
