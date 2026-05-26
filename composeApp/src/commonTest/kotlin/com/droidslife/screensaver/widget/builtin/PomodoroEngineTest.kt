@@ -32,6 +32,7 @@ class PomodoroEngineTest {
         assertEquals(PomodoroPhase.ShortBreak, t.state.phase)
         assertEquals(1, t.state.completedWorkCycles)
         assertEquals(S.shortBreakSeconds, t.state.remainingSeconds)
+        assertEquals(S.shortBreakSeconds, t.state.phaseDurationSeconds)
         assertTrue(t.workCycleCompleted)
         assertNotNull(t.alert)
     }
@@ -43,6 +44,7 @@ class PomodoroEngineTest {
         assertEquals(PomodoroPhase.LongBreak, t.state.phase)
         assertEquals(4, t.state.completedWorkCycles)
         assertEquals(S.longBreakSeconds, t.state.remainingSeconds)
+        assertEquals(S.longBreakSeconds, t.state.phaseDurationSeconds)
     }
 
     @Test
@@ -62,6 +64,23 @@ class PomodoroEngineTest {
         assertEquals(PomodoroPhase.ShortBreak, t.state.phase)
         assertEquals(0, t.state.completedWorkCycles)
         assertFalse(t.workCycleCompleted)
+        assertNull(t.alert)
+    }
+
+    @Test
+    fun skipBreakAdvancesToWorkWithoutAlerting() {
+        val state = PomodoroState(phase = PomodoroPhase.ShortBreak, completedWorkCycles = 1, remainingSeconds = 1)
+        val t = PomodoroEngine.skip(state, S)
+        assertEquals(PomodoroPhase.Work, t.state.phase)
+        assertEquals(1, t.state.completedWorkCycles)
+        assertFalse(t.workCycleCompleted)
+        assertNull(t.alert)
+    }
+
+    @Test
+    fun skipIdleIsNoOp() {
+        val t = PomodoroEngine.skip(PomodoroState(), S)
+        assertEquals(PomodoroPhase.Idle, t.state.phase)
         assertNull(t.alert)
     }
 
