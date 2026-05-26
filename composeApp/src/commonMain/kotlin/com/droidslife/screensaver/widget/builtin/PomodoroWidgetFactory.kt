@@ -150,8 +150,10 @@ private class PomodoroWidget(
     }
 
     override fun onDispose() {
+        // No final persist here: state is already written on every transition,
+        // control, and ~15s tick, and the host cancels our scope immediately
+        // after this returns — so a launched write wouldn't run anyway.
         tickerJob?.cancel()
-        persist()
     }
 
     @Composable
