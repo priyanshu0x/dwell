@@ -122,7 +122,7 @@ fun Lumen(
         }
 
         // Orbital dial behind clock
-        Box(modifier = Modifier.align(Alignment.Center).size(460.dp)) {
+        Box(modifier = Modifier.align(Alignment.Center).size(610.dp)) {
             OrbitalDial(currentMinute = now.minute, modifier = Modifier.fillMaxSize())
         }
 
