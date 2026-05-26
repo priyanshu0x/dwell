@@ -49,9 +49,9 @@ class SettingsViewModel(
     /**
      * Runtime-only flag for Console layout edit mode. Not persisted.
      */
-    // Runtime-only: shows the EDIT LAYOUT banner + size badges. Meaningful only
-    // when dashboardLocked is true. When unlocked, tiles are always editable but
-    // this stays false so no banner / badges clutter. (`L` toggles the lock.)
+    // Runtime-only arrange-mode flag. When true, Console shows the drag/resize
+    // overlay + EDIT LAYOUT banner; when false (default), widgets stay
+    // interactive. `L` toggles it, unless the layout is locked.
     var consoleEditMode by mutableStateOf(false)
         private set
 
