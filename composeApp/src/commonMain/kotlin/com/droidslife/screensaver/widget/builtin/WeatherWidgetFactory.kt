@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.WidgetStatusLine
+import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
@@ -37,6 +39,7 @@ import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.weather.DayForecast
 import com.droidslife.screensaver.weather.ForecastState
 import com.droidslife.screensaver.weather.WeatherState
+import com.droidslife.screensaver.weather.WeatherSyncStatus
 import com.droidslife.screensaver.weather.WeatherViewModel
 import kotlinx.datetime.DayOfWeek
 import com.droidslife.screensaver.weather.providers.WeatherApiProvider
@@ -190,15 +193,16 @@ private fun WeatherStack(
             trailing = null
         }
         is WeatherState.Unconfigured -> {
-            label = "WEATHER"; value = "—"; subtitle = "Add a WeatherAPI key to enable"
+            label = "WEATHER"; value = "—"
+            subtitle = "Needs a WeatherAPI.com key — or switch to wttr.in (no key) in settings"
             valueIsAccent = false
             trailing = {
                 TextButton(
-                    onClick = { settingsViewModel.openSettingsDialog() },
+                    onClick = { settingsViewModel.openWidgetConfig(WIDGET_ID) },
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                 ) {
                     Text(
-                        "Open Settings", fontSize = 11.sp,
+                        "Open weather settings", fontSize = 11.sp,
                         color = DwellColors.StatusAccent,
                         fontFamily = DwellFonts.interTight(),
                     )
@@ -221,6 +225,20 @@ private fun WeatherStack(
             }
         }
     }
+    // Status line is decoupled from `state`: a refresh can fail while we keep
+    // rendering the cached Success above, so the user always sees a signal
+    // instead of stale data masquerading as live.
+    val syncStatus by weatherViewModel.syncStatus.collectAsState()
+    val (statusMessage, statusSeverity) = when (syncStatus) {
+        WeatherSyncStatus.Healthy -> null to WidgetStatusSeverity.Info
+        WeatherSyncStatus.Offline ->
+            "Weather offline — showing last update" to WidgetStatusSeverity.Warning
+        WeatherSyncStatus.Unconfigured ->
+            "Needs a WeatherAPI.com key — or switch to wttr.in (no key)" to WidgetStatusSeverity.Warning
+        WeatherSyncStatus.Failed ->
+            "Weather unavailable — check network/API key" to WidgetStatusSeverity.Error
+    }
+
     val accent = LocalConsoleAccent.current.primary
     Column(modifier = modifier) {
         WidgetHeader(
@@ -254,6 +272,14 @@ private fun WeatherStack(
             Spacer(Modifier.weight(1f))
             ForecastStrip(forecastDays, modifier = Modifier.fillMaxWidth())
         }
+        // Only alongside real data: the Unconfigured/Error branches render their
+        // own full-tile messaging, so a status line there would just repeat it.
+        // With a cached Success showing, the line adds the "stale/offline" context
+        // the state machine can't express on its own.
+        WidgetStatusLine(
+            statusMessage.takeIf { state is WeatherState.Success },
+            severity = statusSeverity,
+        )
     }
 }
 
