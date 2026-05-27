@@ -51,6 +51,26 @@ fun rememberWindowEventHandlers(
             is KeyEventAction.RequestExit -> {
                 onExitApplication()
             }
+            is KeyEventAction.Escape -> {
+                // Dismiss the top-most open overlay; exit only when nothing is
+                // open. Order = visual stacking: a per-widget config dialog sits
+                // above the settings sidebar, which sits above transient
+                // edit/drawer overlays.
+                when {
+                    settingsViewModel.openWidgetConfigId != null ->
+                        settingsViewModel.closeWidgetConfig()
+                    settingsViewModel.isSettingsDialogOpen ->
+                        settingsViewModel.closeSettingsDialog()
+                    showHelpDialog ->
+                        showHelpDialog = false
+                    settingsViewModel.consoleEditMode ->
+                        settingsViewModel.updateConsoleEditMode(false)
+                    settingsViewModel.drawerVisible ->
+                        settingsViewModel.updateDrawerVisible(false)
+                    else ->
+                        onExitApplication()
+                }
+            }
             is KeyEventAction.ToggleExitOnMouseMovement -> {
                 settingsViewModel.setDismissOnMouseMovement(!settingsViewModel.settings.dismissOnMouseMovement)
             }
@@ -87,15 +107,13 @@ fun rememberWindowEventHandlers(
                 }
             }
             is KeyEventAction.ToggleConsoleEdit -> {
-                // Enters/exits Console arrange mode (drag/resize overlay). Widgets
-                // stay interactive in the normal view; a locked layout can't be
-                // rearranged.
+                // L is meaningful only when the dashboard is locked. When
+                // unlocked, tiles are always editable so the banner toggle is
+                // a no-op.
                 if (settingsViewModel.settings.mode == Mode.Console &&
-                    !settingsViewModel.settings.dashboardLocked
+                    settingsViewModel.settings.dashboardLocked
                 ) {
-                    val arranging = !settingsViewModel.consoleEditMode
                     settingsViewModel.toggleConsoleEditMode()
-                    toastState.show(if (arranging) "Arrange layout — drag tiles" else "Layout set")
                 }
             }
             is KeyEventAction.ReloadWidgets -> {

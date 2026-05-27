@@ -7,7 +7,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.math.min
 import kotlin.time.Clock
 
 class SyncRepository(
@@ -100,9 +99,15 @@ class SyncRepository(
         }
     }
 
-    private fun retryDelayMillis(attempts: Int): Long {
-        val seconds = min(300, 1 shl attempts.coerceIn(0, 8))
-        return seconds * 1_000L
+    // Fixed retry cadence instead of exponential backoff: the outbox is drained
+    // opportunistically, so a steady short interval keeps a recovered backend in
+    // sync quickly without the delay creeping toward minutes. [attempts] is kept
+    // for the signature / future capping but no longer grows the wait.
+    private fun retryDelayMillis(@Suppress("UNUSED_PARAMETER") attempts: Int): Long =
+        RETRY_INTERVAL_SECONDS * 1_000L
+
+    private companion object {
+        const val RETRY_INTERVAL_SECONDS = 10L
     }
 }
 

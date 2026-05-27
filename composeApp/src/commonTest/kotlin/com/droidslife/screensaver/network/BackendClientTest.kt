@@ -1,6 +1,5 @@
 package com.droidslife.screensaver.network
 
-import com.droidslife.screensaver.settings.SettingsModel
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -12,7 +11,7 @@ class BackendClientTest {
     fun pullDoesNotConvertCancellationToFailure() = runTest {
         val client = BackendClient(
             httpClient = HttpClient(),
-            settingsProvider = { SettingsModel(backendBaseUrl = "https://example.test") },
+            baseUrlProvider = { "https://example.test" },
             tokenProvider = { throw CancellationException("cancelled") },
         )
 
