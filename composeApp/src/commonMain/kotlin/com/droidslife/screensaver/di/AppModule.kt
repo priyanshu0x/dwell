@@ -71,13 +71,14 @@ val appModule = module {
     single<WeatherCacheStore> { createWeatherCacheStore() }
     single { WeatherViewModel(get(), get(), get(), get()) }
 
-    // Backend sync
+    // Backend sync (global) — still backs Todos' local-sync provider. The
+    // Expenses widget builds its own per-widget client from its config instead.
     single<BackendGateway> {
         val settingsViewModel: SettingsViewModel = get()
         val secretStorage: SecretStorage = get()
         BackendClient(
             httpClient = get(),
-            settingsProvider = { settingsViewModel.settings },
+            baseUrlProvider = { settingsViewModel.settings.backendBaseUrl },
             tokenProvider = { secretStorage.read(settingsViewModel.settings.backendApiKeySecretId) },
         )
     }
@@ -86,7 +87,7 @@ val appModule = module {
     single { ClockWidgetFactory(get()) }
     single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
-    single { ExpensesWidgetFactory(get()) }
+    single { ExpensesWidgetFactory() }
     single { CalendarWidgetFactory() }
     single { IdleCounterWidgetFactory() }
     single { PomodoroWidgetFactory() }

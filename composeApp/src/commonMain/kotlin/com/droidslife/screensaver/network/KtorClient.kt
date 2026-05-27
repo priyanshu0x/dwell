@@ -13,9 +13,12 @@ import kotlinx.serialization.json.Json
  * Provides a configured Ktor HttpClient for making API requests.
  */
 object KtorClient {
+    /** Fixed gap between retry attempts (see [create]). */
+    private const val RETRY_DELAY_MS: Long = 3_000
+
     /**
      * Creates and returns a configured HttpClient instance.
-     * 
+     *
      * @return A configured HttpClient instance.
      */
     fun create(maxRetries: Int = 0): HttpClient {
@@ -46,7 +49,14 @@ object KtorClient {
                 install(HttpRequestRetry) {
                     retryOnServerErrors(maxRetries)
                     retryOnException(maxRetries, retryOnTimeout = true)
-                    exponentialDelay()
+                    // Fixed cadence rather than exponential backoff: a flaky
+                    // network recovers in seconds, and a steadily climbing delay
+                    // just makes the UI feel stuck. Honor Retry-After if present.
+                    constantDelay(
+                        millis = RETRY_DELAY_MS,
+                        randomizationMs = 1_000,
+                        respectRetryAfterHeader = true,
+                    )
                 }
             }
         }

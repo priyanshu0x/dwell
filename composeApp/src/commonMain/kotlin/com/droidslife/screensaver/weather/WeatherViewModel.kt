@@ -64,6 +64,17 @@ class WeatherViewModel(
      */
     val forecast: StateFlow<ForecastState> = _forecast.asStateFlow()
 
+    private val _syncStatus = MutableStateFlow<WeatherSyncStatus>(WeatherSyncStatus.Healthy)
+
+    /**
+     * Live health of the most recent refresh. Decoupled from [state] because a
+     * background refresh can fail while we still want to render the cached
+     * [WeatherState.Success] underneath — the state machine alone can't express
+     * "good data, but it's stale". The widget collects this and shows a calm
+     * status line instead of the failure landing silently.
+     */
+    val syncStatus: StateFlow<WeatherSyncStatus> = _syncStatus.asStateFlow()
+
     // Stale-while-revalidate cache. Keyed by (provider, city) so swapping the
     // source in Settings doesn't surface stale data from the previous provider.
     // Single-threaded access (all VM coroutines run on Dispatchers.Main), so no
@@ -165,13 +176,26 @@ class WeatherViewModel(
                 )
                 currentCache[key] = CurrentEntry(current, location, nowMs())
                 state = WeatherState.Success(current, location)
+                _syncStatus.value = WeatherSyncStatus.Healthy
                 persistCache()
             },
             onFailure = { err ->
-                // Background refresh failure: keep showing the cached payload.
-                if (currentCache[key] != null) return@fold
-                state = if (err is WeatherProviderUnconfigured) WeatherState.Unconfigured
-                else WeatherState.Error(err.message ?: "Unknown error")
+                when {
+                    // Unconfigured is its own actionable state regardless of cache.
+                    err is WeatherProviderUnconfigured -> {
+                        if (currentCache[key] == null) state = WeatherState.Unconfigured
+                        _syncStatus.value = WeatherSyncStatus.Unconfigured
+                    }
+                    // Refresh failed but we have a last-good reading: keep it
+                    // visible and flag the staleness instead of failing silently.
+                    currentCache[key] != null ->
+                        _syncStatus.value = WeatherSyncStatus.Offline
+                    // No data to fall back on — surface a hard error.
+                    else -> {
+                        state = WeatherState.Error(err.message ?: "Unknown error")
+                        _syncStatus.value = WeatherSyncStatus.Failed
+                    }
+                }
             },
         )
     }
@@ -364,6 +388,25 @@ class WeatherViewModel(
         // short enough that "feels like" / conditions don't drift past noticeable.
         const val CACHE_TTL_MS: Long = 10 * 60 * 1000
     }
+}
+
+/**
+ * Health of the most recent weather refresh, surfaced as one calm status line.
+ * Orthogonal to [WeatherState]: it reports *how the last fetch went*, so the
+ * widget can flag stale/offline data while still rendering the cached reading.
+ */
+enum class WeatherSyncStatus {
+    /** The latest fetch succeeded (or there's nothing degraded to report). */
+    Healthy,
+
+    /** Refresh failed but a cached reading is still on screen. */
+    Offline,
+
+    /** The active provider needs an API key the host hasn't configured. */
+    Unconfigured,
+
+    /** Fetch failed with no prior data to fall back on. */
+    Failed,
 }
 
 /**
