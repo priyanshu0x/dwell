@@ -5,8 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
@@ -37,6 +41,13 @@ import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.api.WidgetRenderTarget
 import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.host.WidgetRegistry
+import kotlin.math.roundToInt
+
+// Grid geometry constants, kept in step with ConsoleGrid / ConsoleEditOverlay.
+private const val COLS = 12
+private const val ROWS = 6
+private val GAP = 12.dp
+private val PADDING = 32.dp
 
 private val defaultLayouts: Map<String, GridRect> = mapOf(
     "com.droidslife.screensaver.clock"           to GridRect(0, 0, 7, 4),
@@ -68,16 +79,19 @@ fun ConsoleMode(
     val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
     val locked = settingsViewModel.settings.dashboardLocked
     val editing = settingsViewModel.consoleEditMode
-    // Widget controls stay interactive in the normal view; the drag/resize
-    // overlay (which captures taps) appears only in explicit arrange mode,
-    // toggled by `L` and disabled while the layout is locked. This keeps tiles
-    // tappable regardless of lock state.
-    val tilesEditable = editing && !locked
-    val showEditChrome = tilesEditable
+    // Tiles are editable when the dashboard is unlocked, OR when the user has
+    // explicitly entered edit mode while locked. The visible EDIT LAYOUT banner
+    // and size badges only show in the locked-and-editing case so they don't
+    // clutter the everyday view.
+    val tilesEditable = !locked || editing
+    val showEditChrome = locked && editing
     // Per-tile live pixel offsets, populated by ConsoleEditOverlay while a
     // gesture is in progress so the tile chrome (rendered by ConsoleGrid)
     // tracks the cursor pixel-by-pixel instead of jumping cell-to-cell.
     val liveDrags = remember { mutableStateMapOf<String, TileLiveDrag>() }
+    // Snap-target rect per tile mid-drag. Shared with ConsoleEditOverlay, which
+    // renders the dashed ghost and handles resize into this same map.
+    val ghosts = remember { mutableStateMapOf<String, GridRect>() }
     // Tracks the most recently interacted tile so we can render it last and
     // ensure it draws above overlapping siblings.
     var lastFocused by remember { mutableStateOf<String?>(null) }
@@ -92,13 +106,25 @@ fun ConsoleMode(
         } else placements
     }
     CompositionLocalProvider(LocalConsoleAccent provides accent) {
-        Box(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
+        BoxWithConstraints(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
+            // Grid geometry mirrored from ConsoleGrid so tile-drag pixel deltas
+            // map to the same cells the grid lays out.
+            val density = LocalDensity.current
+            val paddingPx = with(density) { PADDING.toPx() }
+            val gapPx = with(density) { GAP.toPx() }
+            val innerW = (constraints.maxWidth - paddingPx * 2f).coerceAtLeast(0f)
+            val innerH = (constraints.maxHeight - paddingPx * 2f).coerceAtLeast(0f)
+            val cellW = ((innerW - gapPx * (COLS - 1)) / COLS).coerceAtLeast(0f)
+            val cellH = ((innerH - gapPx * (ROWS - 1)) / ROWS).coerceAtLeast(0f)
+            val stepX = cellW + gapPx
+            val stepY = cellH + gapPx
             ConsoleGrid(
                 placements = orderedPlacements,
                 liveDrags = liveDrags,
                 modifier = Modifier.fillMaxSize(),
             ) { id ->
                 val instance = instances[id] ?: return@ConsoleGrid
+                val rect = orderedPlacements.getValue(id)
                 val baseBorder = if (accent.tileBorderTint == Color.Transparent) {
                     DwellColors.Stroke
                 } else {
@@ -152,7 +178,56 @@ fun ConsoleMode(
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null,
-                        ) { lastFocused = id },
+                        ) { lastFocused = id }
+                        // Move-drag lives on the tile (same node as the widget) so a
+                        // quick tap reaches the widget's controls while a press-drag
+                        // moves the tile. Only active when the layout is editable.
+                        .then(
+                            if (tilesEditable) {
+                                Modifier.pointerInput(id, rect, stepX, stepY) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            ghosts[id] = rect
+                                            liveDrags[id] = TileLiveDrag.Zero
+                                            lastFocused = id
+                                        },
+                                        onDrag = { change, drag ->
+                                            change.consume()
+                                            val prev = liveDrags[id] ?: TileLiveDrag.Zero
+                                            val minDx = -rect.col * stepX
+                                            val maxDx = (COLS - rect.cols - rect.col) * stepX
+                                            val minDy = -rect.row * stepY
+                                            val maxDy = (ROWS - rect.rows - rect.row) * stepY
+                                            val newDx = (prev.dx + drag.x).coerceIn(minDx, maxDx)
+                                            val newDy = (prev.dy + drag.y).coerceIn(minDy, maxDy)
+                                            liveDrags[id] = prev.copy(dx = newDx, dy = newDy)
+                                            val safeStepX = if (stepX > 0f) stepX else 1f
+                                            val safeStepY = if (stepY > 0f) stepY else 1f
+                                            val dCol = (newDx / safeStepX).roundToInt()
+                                            val dRow = (newDy / safeStepY).roundToInt()
+                                            val newCol = (rect.col + dCol).coerceIn(0, COLS - rect.cols)
+                                            val newRow = (rect.row + dRow).coerceIn(0, ROWS - rect.rows)
+                                            ghosts[id] = rect.copy(col = newCol, row = newRow)
+                                        },
+                                        onDragEnd = {
+                                            val finalRect = ghosts.remove(id)
+                                            liveDrags.remove(id)
+                                            if (finalRect != null && finalRect != rect &&
+                                                !totallyOverlapsAny(id, finalRect, orderedPlacements)
+                                            ) {
+                                                settingsViewModel.setWidgetLayout(id, finalRect)
+                                            }
+                                        },
+                                        onDragCancel = {
+                                            ghosts.remove(id)
+                                            liveDrags.remove(id)
+                                        },
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
                 ) {
                     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
                         instance.widget.Render(
@@ -171,6 +246,7 @@ fun ConsoleMode(
                     placements = orderedPlacements,
                     sizeConstraints = sizeConstraints,
                     liveDrags = liveDrags,
+                    ghosts = ghosts,
                     hoveredTile = hoveredTile,
                     onHover = { id -> hoveredTile = id },
                     onFocus = { id -> lastFocused = id },

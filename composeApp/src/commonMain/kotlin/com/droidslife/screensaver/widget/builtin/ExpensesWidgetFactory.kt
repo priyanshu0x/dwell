@@ -1,5 +1,8 @@
 package com.droidslife.screensaver.widget.builtin
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,29 +10,46 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.WidgetStatusLine
+import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
-import com.droidslife.screensaver.network.BackendGateway
-import com.droidslife.screensaver.network.BackendResult
-import com.droidslife.screensaver.storage.SyncRepository
+import com.droidslife.screensaver.network.CreateTransactionLine
+import com.droidslife.screensaver.network.CreateTransactionRequest
+import com.droidslife.screensaver.network.FastiflyAccount
+import com.droidslife.screensaver.network.FastiflyCategory
+import com.droidslife.screensaver.network.FastiflyClient
+import com.droidslife.screensaver.network.FastiflyResult
+import com.droidslife.screensaver.network.FastiflyTransactionGroup
+import com.droidslife.screensaver.network.MeContext
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.widget.api.ConfigField
@@ -47,303 +67,714 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.encodeToJsonElement
+import kotlin.math.roundToLong
+import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 private const val WIDGET_ID = "com.droidslife.screensaver.expenses"
 
-class ExpensesWidgetFactory(
-    private val backendGateway: BackendGateway,
-) : WidgetFactory {
+class ExpensesWidgetFactory : WidgetFactory {
     override val id: String = WIDGET_ID
     override val displayName: String = "Expenses"
-    override val description: String = "Current-month expense tracking with local storage"
+    override val description: String = "Income / expense / transfer entry, monthly report, and recent activity — synced to Fastifly, offline-first"
     override val category: WidgetCategory = WidgetCategory.FINANCE
     override val preferredSize: WidgetSize = WidgetSize(
         minCols = 3, minRows = 2,
-        defaultCols = 4, defaultRows = 2,
-        maxCols = 8, maxRows = 3,
+        defaultCols = 4, defaultRows = 3,
+        maxCols = 8, maxRows = 4,
     )
     override val configSchema: List<ConfigField> = listOf(
+        ConfigField.Text(
+            key = "backendUrl",
+            label = "Fastifly URL",
+            placeholder = "http://localhost:3400",
+            help = "Fastifly server origin. Leave blank to disable sync.",
+        ),
+        // Key is intentionally NOT "apiToken"/"apiKey": the shared config panel's
+        // shouldHideField() hides those unless a Todoist/WeatherAPI `provider` is
+        // selected, which would hide this field for the Expenses widget.
+        ConfigField.Secret(
+            key = "fastiflyApiKey",
+            label = "API key",
+            help = "A Fastifly API key (ffk_…) from Settings → API keys in the Fastifly web app.",
+        ),
         ConfigField.Currency(
             key = "currency",
-            label = "Currency",
+            label = "Display currency",
             default = "USD",
             popular = listOf("USD", "EUR", "GBP", "INR"),
-        ),
-        ConfigField.StringList(
-            key = "categories",
-            label = "Categories",
-            default = listOf("food", "transport", "entertainment", "bills"),
+            help = "Fallback shown until the ledger currency loads.",
         ),
     )
 
-    override fun create(config: WidgetConfig, scope: WidgetScope): Widget = ExpensesWidget(config, scope, backendGateway)
+    override fun create(config: WidgetConfig, scope: WidgetScope): Widget {
+        val client = FastiflyClient(
+            httpClient = scope.httpClient,
+            baseUrlProvider = { config.string("backendUrl") },
+            tokenProvider = { config.secret("fastiflyApiKey") },
+        )
+        return ExpensesWidget(config, scope, client)
+    }
 }
+
+private enum class TxType(val wire: String, val label: String, val glyph: String) {
+    Expense("expense", "Expense", "↓"),
+    Income("income", "Income", "↑"),
+    Transfer("transfer", "Transfer", "⇄"),
+}
+
+private enum class Phase { Unconfigured, Loading, Ready, Offline, Error, NeedsSetup }
 
 private class ExpensesWidget(
     private val config: WidgetConfig,
     private val scope: WidgetScope,
-    backendGateway: BackendGateway,
+    private val client: FastiflyClient,
 ) : Widget {
     override val preferredSpan: Int = 1
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private val serializer = ListSerializer(Expense.serializer())
-    private val syncRepository = SyncRepository("expenses", scope.storage, backendGateway)
-    private var expenses by mutableStateOf<List<Expense>>(emptyList())
-    private var amountInput by mutableStateOf("")
-    private var categoryInput by mutableStateOf("")
-    private var noteInput by mutableStateOf("")
-    private var unsyncedCount by mutableStateOf(0)
+    private val pendingSerializer = ListSerializer(PendingTransaction.serializer())
+
+    private var context by mutableStateOf<MeContext?>(null)
+    private var accounts by mutableStateOf<List<FastiflyAccount>>(emptyList())
+    private var categories by mutableStateOf<List<FastiflyCategory>>(emptyList())
+    private var recent by mutableStateOf<List<FastiflyTransactionGroup>>(emptyList())
+    private var pending by mutableStateOf<List<PendingTransaction>>(emptyList())
+    private var phase by mutableStateOf(Phase.Loading)
+    private var lastError by mutableStateOf<String?>(null)
+
+    // Add-form state
     private var inputVisible by mutableStateOf(false)
+    private var txType by mutableStateOf(TxType.Expense)
+    private var amountInput by mutableStateOf("")
+    private var noteInput by mutableStateOf("")
+    private var categoryId by mutableStateOf("")
+    private var sourceId by mutableStateOf("")
+    private var destId by mutableStateOf("")
+
+    private val currencyFallback: String get() = config.enum("currency", "USD")
+    private val currency: String get() = context?.currencyCode?.takeIf { it.isNotBlank() } ?: currencyFallback
+
+    private var started = false
+
+    // The host does not reliably drive onResume() (see PomodoroWidget), so the
+    // first load is kicked off from Content via a LaunchedEffect. onResume() is
+    // kept for hosts that do call it; both funnel through the guarded start().
+    override fun onResume() {
+        scope.coroutineScope.launch { start() }
+    }
+
+    private suspend fun start() {
+        if (started) return
+        started = true
+        loadCache()
+        pending = readOutbox()
+        if (!client.isConfigured()) {
+            phase = Phase.Unconfigured
+            return
+        }
+        refresh()
+    }
 
     override fun summary(): WidgetSummary {
-        val currency = config.enum("currency", "USD")
-        val total = expenses.sumOf { it.amount }
-        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-        val monthName = monthShortName(now.month)
-        val topCategories = expenses
-            .groupBy { it.category }
-            .map { (cat, items) -> cat to items.sumOf { it.amount } }
-            .sortedByDescending { it.second }
-            .take(3)
-        val subtitle = if (topCategories.isEmpty()) {
-            "No expenses yet"
-        } else {
-            topCategories.joinToString(" · ") { (cat, amt) -> "$cat $currency ${"%.2f".format(amt)}" }
-        }
+        val (income, expense) = monthlyTotals()
+        val net = income - expense
         return WidgetSummary(
-            primaryValue = "$currency ${"%.2f".format(total)}",
-            primaryLabel = "Spend · $monthName",
-            subtitle = subtitle,
+            primaryValue = formatMoney(expense, currency),
+            primaryLabel = "Spend · ${monthShort()}",
+            subtitle = "In ${formatMoney(income, currency)} · Net ${formatMoney(net, currency)}",
         )
-    }
-
-    private fun monthShortName(month: Month): String = when (month) {
-        Month.JANUARY -> "Jan"
-        Month.FEBRUARY -> "Feb"
-        Month.MARCH -> "Mar"
-        Month.APRIL -> "Apr"
-        Month.MAY -> "May"
-        Month.JUNE -> "Jun"
-        Month.JULY -> "Jul"
-        Month.AUGUST -> "Aug"
-        Month.SEPTEMBER -> "Sep"
-        Month.OCTOBER -> "Oct"
-        Month.NOVEMBER -> "Nov"
-        Month.DECEMBER -> "Dec"
-    }
-
-    override fun onResume() {
-        scope.coroutineScope.launch {
-            expenses = scope.storage.read(storageKey(), String::class.java)
-                ?.let { json.decodeFromString(serializer, it) }
-                ?: emptyList()
-            mergeRemoteExpenses()
-            pushPending()
-        }
     }
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val currency = config.enum("currency", "USD")
-        val currentCategories = config.stringList(
-            "categories",
-            default = listOf("food", "transport", "entertainment", "bills"),
-        )
-        val total = expenses.sumOf { it.amount }
-        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-        val monthLabel = monthShortName(now.month).uppercase()
-
-        val topCategories = expenses
-            .groupBy { it.category }
-            .map { (cat, items) -> cat to items.sumOf { it.amount } }
-            .sortedByDescending { it.second }
-            .take(3)
-        val subtitle = if (topCategories.isEmpty()) {
-            "No expenses yet"
-        } else {
-            topCategories.joinToString(" · ") { (cat, amt) ->
-                "$cat $currency ${"%.0f".format(amt)}"
-            }
-        }
-
-        Box(modifier = modifier.fillMaxSize()) {
-            WidgetHeader(
-                label = "SPEND · $monthLabel",
-                settingsId = WIDGET_ID,
-                modifier = Modifier.align(Alignment.TopStart),
-            ) {
+        LaunchedEffect(Unit) { start() }
+        val month = monthShort().uppercase()
+        Column(modifier = modifier.fillMaxSize()) {
+            WidgetHeader(label = "EXPENSES · $month", settingsId = WIDGET_ID) {
                 IconButton(
-                    onClick = { inputVisible = !inputVisible },
+                    onClick = { if (canAdd()) inputVisible = !inputVisible },
+                    enabled = canAdd(),
                     modifier = Modifier.size(20.dp),
                 ) {
                     Icon(
                         imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
-                        contentDescription = if (inputVisible) "Hide add form" else "Add expense",
+                        contentDescription = if (inputVisible) "Hide add form" else "Add transaction",
                         tint = DwellColors.TextLow,
                     )
                 }
             }
 
-            if (inputVisible) {
-                // Add form covers the tile while open; collapses back to the
-                // big-value layout on close.
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxSize().align(Alignment.Center),
-                ) {
-                    Spacer(Modifier.size(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = amountInput,
-                            onValueChange = { amountInput = it.filter { char -> char.isDigit() || char == '.' } },
-                            label = { Text("Amount") },
-                            modifier = Modifier.weight(0.8f).pausesShortcutsWhileFocused(),
-                            singleLine = true,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        OutlinedTextField(
-                            value = categoryInput,
-                            onValueChange = { categoryInput = it },
-                            label = { Text("Category") },
-                            modifier = Modifier.weight(1f).pausesShortcutsWhileFocused(),
-                            singleLine = true,
-                        )
-                    }
-                    OutlinedTextField(
-                        value = noteInput,
-                        onValueChange = { noteInput = it },
-                        label = { Text("Note") },
-                        modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
-                        singleLine = true,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spacer(modifier = Modifier.weight(1f))
-                        Button(
-                            onClick = { addExpense(currentCategories) },
-                            enabled = amountInput.toDoubleOrNull() != null,
-                        ) {
-                            Text("Add")
-                        }
-                    }
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    inputVisible -> AddForm()
+                    // Show a clear empty-state — not a zeroed dashboard — until the
+                    // widget is configured and has actually loaded ledger data.
+                    phase == Phase.Unconfigured ->
+                        EmptyState("Connect to Fastifly", "Open settings (gear above) and add your Fastifly URL + API key.")
+                    phase == Phase.Loading && context == null -> EmptyState("Loading…", null)
+                    phase == Phase.Error && context == null ->
+                        EmptyState("Can't reach Fastifly", lastError ?: "Check the URL and API key.")
+                    else -> Overview()
                 }
-            } else {
+            }
+
+            val (msg, sev) = statusLine()
+            WidgetStatusLine(msg, severity = sev)
+        }
+    }
+
+    @Composable
+    private fun EmptyState(title: String, subtitle: String?) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(title, fontFamily = DwellFonts.interTight(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = DwellColors.TextHigh)
+            if (subtitle != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(subtitle, fontFamily = DwellFonts.interTight(), fontSize = 11.sp, color = DwellColors.TextMid)
+            }
+        }
+    }
+
+    // --- Overview (summary + recent) ---------------------------------------
+
+    @Composable
+    private fun Overview() {
+        val (income, expense) = monthlyTotals()
+        val net = income - expense
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SummaryCell("IN", income, DwellColors.StatusAccent, Modifier.weight(1f))
+                SummaryCell("OUT", expense, DwellColors.TextHigh, Modifier.weight(1f))
+                SummaryCell("NET", net, if (net >= 0) DwellColors.StatusAccent else DwellColors.TextHigh, Modifier.weight(1f))
+            }
+
+            val tops = topCategories()
+            if (tops.isNotEmpty()) {
                 Text(
-                    text = "$currency ${"%.2f".format(total)}",
-                    fontFamily = DwellFonts.jetBrainsMono(),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 36.sp,
-                    color = DwellColors.TextHigh,
+                    text = tops.joinToString(" · ") { (name, amt) -> "$name ${formatMoney(amt, currency)}" },
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 10.sp,
+                    color = DwellColors.TextMid,
                     maxLines = 1,
-                    modifier = Modifier.align(Alignment.Center),
                 )
             }
 
+            val rows = displayRows()
+            if (rows.isEmpty()) {
+                Text(
+                    text = if (phase == Phase.NeedsSetup) {
+                        "Add an account and a category in the Fastifly web app to start."
+                    } else {
+                        "No transactions yet this month."
+                    },
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 11.sp,
+                    color = DwellColors.TextLow,
+                )
+            } else {
+                rows.take(3).forEach { TransactionRow(it) }
+            }
+        }
+    }
+
+    @Composable
+    private fun SummaryCell(label: String, minor: Long, valueColor: androidx.compose.ui.graphics.Color, modifier: Modifier) {
+        Column(modifier = modifier) {
+            Text(label, fontFamily = DwellFonts.interTight(), fontSize = 9.sp, color = DwellColors.TextLow)
             Text(
-                text = if (unsyncedCount > 0) "$unsyncedCount unsynced" else subtitle,
-                fontFamily = DwellFonts.interTight(),
-                fontSize = 10.sp,
-                color = if (unsyncedCount > 0) DwellColors.StatusError else DwellColors.TextMid,
-                maxLines = 2,
-                modifier = Modifier.align(Alignment.BottomStart),
+                formatMoney(minor, currency),
+                fontFamily = DwellFonts.jetBrainsMono(),
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                color = valueColor,
+                maxLines = 1,
             )
         }
     }
 
-    private fun addExpense(categories: List<String>) {
-        val amount = amountInput.toDoubleOrNull()?.takeIf { it > 0.0 } ?: return
-        val now = Clock.System.now().toEpochMilliseconds()
-        val category = categoryInput.trim().ifBlank { categories.firstOrNull() ?: "general" }
-        expenses = expenses + Expense(
-            id = "expense-$now-${expenses.size}",
-            amount = amount,
-            category = category,
-            note = noteInput.trim(),
-            occurredAt = now,
-            createdAt = now,
-            updatedAt = now,
-        )
-        amountInput = ""
-        categoryInput = ""
-        noteInput = ""
-        persist()
-        queueUpsert(expenses.last())
-    }
-
-    private fun persist() {
-        val snapshot = json.encodeToString(serializer, expenses)
-        scope.coroutineScope.launch {
-            scope.storage.write(storageKey(), snapshot)
-        }
-    }
-
-    private fun queueUpsert(expense: Expense) {
-        scope.coroutineScope.launch {
-            syncRepository.enqueueUpsert(expense.id, expense.toJsonObject(), expense.updatedAt)
-            pushPending()
-        }
-    }
-
-    private suspend fun mergeRemoteExpenses() {
-        when (val result = syncRepository.pullRemote()) {
-            BackendResult.Disabled -> Unit
-            is BackendResult.Failure -> {
-                scope.log.warn("Expense sync pull failed", result.cause)
-                unsyncedCount = syncRepository.pendingCount()
+    @Composable
+    private fun TransactionRow(row: DisplayRow) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(row.glyph, fontFamily = DwellFonts.jetBrainsMono(), fontSize = 13.sp, color = DwellColors.TextMid)
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    row.label.ifBlank { "—" },
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 12.sp,
+                    color = if (row.pending) DwellColors.TextLow else DwellColors.TextHigh,
+                    maxLines = 1,
+                )
+                Text(
+                    if (row.pending) "syncing · ${row.dateLabel}" else row.dateLabel,
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 9.sp,
+                    color = DwellColors.TextLow,
+                    maxLines = 1,
+                )
             }
-            is BackendResult.Success -> {
-                val remote = result.value.mapNotNull { runCatching { it.toExpense() }.getOrNull() }
-                val currentMonthKey = storageKey()
-                val remoteForMonth = remote.filter { storageKeyFor(it.occurredAt) == currentMonthKey }
-                if (remoteForMonth.isNotEmpty()) {
-                    expenses = (expenses + remoteForMonth)
-                        .groupBy { it.id }
-                        .map { (_, values) -> values.maxBy { it.updatedAt } }
-                    persist()
+            Text(
+                formatMoney(row.amountMinor, currency),
+                fontFamily = DwellFonts.jetBrainsMono(),
+                fontSize = 12.sp,
+                color = if (row.income) DwellColors.StatusAccent else DwellColors.TextHigh,
+                maxLines = 1,
+            )
+        }
+    }
+
+    // --- Add form ----------------------------------------------------------
+
+    @Composable
+    private fun AddForm() {
+        val sources = sourceAccountsFor(txType)
+        val usableCategories = expenseCategories()
+        val destinations = destinationAccountsFor(txType, sourceId)
+
+        // Keep selections valid as the type or available options change.
+        LaunchedEffect(txType, accounts, categories) {
+            if (sources.none { it.id == sourceId }) sourceId = sources.firstOrNull()?.id.orEmpty()
+            if (usableCategories.none { it.id == categoryId }) categoryId = usableCategories.firstOrNull()?.id.orEmpty()
+        }
+        LaunchedEffect(txType, sourceId, accounts) {
+            val dests = destinationAccountsFor(txType, sourceId)
+            if (dests.none { it.id == destId }) destId = dests.firstOrNull()?.id.orEmpty()
+        }
+
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TxType.entries.forEach { type ->
+                    TypeChip(type, selected = txType == type, modifier = Modifier.weight(1f)) { txType = type }
+                }
+            }
+
+            OutlinedTextField(
+                value = amountInput,
+                onValueChange = { amountInput = it.filter { c -> c.isDigit() || c == '.' } },
+                label = { Text("Amount (${currency})") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
+            )
+            OutlinedTextField(
+                value = noteInput,
+                onValueChange = { noteInput = it },
+                label = { Text("Description") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
+            )
+
+            when (txType) {
+                TxType.Expense -> {
+                    Picker("Category", usableCategories.map { it.id to it.name }, categoryId) { categoryId = it }
+                    Picker("From account", sources.map { it.id to it.name }, sourceId) { sourceId = it }
+                }
+                TxType.Income -> {
+                    Picker("From (income source)", sources.map { it.id to it.name }, sourceId) { sourceId = it }
+                    Picker("To account", destinations.map { it.id to it.name }, destId) { destId = it }
+                }
+                TxType.Transfer -> {
+                    Picker("From account", sources.map { it.id to it.name }, sourceId) { sourceId = it }
+                    Picker("To account", destinations.map { it.id to it.name }, destId) { destId = it }
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = { submit() }, enabled = canSubmit()) { Text("Add") }
+            }
+        }
+    }
+
+    @Composable
+    private fun TypeChip(type: TxType, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (selected) DwellColors.StatusAccent.copy(alpha = 0.16f) else DwellColors.Surface1)
+                .border(1.dp, if (selected) DwellColors.StatusAccent else DwellColors.Stroke, RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "${type.glyph} ${type.label}",
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 11.sp,
+                color = if (selected) DwellColors.TextHigh else DwellColors.TextMid,
+                maxLines = 1,
+            )
+        }
+    }
+
+    @Composable
+    private fun Picker(label: String, options: List<Pair<String, String>>, selectedId: String, onSelect: (String) -> Unit) {
+        var expanded by remember { mutableStateOf(false) }
+        val selectedLabel = options.firstOrNull { it.first == selectedId }?.second ?: "—"
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(label, fontFamily = DwellFonts.interTight(), fontSize = 10.sp, color = DwellColors.TextLow)
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
+                        .clickable(enabled = options.isNotEmpty()) { expanded = true }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (options.isEmpty()) "None available" else selectedLabel,
+                        fontFamily = DwellFonts.interTight(),
+                        fontSize = 12.sp,
+                        color = if (options.isEmpty()) DwellColors.TextLow else DwellColors.TextHigh,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("▾", fontFamily = DwellFonts.interTight(), fontSize = 12.sp, color = DwellColors.TextMid)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    options.forEach { (id, name) ->
+                        DropdownMenuItem(text = { Text(name) }, onClick = { onSelect(id); expanded = false })
+                    }
                 }
             }
         }
     }
 
-    private suspend fun pushPending() {
-        val result = syncRepository.pushPending()
-        if (result.lastError != null) {
-            scope.log.warn("Expense sync push failed: ${result.lastError}")
+    // --- Actions -----------------------------------------------------------
+
+    private fun canAdd(): Boolean = phase == Phase.Ready || phase == Phase.Offline
+
+    private fun canSubmit(): Boolean {
+        val minor = parseMinor(amountInput) ?: return false
+        if (minor <= 0L || sourceId.isBlank()) return false
+        return when (txType) {
+            TxType.Expense -> categoryId.isNotBlank()
+            else -> destId.isNotBlank()
         }
-        unsyncedCount = result.remaining
     }
 
-    private fun storageKey(): String {
-        return storageKeyFor(Clock.System.now().toEpochMilliseconds())
+    private fun submit() {
+        val ctx = context ?: return
+        val minor = parseMinor(amountInput) ?: return
+        val source = accounts.firstOrNull { it.id == sourceId } ?: return
+        val description = noteInput.trim().ifBlank { defaultDescription() }
+        val line = when (txType) {
+            TxType.Expense -> {
+                val cat = categories.firstOrNull { it.id == categoryId } ?: return
+                val dest = cat.counterpartyAccountId ?: return
+                CreateTransactionLine(amountMinor = minor.toString(), destinationAccountId = dest, categoryId = cat.id)
+            }
+            else -> CreateTransactionLine(amountMinor = minor.toString(), destinationAccountId = destId)
+        }
+        val request = CreateTransactionRequest(
+            type = txType.wire,
+            currencyCode = source.currencyCode.ifBlank { ctx.currencyCode },
+            description = description,
+            occurredAt = Clock.System.now().toString(),
+            sourceAccountId = source.id,
+            transactions = listOf(line),
+        )
+        val item = PendingTransaction(
+            idempotencyKey = "dwell-${randomToken()}",
+            request = request,
+            displayLabel = description,
+            displayType = txType.wire,
+            displayAmountMinor = minor,
+            displayOccurredAt = request.occurredAt,
+        )
+        amountInput = ""
+        noteInput = ""
+        inputVisible = false
+        scope.coroutineScope.launch {
+            pending = pending + item
+            writeOutbox(pending)
+            pushOutbox()
+        }
     }
 
-    private fun storageKeyFor(epochMillis: Long): String {
-        val date = kotlin.time.Instant.fromEpochMilliseconds(epochMillis)
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-        val month = (date.month.ordinal + 1).toString().padStart(2, '0')
-        return "expenses-${date.year}-$month.json"
+    private fun defaultDescription(): String = when (txType) {
+        TxType.Expense -> categories.firstOrNull { it.id == categoryId }?.name ?: "Expense"
+        TxType.Income -> "Income"
+        TxType.Transfer -> "Transfer"
     }
 
-    private fun Expense.toJsonObject(): JsonObject {
-        return json.encodeToJsonElement(Expense.serializer(), this) as JsonObject
+    private suspend fun refresh() {
+        when (val ctxResult = client.meContext()) {
+            FastiflyResult.Disabled -> { phase = Phase.Unconfigured; return }
+            is FastiflyResult.Failure -> {
+                lastError = ctxResult.message
+                phase = if (context != null) Phase.Offline else Phase.Error
+                return
+            }
+            is FastiflyResult.Success -> context = ctxResult.value
+        }
+        val ctx = context ?: return
+
+        val accountsResult = client.listAccounts(ctx)
+        val categoriesResult = client.listCategories(ctx)
+        val txnResult = client.listTransactions(ctx, limit = 25, fromOccurredAt = monthStartIso())
+
+        if (accountsResult is FastiflyResult.Success) accounts = accountsResult.value
+        if (categoriesResult is FastiflyResult.Success) categories = categoriesResult.value
+        if (txnResult is FastiflyResult.Success) recent = txnResult.value
+
+        val anyFailure = listOf(accountsResult, categoriesResult, txnResult).any { it is FastiflyResult.Failure }
+        lastError = (listOf(accountsResult, categoriesResult, txnResult)
+            .firstOrNull { it is FastiflyResult.Failure } as? FastiflyResult.Failure)?.message
+
+        phase = when {
+            anyFailure && (accounts.isEmpty() && recent.isEmpty()) -> Phase.Error
+            anyFailure -> Phase.Offline
+            accounts.isEmpty() || categories.isEmpty() -> Phase.NeedsSetup
+            else -> Phase.Ready
+        }
+        saveCache()
+        pushOutbox()
     }
 
-    private fun JsonObject.toExpense(): Expense {
-        return json.decodeFromJsonElement(Expense.serializer(), this)
+    private suspend fun pushOutbox() {
+        val ctx = context ?: return
+        val items = readOutbox()
+        if (items.isEmpty()) { pending = emptyList(); return }
+        var pushed = 0
+        var index = 0
+        var failure: String? = null
+        while (index < items.size) {
+            when (val result = client.createTransaction(ctx, items[index].request, items[index].idempotencyKey)) {
+                is FastiflyResult.Success -> { index++; pushed++ }
+                FastiflyResult.Disabled -> { failure = "Sync disabled"; break }
+                is FastiflyResult.Failure -> {
+                    // 409 = this idempotency key was already applied server-side
+                    // (e.g. a prior attempt committed but its response was lost).
+                    // Treat as done and drop it instead of retrying forever.
+                    if (result.httpCode == 409) { index++; pushed++ } else { failure = result.message; break }
+                }
+            }
+        }
+        val remaining = items.drop(index)
+        writeOutbox(remaining)
+        pending = remaining
+        lastError = failure
+        if (pushed > 0 && failure == null) {
+            // Pull the authoritative server view so the just-synced rows replace
+            // their optimistic placeholders.
+            client.listTransactions(ctx, limit = 25, fromOccurredAt = monthStartIso()).let {
+                if (it is FastiflyResult.Success) { recent = it.value; saveCache() }
+            }
+        }
+    }
+
+    // --- Derived data ------------------------------------------------------
+
+    /** Per-currency assumption of 2 minor digits — adequate for the tile display. */
+    private fun formatMoney(minor: Long, currencyCode: String): String =
+        "$currencyCode ${"%.2f".format(minor / 100.0)}"
+
+    private fun parseMinor(input: String): Long? {
+        val value = input.trim().toDoubleOrNull() ?: return null
+        return (value * 100.0).roundToLong()
+    }
+
+    /** Transaction magnitude = sum of the positive (incoming) postings. */
+    private fun magnitude(group: FastiflyTransactionGroup): Long =
+        group.journals.sumOf { journal ->
+            journal.postings.sumOf { posting ->
+                (posting.amountMinor.toLongOrNull() ?: 0L).coerceAtLeast(0L)
+            }
+        }
+
+    private fun monthlyTotals(): Pair<Long, Long> {
+        var income = 0L
+        var expense = 0L
+        recent.forEach { group ->
+            when (group.type) {
+                "income" -> income += magnitude(group)
+                "expense" -> expense += magnitude(group)
+            }
+        }
+        pending.forEach { p ->
+            when (p.displayType) {
+                "income" -> income += p.displayAmountMinor
+                "expense" -> expense += p.displayAmountMinor
+            }
+        }
+        return income to expense
+    }
+
+    private fun topCategories(): List<Pair<String, Long>> {
+        val counterpartyToName = categories
+            .filter { it.counterpartyAccountId != null }
+            .associate { it.counterpartyAccountId!! to it.name }
+        val byCategory = mutableMapOf<String, Long>()
+        recent.filter { it.type == "expense" }.forEach { group ->
+            val accountId = group.journals
+                .flatMap { it.postings }
+                .firstOrNull { counterpartyToName.containsKey(it.accountId) }
+                ?.accountId
+            val name = accountId?.let { counterpartyToName[it] } ?: "Other"
+            byCategory[name] = (byCategory[name] ?: 0L) + magnitude(group)
+        }
+        return byCategory.entries.sortedByDescending { it.value }.take(2).map { it.key to it.value }
+    }
+
+    private fun displayRows(): List<DisplayRow> {
+        val pendingRows = pending.map { p ->
+            DisplayRow(
+                glyph = TxType.entries.firstOrNull { it.wire == p.displayType }?.glyph ?: "•",
+                label = p.displayLabel,
+                amountMinor = p.displayAmountMinor,
+                dateLabel = shortDate(p.displayOccurredAt),
+                income = p.displayType == "income",
+                pending = true,
+            )
+        }
+        val serverRows = recent.map { group ->
+            val journal = group.journals.firstOrNull()
+            DisplayRow(
+                glyph = TxType.entries.firstOrNull { it.wire == group.type }?.glyph ?: "•",
+                label = group.title ?: journal?.description ?: group.type.replaceFirstChar { it.uppercase() },
+                amountMinor = magnitude(group),
+                dateLabel = shortDate(journal?.occurredAt),
+                income = group.type == "income",
+                pending = false,
+            )
+        }
+        return pendingRows + serverRows
+    }
+
+    private fun sourceAccountsFor(type: TxType): List<FastiflyAccount> = accounts.filter { account ->
+        account.isActive && when (type) {
+            TxType.Income -> account.kind == "revenue"
+            else -> account.kind == "asset" || account.kind == "liability"
+        }
+    }
+
+    private fun destinationAccountsFor(type: TxType, fromId: String): List<FastiflyAccount> {
+        if (type == TxType.Expense) return emptyList()
+        val source = accounts.firstOrNull { it.id == fromId }
+        return accounts.filter { account ->
+            account.isActive &&
+                account.id != fromId &&
+                (account.kind == "asset" || account.kind == "liability") &&
+                (source == null || account.currencyCode == source.currencyCode)
+        }
+    }
+
+    private fun expenseCategories(): List<FastiflyCategory> {
+        val activeAccountIds = accounts.filter { it.isActive }.map { it.id }.toSet()
+        return categories.filter { it.counterpartyAccountId != null && it.counterpartyAccountId in activeAccountIds }
+    }
+
+    private fun statusLine(): Pair<String?, WidgetStatusSeverity> {
+        val unsynced = pending.size
+        return when (phase) {
+            // The body's empty-state already explains these — no duplicate line.
+            Phase.Unconfigured, Phase.Loading, Phase.Error -> null to WidgetStatusSeverity.Info
+            Phase.NeedsSetup -> "Set up accounts & categories in Fastifly web" to WidgetStatusSeverity.Warning
+            Phase.Offline ->
+                (if (unsynced > 0) "Offline — $unsynced queued" else "Offline — showing cached data") to WidgetStatusSeverity.Warning
+            Phase.Ready ->
+                (if (unsynced > 0) "$unsynced syncing…" else null) to WidgetStatusSeverity.Info
+        }
+    }
+
+    // --- Time helpers ------------------------------------------------------
+
+    private fun monthShort(): String = monthShortName(
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).month,
+    )
+
+    private fun monthStartIso(): String {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val month = (today.month.ordinal + 1).toString().padStart(2, '0')
+        // UTC midnight on the 1st as the month lower bound — adequate for a
+        // current-month tile summary without per-zone instant conversion.
+        return "${today.year}-$month-01T00:00:00.000Z"
+    }
+
+    private fun shortDate(iso: String?): String {
+        if (iso.isNullOrBlank()) return ""
+        val instant = runCatching { Instant.parse(iso) }.getOrNull() ?: return ""
+        val date = instant.toLocalDateTime(TimeZone.currentSystemDefault()).date
+        return "${monthShortName(date.month)} ${date.day}"
+    }
+
+    private fun monthShortName(month: Month): String = when (month) {
+        Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"; Month.MARCH -> "Mar"
+        Month.APRIL -> "Apr"; Month.MAY -> "May"; Month.JUNE -> "Jun"
+        Month.JULY -> "Jul"; Month.AUGUST -> "Aug"; Month.SEPTEMBER -> "Sep"
+        Month.OCTOBER -> "Oct"; Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"
+    }
+
+    private fun randomToken(): String =
+        (1..16).joinToString("") { Random.nextInt(16).toString(16) }
+
+    // --- Persistence (offline cache + outbox) ------------------------------
+
+    private fun saveCache() {
+        val snapshot = CacheSnapshot(context, accounts, categories, recent)
+        scope.coroutineScope.launch {
+            scope.storage.write(CACHE_KEY, json.encodeToString(CacheSnapshot.serializer(), snapshot))
+        }
+    }
+
+    private suspend fun loadCache() {
+        val raw = scope.storage.read(CACHE_KEY, String::class.java) ?: return
+        val snapshot = runCatching { json.decodeFromString(CacheSnapshot.serializer(), raw) }.getOrNull() ?: return
+        context = snapshot.context
+        accounts = snapshot.accounts
+        categories = snapshot.categories
+        recent = snapshot.recent
+    }
+
+    private suspend fun readOutbox(): List<PendingTransaction> =
+        scope.storage.read(OUTBOX_KEY, String::class.java)
+            ?.let { runCatching { json.decodeFromString(pendingSerializer, it) }.getOrNull() }
+            ?: emptyList()
+
+    private suspend fun writeOutbox(items: List<PendingTransaction>) {
+        if (items.isEmpty()) scope.storage.delete(OUTBOX_KEY)
+        else scope.storage.write(OUTBOX_KEY, json.encodeToString(pendingSerializer, items))
+    }
+
+    private companion object {
+        const val CACHE_KEY = "fastifly-expenses-cache.json"
+        const val OUTBOX_KEY = "fastifly-expenses-outbox.json"
     }
 }
 
+private data class DisplayRow(
+    val glyph: String,
+    val label: String,
+    val amountMinor: Long,
+    val dateLabel: String,
+    val income: Boolean,
+    val pending: Boolean,
+)
+
 @Serializable
-private data class Expense(
-    val id: String,
-    val amount: Double,
-    val category: String,
-    val note: String,
-    val occurredAt: Long,
-    val createdAt: Long,
-    val updatedAt: Long,
+private data class CacheSnapshot(
+    val context: MeContext? = null,
+    val accounts: List<FastiflyAccount> = emptyList(),
+    val categories: List<FastiflyCategory> = emptyList(),
+    val recent: List<FastiflyTransactionGroup> = emptyList(),
+)
+
+@Serializable
+private data class PendingTransaction(
+    val idempotencyKey: String,
+    val request: CreateTransactionRequest,
+    val displayLabel: String,
+    val displayType: String,
+    val displayAmountMinor: Long,
+    val displayOccurredAt: String,
 )

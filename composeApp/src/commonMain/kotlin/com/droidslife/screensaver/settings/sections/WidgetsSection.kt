@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
@@ -57,6 +58,7 @@ import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.todos.providers.TodoistProvider
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.serialization.json.JsonObject
@@ -223,11 +225,14 @@ internal fun WidgetConfigPanel(
     savedSecretIds: Set<String>,
     onConfigChange: (JsonObject) -> Unit,
     onSecretChange: (String, String) -> Unit,
+    // Indents the fields under the widget row in the Settings → Widgets list.
+    // The standalone gear dialog already pads its body, so it passes 0.dp.
+    startIndent: Dp = 28.dp,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 28.dp),
+            .padding(start = startIndent),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         schema.forEach { field ->
@@ -245,12 +250,20 @@ internal fun WidgetConfigPanel(
     }
 }
 
-// Conditional fields: the WeatherAPI key only matters when WeatherAPI is the
-// active source. Hiding it on wttr.in removes a row of dead chrome.
+// Conditional fields: hide credential inputs that don't apply to the active
+// source so the panel doesn't show dead chrome (e.g. a Todoist token while the
+// Todos widget is on Local).
 private fun shouldHideField(field: ConfigField, config: JsonObject): Boolean {
-    if (field.key != "apiKey") return false
     val provider = config["provider"]?.jsonPrimitive?.content
-    return provider != null && provider != "weatherapi"
+    return when (field.key) {
+        // WeatherAPI key only matters on the weatherapi source. Absent provider
+        // means the schema default (weatherapi) is active, so keep it visible.
+        "apiKey" -> provider != null && provider != "weatherapi"
+        // Todoist token only matters on the Todoist source. The default source
+        // is Local, so hide it whenever the source isn't explicitly Todoist.
+        "apiToken" -> provider != TodoistProvider.ID
+        else -> false
+    }
 }
 
 @Composable

@@ -23,7 +23,9 @@ class KeyEventHandler(
         if (TextInputFocus.isActive) return false
 
         if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-            onAction(KeyEventAction.RequestExit)
+            // Contextual: dismiss an open overlay first; only exit when nothing
+            // is open. The cascade is resolved by the action handler.
+            onAction(KeyEventAction.Escape)
             return true
         }
 

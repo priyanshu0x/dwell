@@ -5,10 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -23,6 +26,14 @@ class SettingsViewModel(
     private val startupRegistration: StartupRegistration = createStartupRegistration(),
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Secret writes are serialized through this fair mutex so a per-keystroke
+    // sequence ("t" → "to" → "tok"…) can't land out of order and leave a stale
+    // prefix in storage. [lastSecretWriteJob] tracks the most recent write so
+    // callers can [flushSecretsThen] wait for every queued write to flush before
+    // they read the value back (e.g. rebuilding a widget to pick up a new token).
+    private val secretWriteMutex = Mutex()
+    private var lastSecretWriteJob: Job? = null
 
     /**
      * The current settings state.
@@ -49,9 +60,9 @@ class SettingsViewModel(
     /**
      * Runtime-only flag for Console layout edit mode. Not persisted.
      */
-    // Runtime-only arrange-mode flag. When true, Console shows the drag/resize
-    // overlay + EDIT LAYOUT banner; when false (default), widgets stay
-    // interactive. `L` toggles it, unless the layout is locked.
+    // Runtime-only: shows the EDIT LAYOUT banner + size badges. Meaningful only
+    // when dashboardLocked is true (toggles via `L`). When unlocked, tiles are
+    // always editable but this stays false so no banner / badges clutter.
     var consoleEditMode by mutableStateOf(false)
         private set
 
@@ -142,13 +153,34 @@ class SettingsViewModel(
         val secretId = widgetSecretId(widgetId, key)
         val currentConfig = settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
         updateSettings(settings.copy(widgetConfigs = settings.widgetConfigs + (widgetId to JsonObject(currentConfig + (key to JsonPrimitive(secretId))))))
+        writeSecret(secretId, value)
+    }
+
+    /**
+     * Suspends until every queued secret write has flushed to storage, then runs
+     * [action]. The widget secret resolver reads from storage at build time, so
+     * callers rebuilding a widget to apply a freshly entered token must wait here
+     * first — otherwise the rebuild races the write and reads a stale value.
+     */
+    fun flushSecretsThen(action: () -> Unit) {
         viewModelScope.launch {
-            if (value.isBlank()) {
-                secretStorage.delete(secretId)
-                savedSecretIds -= secretId
-            } else {
-                secretStorage.write(secretId, value)
-                savedSecretIds += secretId
+            lastSecretWriteJob?.join()
+            action()
+        }
+    }
+
+    // All secret persistence funnels through here so writes stay serialized (see
+    // [secretWriteMutex]) and observable via [lastSecretWriteJob].
+    private fun writeSecret(secretId: String, value: String) {
+        lastSecretWriteJob = viewModelScope.launch {
+            secretWriteMutex.withLock {
+                if (value.isBlank()) {
+                    secretStorage.delete(secretId)
+                    savedSecretIds -= secretId
+                } else {
+                    secretStorage.write(secretId, value)
+                    savedSecretIds += secretId
+                }
             }
         }
     }
@@ -173,27 +205,11 @@ class SettingsViewModel(
     }
 
     fun updateBackendApiKey(value: String) {
-        viewModelScope.launch {
-            if (value.isBlank()) {
-                secretStorage.delete(settings.backendApiKeySecretId)
-                savedSecretIds -= settings.backendApiKeySecretId
-            } else {
-                secretStorage.write(settings.backendApiKeySecretId, value)
-                savedSecretIds += settings.backendApiKeySecretId
-            }
-        }
+        writeSecret(settings.backendApiKeySecretId, value)
     }
 
     fun updateWeatherApiKey(value: String) {
-        viewModelScope.launch {
-            if (value.isBlank()) {
-                secretStorage.delete(settings.weatherApiKeySecretId)
-                savedSecretIds -= settings.weatherApiKeySecretId
-            } else {
-                secretStorage.write(settings.weatherApiKeySecretId, value)
-                savedSecretIds += settings.weatherApiKeySecretId
-            }
-        }
+        writeSecret(settings.weatherApiKeySecretId, value)
     }
 
     fun isSecretSaved(secretId: String): Boolean = secretId in savedSecretIds
