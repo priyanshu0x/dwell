@@ -16,6 +16,8 @@ import io.ktor.http.isSuccess
 import io.ktor.http.parameters
 import io.ktor.http.takeFrom
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -140,12 +142,20 @@ class FastiflyClient(
     private suspend inline fun <T> call(crossinline block: suspend () -> T): FastiflyResult<T> {
         if (baseUrlOrNull() == null) return FastiflyResult.Disabled
         return try {
-            FastiflyResult.Success(block())
+            // The shared Ktor client has no request timeout, so a stalled
+            // connection would hang the widget on "Loading…" forever. Bound it.
+            FastiflyResult.Success(withTimeout(REQUEST_TIMEOUT_MS) { block() })
+        } catch (timeout: TimeoutCancellationException) {
+            FastiflyResult.Failure("Request timed out", null)
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             val code = (error as? FastiflyHttpException)?.code
             FastiflyResult.Failure(error.message ?: "Fastifly request failed", code)
         }
+    }
+
+    private companion object {
+        const val REQUEST_TIMEOUT_MS = 20_000L
     }
 }
 
