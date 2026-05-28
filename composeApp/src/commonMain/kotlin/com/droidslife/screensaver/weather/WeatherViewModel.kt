@@ -129,18 +129,18 @@ class WeatherViewModel(
      * is older than [CACHE_TTL_MS]. Background-refresh failures are swallowed
      * so we keep showing the stale data rather than flashing an error.
      */
-    fun loadWeatherDataForCity(cityName: String) {
+    fun loadWeatherDataForCity(cityName: String, forceRefresh: Boolean = false) {
         val providerId = weatherRepository.activeProviderId()
-        loadCurrent(cityName, providerId)
-        loadForecast(cityName, providerId)
+        loadCurrent(cityName, providerId, forceRefresh)
+        loadForecast(cityName, providerId, forceRefresh)
         selectedCity = cityName
     }
 
-    private fun loadCurrent(cityName: String, providerId: String) {
+    private fun loadCurrent(cityName: String, providerId: String, forceRefresh: Boolean) {
         if (cityName.isBlank()) return
         val key = CacheKey(providerId, cityName)
         val cached = currentCache[key]
-        if (cached != null) {
+        if (cached != null && !forceRefresh) {
             state = WeatherState.Success(cached.data, cached.location)
             if (nowMs() - cached.fetchedAtMs > CACHE_TTL_MS) {
                 refreshCurrentInBackground(cityName, key)
@@ -148,7 +148,7 @@ class WeatherViewModel(
             return
         }
         viewModelScope.launch {
-            state = WeatherState.Loading
+            if (cached == null) state = WeatherState.Loading
             fetchAndStoreCurrent(cityName, key)
         }
     }
@@ -200,11 +200,11 @@ class WeatherViewModel(
         )
     }
 
-    private fun loadForecast(cityName: String, providerId: String) {
+    private fun loadForecast(cityName: String, providerId: String, forceRefresh: Boolean) {
         if (cityName.isBlank()) return
         val key = CacheKey(providerId, cityName)
         val cached = forecastCache[key]
-        if (cached != null) {
+        if (cached != null && !forceRefresh) {
             _forecast.value = ForecastState.Loaded(cached.days)
             if (nowMs() - cached.fetchedAtMs > CACHE_TTL_MS) {
                 refreshForecastInBackground(cityName, key)

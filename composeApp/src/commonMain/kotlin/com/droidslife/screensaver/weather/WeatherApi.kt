@@ -25,6 +25,7 @@ class WeatherApi(
     private val client: HttpClient,
     private val secretStorage: SecretStorage,
     private val weatherApiKeySecretIdProvider: () -> String = { WEATHER_API_KEY_SECRET_ID },
+    private val weatherApiKeyProvider: (suspend () -> String?)? = null,
 ) {
 
     /**
@@ -123,7 +124,8 @@ class WeatherApi(
     }
 
     private suspend fun apiKey(): String {
-        return secretStorage.read(weatherApiKeySecretIdProvider())?.trim()?.takeIf { it.isNotBlank() }
+        return weatherApiKeyProvider?.invoke()?.trim()?.takeIf { it.isNotBlank() }
+            ?: secretStorage.read(weatherApiKeySecretIdProvider())?.trim()?.takeIf { it.isNotBlank() }
             ?: System.getenv("WEATHERAPI")?.trim()?.takeIf { it.isNotBlank() }
             ?: throw WeatherApiException("WeatherAPI key is not configured")
     }

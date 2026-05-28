@@ -42,6 +42,13 @@ data class SettingsModel(
     val widgetConfigs: Map<String, JsonObject> = emptyMap(),
 
     /**
+     * Monotonic revision per widget secret id. Values are not secrets; they let
+     * running widgets rebuild when a token changes but its config reference does
+     * not.
+     */
+    val widgetSecretVersions: Map<String, Long> = emptyMap(),
+
+    /**
      * Seconds of OS idle time before the daemon opens the dashboard.
      */
     val idleTimeoutSeconds: Int = 5 * 60,

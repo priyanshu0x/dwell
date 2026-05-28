@@ -135,10 +135,12 @@ private class WeatherWidget(
     @Composable
     override fun Content(modifier: Modifier) {
         val configuredCity = config.string("city")
+        val provider = config.enum("provider", WttrInProvider.ID)
+        val apiKeyReference = config.raw("apiKey")
 
-        LaunchedEffect(configuredCity) {
+        LaunchedEffect(configuredCity, provider, apiKeyReference) {
             if (configuredCity.isNotBlank()) {
-                weatherViewModel.loadWeatherDataForCity(configuredCity)
+                weatherViewModel.loadWeatherDataForCity(configuredCity, forceRefresh = true)
             }
         }
 

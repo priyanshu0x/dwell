@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -90,10 +91,12 @@ fun BoxScope.WidgetDrawer(
         ) {
             enabled.forEach { instance ->
                 val widget = instance.widget
-                if (widget.rendersOwnChip) {
-                    widget.Render(WidgetRenderTarget.Chip, instance.scope, Modifier)
-                } else {
-                    DefaultChipRender(widget.summary())
+                key(instance.scope) {
+                    if (widget.rendersOwnChip) {
+                        widget.Render(WidgetRenderTarget.Chip, instance.scope, Modifier)
+                    } else {
+                        DefaultChipRender(widget.summary())
+                    }
                 }
             }
         }

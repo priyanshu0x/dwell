@@ -28,9 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,25 +67,7 @@ fun BoxScope.WidgetConfigDialog(
 
     val config = settingsViewModel.settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
 
-    // A widget injects its secrets only when it's (re)built, and the config JSON
-    // stores a *stable* secret reference — so editing a token never changes the
-    // JSON and `syncWithSettings` won't rebuild the tile. Track that a secret was
-    // touched and force a rebuild on close so the freshly saved value takes
-    // effect. Gated on an actual edit so a no-op open/close doesn't flicker.
-    var secretEdited by remember(widgetId) { mutableStateOf(false) }
-    val dismiss: () -> Unit = {
-        if (secretEdited) {
-            // Wait for the secret write to flush, then rebuild so the widget
-            // re-reads the new token. Runs on the ViewModel's scope, not the
-            // dialog's — onDismiss removes this composable immediately, which
-            // would cancel a dialog-scoped coroutine before the rebuild ran.
-            val latest = settingsViewModel.settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
-            settingsViewModel.flushSecretsThen {
-                widgetRegistry.updateConfig(widgetId, latest)
-            }
-        }
-        onDismiss()
-    }
+    val dismiss: () -> Unit = onDismiss
 
     // The dialog can be opened from any mode (Cinematic / Ambient / Console).
     // Console mode publishes its own LocalConsoleAccent in its scope, but this
@@ -199,7 +179,6 @@ fun BoxScope.WidgetConfigDialog(
                         settingsViewModel.updateWidgetConfig(widgetId, newConfig)
                     },
                     onSecretChange = { key, value ->
-                        secretEdited = true
                         settingsViewModel.updateWidgetSecret(widgetId, key, value)
                     },
                 )

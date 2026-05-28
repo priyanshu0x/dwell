@@ -45,10 +45,17 @@ val appModule = module {
     // Weather API
     single {
         val settingsViewModel: SettingsViewModel = get()
+        val secretStorage: SecretStorage = get()
         WeatherApi(
             client = get(),
-            secretStorage = get(),
-            weatherApiKeySecretIdProvider = { settingsViewModel.settings.weatherApiKeySecretId },
+            secretStorage = secretStorage,
+            weatherApiKeyProvider = {
+                val widgetKey = settingsViewModel.widgetSecretReference(
+                    WeatherRepository.WEATHER_WIDGET_ID,
+                    WeatherRepository.WEATHER_API_KEY_FIELD,
+                )?.let { secretStorage.read(it) }
+                widgetKey ?: secretStorage.read(settingsViewModel.settings.weatherApiKeySecretId)
+            },
         )
     }
 

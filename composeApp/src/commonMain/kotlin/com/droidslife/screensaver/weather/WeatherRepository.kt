@@ -13,6 +13,7 @@ import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Thin façade over the configurable set of [WeatherProvider] adapters.
@@ -23,9 +24,8 @@ import kotlinx.coroutines.flow.flow
  *
  * @param httpClient        Shared Ktor client used by all provider adapters.
  * @param locationService   Geo helper used by the legacy [getWeatherData] path.
- * @param settingsViewModel Read-only access to widget configs + the saved
- *                          WeatherAPI key (still surfaced through the existing
- *                          secret store).
+ * @param settingsViewModel Read-only access to widget configs and the
+ *                          WeatherAPI secret reference.
  * @param secretStorage     Backing store the repository reads the WeatherAPI
  *                          key from when the user selects that provider.
  */
@@ -43,11 +43,7 @@ class WeatherRepository(
         val providerId = providerIdFromSettings()
         return when (providerId) {
             WeatherApiProvider.ID -> {
-                val key = secretStorage
-                    .read(settingsViewModel.settings.weatherApiKeySecretId)
-                    ?.trim()
-                    .orEmpty()
-                WeatherApiProvider(httpClient, key)
+                WeatherApiProvider(httpClient, weatherApiKey())
             }
             else -> WttrInProvider(httpClient)
         }
@@ -64,8 +60,19 @@ class WeatherRepository(
         val widgetConfig = settingsViewModel.settings.widgetConfigs[WEATHER_WIDGET_ID]
             ?: return WttrInProvider.ID
         return widgetConfig["provider"]?.let { element ->
-            (element as? kotlinx.serialization.json.JsonPrimitive)?.content
+            (element as? JsonPrimitive)?.content
         } ?: WttrInProvider.ID
+    }
+
+    private suspend fun weatherApiKey(): String {
+        val widgetKey = settingsViewModel.widgetSecretReference(WEATHER_WIDGET_ID, WEATHER_API_KEY_FIELD)
+            ?.let { secretStorage.read(it) }
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        val legacyKey = secretStorage.read(settingsViewModel.settings.weatherApiKeySecretId)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        return widgetKey ?: legacyKey.orEmpty()
     }
 
     /**
@@ -113,6 +120,7 @@ class WeatherRepository(
 
     companion object {
         const val WEATHER_WIDGET_ID: String = "com.droidslife.screensaver.weather"
+        const val WEATHER_API_KEY_FIELD: String = "apiKey"
     }
 }
 
