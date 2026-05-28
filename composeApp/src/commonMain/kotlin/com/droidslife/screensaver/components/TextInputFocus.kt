@@ -37,6 +37,25 @@ object TextInputFocus {
 }
 
 /**
+ * Reference-counted pause for widget-local modal surfaces that are not global
+ * app dialogs. They need first chance at Esc without the window handler hiding
+ * the whole dashboard.
+ */
+object ShortcutPause {
+    private var pauseCount by mutableIntStateOf(0)
+
+    val isActive: Boolean get() = pauseCount > 0
+
+    fun acquire() {
+        pauseCount++
+    }
+
+    fun release() {
+        if (pauseCount > 0) pauseCount--
+    }
+}
+
+/**
  * Marks a composable's focus target as text entry, pausing app keyboard
  * shortcuts while it's focused. Apply to every editable field's `modifier`.
  *

@@ -3,6 +3,7 @@ package com.droidslife.screensaver.widget.builtin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,6 +82,7 @@ import com.droidslife.screensaver.todos.EisenhowerMatrix
 import com.droidslife.screensaver.todos.Quadrant
 import com.droidslife.screensaver.components.WidgetStatusLine
 import com.droidslife.screensaver.components.WidgetStatusSeverity
+import com.droidslife.screensaver.components.ShortcutPause
 import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.network.BackendGateway
@@ -345,6 +349,7 @@ private class TodosWidget(
                     subtaskCountOf = subtaskCountOf,
                     onDrop = { todo, target -> onDropIntoQuadrant(todo, target, today) },
                     onOpen = { detailId = it.id },
+                    onToggle = { onToggle(it) },
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
                 else -> LazyColumn(
@@ -417,7 +422,7 @@ private class TodosWidget(
      * Buckets open tasks by due-date proximity (Overdue / Today / Upcoming / No
      * date) and appends completed tasks last, so a long list reads as a plan
      * rather than a flat dump. Empty buckets are dropped. Dated buckets sort by
-     * date then priority; the undated bucket uses the user's sort preference.
+     * date then priority; the undated bucket sorts by priority first.
      */
     private fun groupedSections(todos: List<Todo>, today: LocalDate): List<TodoSectionData> {
         val open = todos.filterNot { it.done }
@@ -439,7 +444,7 @@ private class TodosWidget(
         for (section in listOf(TodoSection.Overdue, TodoSection.Today, TodoSection.Upcoming)) {
             bySection[section]?.let { out += TodoSectionData(section, it.sortedWith(dueOrder)) }
         }
-        bySection[TodoSection.NoDate]?.let { out += TodoSectionData(TodoSection.NoDate, sortByConfig(it)) }
+        bySection[TodoSection.NoDate]?.let { out += TodoSectionData(TodoSection.NoDate, sortUndated(it)) }
         if (done.isNotEmpty()) out += TodoSectionData(TodoSection.Done, done.sortedByDescending { it.updatedAt })
         return out
     }
@@ -449,6 +454,9 @@ private class TodosWidget(
         "alphabetical" -> todos.sortedBy { it.text.lowercase() }
         else -> todos.sortedByDescending { it.createdAt }
     }
+
+    private fun sortUndated(todos: List<Todo>): List<Todo> =
+        sortByConfig(todos).sortedByDescending { it.priority }
 
     private fun onAdd() {
         val text = input.trim()
@@ -600,13 +608,15 @@ private fun SectionHeader(label: String, count: Int) {
     }
 }
 
-/** Leading priority bar colour, or null for normal (Todoist p4 / priority 1). */
+/** Todoist priority tones: p1 red, p2 amber, p3 blue, p4 neutral. */
 private fun priorityColor(priority: Int): Color? = when (priority) {
     4 -> DwellColors.StatusError   // urgent (p1)
-    3 -> DwellColors.StatusAccent  // high (p2)
-    2 -> DwellColors.TextMid       // medium (p3)
+    3 -> DwellColors.ConsoleAmber  // high (p2)
+    2 -> Color(0xFF7AA7FF)         // medium (p3)
     else -> null                   // normal (p4) — no marker
 }
+
+private fun priorityIndicatorColor(priority: Int): Color = priorityColor(priority) ?: DwellColors.TextFaint
 
 /**
  * Relative due label + colour. Overdue is red, today the accent, everything
@@ -768,13 +778,14 @@ private fun TodoRow(
 
         Box(
             modifier = Modifier
-                .size(16.dp)
+                .size(18.dp)
                 .clip(CircleShape)
+                .background(if (todo.done) DwellColors.StatusOk else DwellColors.Surface1)
                 .then(
                     if (todo.done) {
-                        Modifier.background(DwellColors.StatusOk)
+                        Modifier
                     } else {
-                        Modifier.border(1.5.dp, if (hovered) accent else DwellColors.TextLow, CircleShape)
+                        Modifier.border(1.5.dp, if (hovered) accent else DwellColors.TextMid, CircleShape)
                     },
                 )
                 .clickable(enabled = !pending, onClick = onToggle),
@@ -783,9 +794,16 @@ private fun TodoRow(
             if (todo.done) {
                 Icon(
                     imageVector = Icons.Filled.Check,
-                    contentDescription = null,
+                    contentDescription = "Mark task active",
                     tint = DwellColors.Surface0,
                     modifier = Modifier.size(11.dp),
+                )
+            } else if (hovered) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Mark task done",
+                    tint = accent,
+                    modifier = Modifier.size(10.dp),
                 )
             }
         }
@@ -967,6 +985,7 @@ private fun TodoMatrix(
     subtaskCountOf: (Todo) -> Int,
     onDrop: (Todo, Quadrant) -> Unit,
     onOpen: (Todo) -> Unit,
+    onToggle: (Todo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var container by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -1014,6 +1033,7 @@ private fun TodoMatrix(
                                 dragging = null
                             },
                             onOpen = onOpen,
+                            onToggle = onToggle,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                     }
@@ -1058,6 +1078,7 @@ private fun QuadrantCell(
     onDragMove: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onOpen: (Todo) -> Unit,
+    onToggle: (Todo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = quadrantColor(quadrant, accent)
@@ -1070,6 +1091,13 @@ private fun QuadrantCell(
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(label),
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = quadrant.label,
@@ -1114,6 +1142,7 @@ private fun QuadrantCell(
                         onDragMove = onDragMove,
                         onDragEnd = onDragEnd,
                         onOpen = { onOpen(todo) },
+                        onToggle = { onToggle(todo) },
                     )
                 }
             }
@@ -1133,6 +1162,7 @@ private fun MatrixChip(
     onDragMove: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onOpen: () -> Unit,
+    onToggle: () -> Unit,
 ) {
     var chipCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Row(
@@ -1163,8 +1193,21 @@ private fun MatrixChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        priorityColor(todo.priority)?.let {
-            Box(Modifier.size(5.dp).clip(CircleShape).background(it))
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(DwellColors.Surface1)
+                .border(1.dp, DwellColors.TextMid, CircleShape)
+                .clickable(onClick = onToggle),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = "Mark task done",
+                tint = DwellColors.TextLow,
+                modifier = Modifier.size(9.dp),
+            )
         }
         Text(
             text = renderTaskMarkdown(todo.text, DwellColors.TextMid),
@@ -1239,10 +1282,27 @@ private fun BoxScope.TodoDetailOverlay(
     onToggleSubtask: (Todo) -> Unit,
     onDelete: () -> Unit,
 ) {
+    var editingTitle by remember(todo.id, todo.text) { mutableStateOf(false) }
+    val overlayFocusRequester = remember { FocusRequester() }
+    DisposableEffect(Unit) {
+        ShortcutPause.acquire()
+        onDispose { ShortcutPause.release() }
+    }
+    LaunchedEffect(todo.id) { overlayFocusRequester.requestFocus() }
     // Softer scrim than a full-window dialog; tapping outside the card dismisses.
     Box(
         modifier = Modifier
             .matchParentSize()
+            .focusRequester(overlayFocusRequester)
+            .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                    onClose()
+                    true
+                } else {
+                    false
+                }
+            }
             .background(Color.Black.copy(alpha = 0.38f))
             .clickable(
                 indication = null,
@@ -1269,20 +1329,40 @@ private fun BoxScope.TodoDetailOverlay(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                TodoEditField(
-                    initial = todo.text,
-                    accent = accent,
-                    onCommit = onEditText,
-                    onCancel = {},
-                    autoFocus = false,
-                    textStyle = TextStyle(
-                        color = DwellColors.TextHigh,
+                if (editingTitle) {
+                    TodoEditField(
+                        initial = todo.text,
+                        accent = accent,
+                        onCommit = {
+                            editingTitle = false
+                            onEditText(it)
+                        },
+                        onCancel = { editingTitle = false },
+                        autoFocus = true,
+                        textStyle = TextStyle(
+                            color = DwellColors.TextHigh,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = DwellFonts.interTight(),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Text(
+                        text = renderTaskMarkdown(todo.text, accent, interactive = true),
+                        modifier = Modifier.weight(1f),
+                        fontFamily = DwellFonts.interTight(),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
-                        fontFamily = DwellFonts.interTight(),
-                    ),
-                    modifier = Modifier.weight(1f),
-                )
+                        color = DwellColors.TextHigh,
+                    )
+                    IconButton(
+                        onClick = { editingTitle = true },
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        Icon(Icons.Filled.Edit, "Edit task", tint = DwellColors.TextLow, modifier = Modifier.size(15.dp))
+                    }
+                }
                 Box(
                     modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onClose),
                     contentAlignment = Alignment.Center,
@@ -1296,20 +1376,33 @@ private fun BoxScope.TodoDetailOverlay(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(4 to "P1", 3 to "P2", 2 to "P3", 1 to "P4").forEach { (level, label) ->
                     val selected = todo.priority == level
+                    val priorityColor = priorityIndicatorColor(level)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (selected) accent.copy(alpha = 0.16f) else DwellColors.Surface1)
-                            .border(1.dp, if (selected) accent else DwellColors.Stroke, RoundedCornerShape(6.dp))
+                            .background(if (selected) priorityColor.copy(alpha = 0.10f) else DwellColors.Surface1)
+                            .border(
+                                1.dp,
+                                if (selected) priorityColor.copy(alpha = 0.72f) else DwellColors.Stroke,
+                                RoundedCornerShape(6.dp),
+                            )
                             .clickable { onSetPriority(level) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
                     ) {
-                        Text(
-                            text = label,
-                            fontFamily = DwellFonts.interTight(),
-                            fontSize = 11.sp,
-                            color = if (selected) accent else DwellColors.TextMid,
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(priorityColor.copy(alpha = if (selected) 1f else 0.56f)),
+                            )
+                            Text(
+                                text = label,
+                                fontFamily = DwellFonts.interTight(),
+                                fontSize = 11.sp,
+                                color = if (selected && level != 1) priorityColor else DwellColors.TextMid,
+                            )
+                        }
                     }
                 }
             }
