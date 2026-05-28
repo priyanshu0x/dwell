@@ -140,7 +140,7 @@ private class ExpensesWidget(
     private var categories by mutableStateOf<List<FastiflyCategory>>(emptyList())
     private var recent by mutableStateOf<List<FastiflyTransactionGroup>>(emptyList())
     private var pending by mutableStateOf<List<PendingTransaction>>(emptyList())
-    private var phase by mutableStateOf(Phase.Loading)
+    private var phase by mutableStateOf(if (client.isConfigured()) Phase.Loading else Phase.Unconfigured)
     private var lastError by mutableStateOf<String?>(null)
 
     // Add-form state
@@ -155,24 +155,28 @@ private class ExpensesWidget(
     private val currencyFallback: String get() = config.enum("currency", "USD")
     private val currency: String get() = context?.currencyCode?.takeIf { it.isNotBlank() } ?: currencyFallback
 
-    private var started = false
-
     // The host does not reliably drive onResume() (see PomodoroWidget), so the
-    // first load is kicked off from Content via a LaunchedEffect. onResume() is
-    // kept for hosts that do call it; both funnel through the guarded start().
+    // first load is kicked off from Content via a LaunchedEffect. No "already
+    // started" guard: if that effect's coroutine is cancelled by composition
+    // churn, a sticky guard would leave the tile stuck on "Loading…" forever.
+    // Re-entry simply re-runs start(), which is safe (idempotent reads + an
+    // idempotent outbox push).
     override fun onResume() {
         scope.coroutineScope.launch { start() }
     }
 
     private suspend fun start() {
-        if (started) return
-        started = true
-        loadCache()
-        pending = readOutbox()
+        // Resolve the unconfigured state synchronously — before any cancellable
+        // suspension — so an unconfigured tile shows "Connect to Fastifly"
+        // immediately instead of hanging on the initial "Loading…".
         if (!client.isConfigured()) {
             phase = Phase.Unconfigured
+            runCatching { loadCache(); pending = readOutbox() }
+                .onFailure { scope.log.warn("Expenses cache load failed: ${it.message}") }
             return
         }
+        runCatching { loadCache() }.onFailure { scope.log.warn("Expenses cache load failed: ${it.message}") }
+        pending = runCatching { readOutbox() }.getOrDefault(emptyList())
         refresh()
     }
 
@@ -207,11 +211,12 @@ private class ExpensesWidget(
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
-                    inputVisible -> AddForm()
-                    // Show a clear empty-state — not a zeroed dashboard — until the
-                    // widget is configured and has actually loaded ledger data.
-                    phase == Phase.Unconfigured ->
+                    // Computed at render time from config — never depends on a
+                    // background coroutine — so an unconfigured tile is guaranteed
+                    // to show the connect prompt instead of a stuck "Loading…".
+                    !client.isConfigured() ->
                         EmptyState("Connect to Fastifly", "Open settings (gear above) and add your Fastifly URL + API key.")
+                    inputVisible -> AddForm()
                     phase == Phase.Loading && context == null -> EmptyState("Loading…", null)
                     phase == Phase.Error && context == null ->
                         EmptyState("Can't reach Fastifly", lastError ?: "Check the URL and API key.")
