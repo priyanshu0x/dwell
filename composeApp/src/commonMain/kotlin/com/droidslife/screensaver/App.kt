@@ -39,14 +39,18 @@ internal fun App(
     val settingsViewModel = koinInject<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
 
-    LaunchedEffect(settingsViewModel.settings) {
-        widgetRegistry.syncWithSettings(settingsViewModel.settings)
+    LaunchedEffect(settingsViewModel.settings, settingsViewModel.settingsLoaded) {
+        if (settingsViewModel.settingsLoaded) {
+            widgetRegistry.syncWithSettings(settingsViewModel.settings)
+        }
     }
 
     var visible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        visible = true
+    LaunchedEffect(settingsViewModel.settingsLoaded) {
+        if (settingsViewModel.settingsLoaded) {
+            visible = true
+        }
     }
 
     LaunchedEffect(exitRequested) {
@@ -63,8 +67,8 @@ internal fun App(
     }
 
     val welcomeToast = rememberToastState()
-    LaunchedEffect(visible, settingsViewModel.settings.welcomeShown) {
-        if (visible && !settingsViewModel.settings.welcomeShown) {
+    LaunchedEffect(visible, settingsViewModel.settingsLoaded, settingsViewModel.settings.welcomeShown) {
+        if (visible && settingsViewModel.settingsLoaded && !settingsViewModel.settings.welcomeShown) {
             // Give the fade-in time to settle, then greet the user once.
             kotlinx.coroutines.delay(900)
             welcomeToast.show(
@@ -84,32 +88,34 @@ internal fun App(
             ),
             exit = fadeOut(tween(400)),
         ) {
-            Box(modifier = modifier.fillMaxSize()) {
-                ModeHost(
-                    settingsViewModel = settingsViewModel,
-                    registry = widgetRegistry,
-                    onOpenSettings = { settingsViewModel.openSettingsDialog() },
-                    onOpenHelp = onShowHelpDialog,
-                )
-                ShortcutToast(toastState = welcomeToast)
-
-                // Settings as an in-window sidebar — the dashboard underneath
-                // stays live so toggle effects are visible immediately.
-                if (settingsViewModel.isSettingsDialogOpen) {
-                    SettingsSidebar(
+            if (settingsViewModel.settingsLoaded) {
+                Box(modifier = modifier.fillMaxSize()) {
+                    ModeHost(
                         settingsViewModel = settingsViewModel,
-                        widgetRegistry = widgetRegistry,
-                        onDismiss = { settingsViewModel.closeSettingsDialog() },
+                        registry = widgetRegistry,
+                        onOpenSettings = { settingsViewModel.openSettingsDialog() },
+                        onOpenHelp = onShowHelpDialog,
                     )
-                }
+                    ShortcutToast(toastState = welcomeToast)
 
-                settingsViewModel.openWidgetConfigId?.let { widgetId ->
-                    WidgetConfigDialog(
-                        widgetId = widgetId,
-                        settingsViewModel = settingsViewModel,
-                        widgetRegistry = widgetRegistry,
-                        onDismiss = { settingsViewModel.closeWidgetConfig() },
-                    )
+                    // Settings as an in-window sidebar — the dashboard underneath
+                    // stays live so toggle effects are visible immediately.
+                    if (settingsViewModel.isSettingsDialogOpen) {
+                        SettingsSidebar(
+                            settingsViewModel = settingsViewModel,
+                            widgetRegistry = widgetRegistry,
+                            onDismiss = { settingsViewModel.closeSettingsDialog() },
+                        )
+                    }
+
+                    settingsViewModel.openWidgetConfigId?.let { widgetId ->
+                        WidgetConfigDialog(
+                            widgetId = widgetId,
+                            settingsViewModel = settingsViewModel,
+                            widgetRegistry = widgetRegistry,
+                            onDismiss = { settingsViewModel.closeWidgetConfig() },
+                        )
+                    }
                 }
             }
         }
