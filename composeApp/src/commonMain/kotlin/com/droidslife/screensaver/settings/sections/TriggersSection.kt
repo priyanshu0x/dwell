@@ -45,12 +45,6 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             SectionHeader("Dismiss behavior")
             ToggleRow(
-                label = "Exit on mouse movement",
-                checked = settings.dismissOnMouseMovement,
-                onCheckedChange = settingsViewModel::setDismissOnMouseMovement,
-                description = "Moving the mouse dismisses the dashboard",
-            )
-            ToggleRow(
                 label = "Exit on keypress",
                 checked = settings.exitOnKeypress,
                 onCheckedChange = settingsViewModel::setExitOnKeypress,

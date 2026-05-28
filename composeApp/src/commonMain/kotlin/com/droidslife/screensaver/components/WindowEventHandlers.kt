@@ -16,7 +16,6 @@ data class WindowEventHandlers(
     val keyEventHandler: KeyEventHandler,
     val mouseEventModifier: Modifier,
     val toastState: ToastState,
-    val exitOnMouseMovementEnabled: Boolean,
     val showHelpDialog: Boolean,
     val onHelpDialogDismiss: () -> Unit,
     val onShowHelpDialog: () -> Unit,
@@ -30,7 +29,6 @@ fun rememberWindowEventHandlers(
     val settingsViewModel = koinInject<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
 
-    val exitOnMouseMovementEnabled = settingsViewModel.settings.dismissOnMouseMovement
     var showHelpDialog by remember { mutableStateOf(false) }
     val toastState = rememberToastState()
 
@@ -40,9 +38,6 @@ fun rememberWindowEventHandlers(
         }
     }
 
-    val keyEventState = KeyEventState(
-        exitOnMouseMovementEnabled = exitOnMouseMovementEnabled,
-    )
     val onAction: (KeyEventAction) -> Unit = { action ->
         when (action) {
             is KeyEventAction.ExitApplication -> {
@@ -70,9 +65,6 @@ fun rememberWindowEventHandlers(
                     else ->
                         onExitApplication()
                 }
-            }
-            is KeyEventAction.ToggleExitOnMouseMovement -> {
-                settingsViewModel.setDismissOnMouseMovement(!settingsViewModel.settings.dismissOnMouseMovement)
             }
             is KeyEventAction.OpenSettings -> {
                 settingsViewModel.openSettingsDialog()
@@ -123,7 +115,6 @@ fun rememberWindowEventHandlers(
         }
     }
     val keyEventHandler = rememberKeyEventHandler(
-        state = keyEventState,
         onAction = onAction,
     )
 
@@ -131,7 +122,6 @@ fun rememberWindowEventHandlers(
         keyEventHandler = keyEventHandler,
         mouseEventModifier = Modifier,
         toastState = toastState,
-        exitOnMouseMovementEnabled = exitOnMouseMovementEnabled,
         showHelpDialog = showHelpDialog,
         onHelpDialogDismiss = { showHelpDialog = false },
         onShowHelpDialog = { showHelpDialog = true },

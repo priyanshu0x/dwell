@@ -148,7 +148,6 @@ fun main(args: Array<String>) = application {
             ShortcutToast(toastState = windowEvents.toastState)
 
             App(
-                exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
                 onExitApplication = requestDashboardExit,
                 exitRequested = exitRequested,
                 onExited = {

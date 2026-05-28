@@ -24,11 +24,6 @@ sealed class KeyEventAction {
     object Escape : KeyEventAction()
 
     /**
-     * Action to toggle exit on mouse movement functionality.
-     */
-    object ToggleExitOnMouseMovement : KeyEventAction()
-
-    /**
      * Action to open settings dialog.
      */
     object OpenSettings : KeyEventAction()
@@ -74,13 +69,3 @@ sealed class KeyEventAction {
     object ReloadWidgets : KeyEventAction()
 }
 
-/**
- * Data class representing the current UI state that the KeyEventHandler needs to know about.
- * This decouples the KeyEventHandler from direct ViewModel dependencies.
- */
-data class KeyEventState(
-    /**
-     * Whether exit on mouse movement is enabled.
-     */
-    val exitOnMouseMovementEnabled: Boolean = true
-)
