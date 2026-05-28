@@ -31,6 +31,7 @@ The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` s
 | `dwell status` | Show whether Dwell is running + which JDK / settings file is in use. |
 
 > On Windows substitute `scripts\dwell.cmd` for `./scripts/dwell`. The install subcommand drops a `dwell.cmd` shim in `%USERPROFILE%\bin`.
+> Add `--debug` or set `DWELL_DEBUG=1` to show Gradle/Kotlin build output; normal launches keep it in the launcher log.
 
 ## Three modes
 
