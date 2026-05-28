@@ -21,7 +21,7 @@ The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` s
 
 | Command | What it does |
 |---|---|
-| `dwell show` | Open the dashboard once (fullscreen, exit on dismiss). |
+| `dwell show` | Open the dashboard and keep Dwell in the tray after dismiss. |
 | `dwell daemon` | Run as a tray daemon — dashboard appears after idle timeout. |
 | `dwell config` | Open the dashboard with Settings pre-opened. |
 | `dwell dev` | Compose Hot Reload dev mode (auto-recompiles on save). |
@@ -68,7 +68,7 @@ Every enabled widget visible at once on a 12×6 grid. Press `L` to enter **Edit 
 
 | Key | Action |
 |---|---|
-| `Esc`, `Alt`, mouse-move, any key (configurable) | Dismiss dashboard |
+| `Esc`, `Alt`, mouse-move, any key (configurable) | Dismiss dashboard to tray |
 | `Ctrl+Q` / `Cmd+Q` | Quit application |
 | `Ctrl+,` | Open Settings sheet |
 | `F1` / `?` | Help dialog |

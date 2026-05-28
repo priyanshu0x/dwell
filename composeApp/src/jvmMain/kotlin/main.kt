@@ -46,8 +46,12 @@ fun main(args: Array<String>) = application {
     var dashboardVisible by remember { mutableStateOf(launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
     val requestDashboardExit = { exitRequested = true }
+    val keepRunningInTray = launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show
+    // `dwell show` must leave an affordance after Esc even if the daemon tray
+    // preference is off; otherwise the app would keep running with no way back.
+    val showTrayIcon = keepRunningInTray && (settings.trayIconEnabled || launchArgs.mode == LaunchMode.Show)
 
-    if (launchArgs.mode == LaunchMode.Daemon && !dashboardVisible) {
+    if (keepRunningInTray && !dashboardVisible) {
         Window(
             title = "Dwell Daemon",
             visible = false,
@@ -69,7 +73,7 @@ fun main(args: Array<String>) = application {
     }
 
     DisposableEffect(launchArgs.mode, settings.trayIconEnabled) {
-        if (launchArgs.mode == LaunchMode.Daemon && settings.trayIconEnabled) {
+        if (showTrayIcon) {
             tray.install(
                 getSettings = { settingsViewModel.settings },
                 onShow = { onShow() },
@@ -88,7 +92,7 @@ fun main(args: Array<String>) = application {
 
     // Keep tray checkmarks in sync when settings change (from dashboard or another tray click).
     LaunchedEffect(settings.mode, settings.cinematicVariant, settings.ambientVariant, settings.consoleVariant, settings.startWithSystem) {
-        if (launchArgs.mode == LaunchMode.Daemon && settings.trayIconEnabled) {
+        if (showTrayIcon) {
             tray.refresh(
                 getSettings = { settingsViewModel.settings },
                 onShow = { onShow() },
@@ -137,9 +141,7 @@ fun main(args: Array<String>) = application {
             ),
             onCloseRequest = requestDashboardExit,
             resizable = false,
-            // Dropped alwaysOnTop: the OS should be able to switch focus
-            // (Super, Alt-Tab) without our window staying floated over the
-            // user's actual work. We hide ourselves below when focus is lost.
+            // Keep Dwell in the normal window stack so Alt-Tab behaves like a regular app.
             alwaysOnTop = false,
             undecorated = true,
             transparent = true,
@@ -151,7 +153,7 @@ fun main(args: Array<String>) = application {
                 onExitApplication = requestDashboardExit,
                 exitRequested = exitRequested,
                 onExited = {
-                    if (launchArgs.mode == LaunchMode.Daemon) {
+                    if (keepRunningInTray) {
                         dashboardVisible = false
                         exitRequested = false
                     } else {

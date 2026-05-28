@@ -3,7 +3,7 @@
 # Auto-installs Temurin JDK 21 to ~/jdks/ if missing, then runs the requested mode.
 #
 # Usage:
-#   ./scripts/dwell show       # open dashboard once
+#   ./scripts/dwell show       # open dashboard and keep Dwell in the tray
 #   ./scripts/dwell daemon     # run as tray daemon (dashboard appears after idle)
 #   ./scripts/dwell config     # open dashboard with Settings pre-opened
 #   ./scripts/dwell dev        # hot-reload dev mode
@@ -87,7 +87,7 @@ cheatsheet() {
     cat <<'EOF'
   M       cycle mode (Cinematic → Ambient → Console)
   V       cycle variant
-  Esc     dismiss
+  Esc     hide to tray
   Ctrl+,  Settings    F1 / ?  Help    Ctrl+Q  quit
 EOF
 }
@@ -99,7 +99,7 @@ Dwell — screensaver-with-widgets
 Usage: ./scripts/dwell <command>
 
 Commands:
-  show       Open the dashboard once (fullscreen, exit on dismiss).
+  show       Open the dashboard; Esc hides it to the tray.
   daemon     Run as a tray daemon (dashboard appears after idle timeout).
   config     Open the dashboard with Settings pre-opened.
   dev        Run with Compose Hot Reload (for development).

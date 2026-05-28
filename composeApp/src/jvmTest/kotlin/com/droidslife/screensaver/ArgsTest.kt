@@ -11,13 +11,17 @@ class ArgsTest {
 
     @Test
     fun emptyScrArgsOpenScreensaver() {
-        assertEquals(LaunchMode.Show, Args.parse(emptyArray(), executablePath = "Screen Saver App.scr").mode)
+        assertEquals(LaunchMode.Screensaver, Args.parse(emptyArray(), executablePath = "Screen Saver App.scr").mode)
     }
 
     @Test
-    fun showArgsOpenDashboard() {
+    fun showArgOpensTrayBackedDashboard() {
         assertEquals(LaunchMode.Show, Args.parse(arrayOf("--show")).mode)
-        assertEquals(LaunchMode.Show, Args.parse(arrayOf("/s")).mode)
+    }
+
+    @Test
+    fun screensaverArgOpensOneShotDashboard() {
+        assertEquals(LaunchMode.Screensaver, Args.parse(arrayOf("/s")).mode)
     }
 
     @Test

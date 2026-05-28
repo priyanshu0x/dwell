@@ -97,8 +97,8 @@ private fun HelpPanel(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 ShortcutGroup("Navigation", listOf(
-                    "Esc"             to "Dismiss dashboard",
-                    "Alt"             to "Dismiss dashboard",
+                    "Esc"             to "Hide dashboard",
+                    "Alt"             to "Hide dashboard",
                     "Ctrl+Q · Cmd+Q"  to "Quit Dwell",
                     "S · Ctrl+,"      to "Open Settings",
                     "F1 · ?"          to "Show this help",

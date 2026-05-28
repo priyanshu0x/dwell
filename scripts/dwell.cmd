@@ -3,7 +3,7 @@
 :: Auto-installs Temurin JDK 21 to %USERPROFILE%\jdks\ if missing, then runs the requested mode.
 ::
 :: Usage:
-::   scripts\dwell.cmd show     -- open dashboard once
+::   scripts\dwell.cmd show     -- open dashboard and keep Dwell in the tray
 ::   scripts\dwell.cmd daemon   -- run as tray daemon
 ::   scripts\dwell.cmd config   -- open dashboard with Settings pre-opened
 ::   scripts\dwell.cmd dev      -- hot-reload dev mode
@@ -60,9 +60,10 @@ call :bootstrap_java || goto :end
 if /I "%CMD%"=="show" (
     call :first_build_hint
     echo Dwell - opening dashboard.
+    echo   Esc hides it to the tray; use the tray menu to show or quit.
     call :cheatsheet
     echo.
-    call :run_gradle :composeApp:run --args=--show
+    call :run_gradle --no-daemon :composeApp:run --args=--show
     goto :end
 )
 if /I "%CMD%"=="daemon" (
@@ -329,7 +330,7 @@ goto :eof
 :cheatsheet
 echo   M       cycle mode ^(Cinematic ^> Ambient ^> Console^)
 echo   V       cycle variant
-echo   Esc     dismiss
+echo   Esc     hide to tray
 echo   Ctrl+,  Settings    F1 / ?  Help    Ctrl+Q  quit
 goto :eof
 
@@ -339,7 +340,7 @@ echo.
 echo Usage: scripts\dwell.cmd ^<command^>
 echo.
 echo Commands:
-echo   show       Open the dashboard once.
+echo   show       Open the dashboard; Esc hides it to the tray.
 echo   daemon     Run as a tray daemon ^(dashboard appears after idle timeout^).
 echo   config     Open the dashboard with Settings pre-opened.
 echo   dev        Run with Compose Hot Reload ^(for development^).
