@@ -82,9 +82,6 @@ data class SettingsModel(
     val widgetOrder: List<String> = emptyList(),
     val exitOnKeypress: Boolean = true,
 
-    /** Dismiss the dashboard when the mouse moves (true) or only on key/tap (false). */
-    val dismissOnMouseMovement: Boolean = true,
-
     /**
      * When true, Console tiles ignore drag / resize gestures until the user
      * explicitly enters edit mode (press `L`). When false (default), tiles are

@@ -38,7 +38,6 @@ fun main() = application {
         ShortcutToast(toastState = windowEvents.toastState)
 
         App(
-            exitOnMouseMovementEnabled = windowEvents.exitOnMouseMovementEnabled,
             onExitApplication = requestExit,
             exitRequested = exitRequested,
             onExited = { exitApplication() },
