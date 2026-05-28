@@ -254,10 +254,6 @@ class SettingsViewModel(
         updateSettings(settings.copy(exitOnKeypress = enabled))
     }
 
-    fun setDismissOnMouseMovement(enabled: Boolean) {
-        updateSettings(settings.copy(dismissOnMouseMovement = enabled))
-    }
-
     fun setDashboardLocked(locked: Boolean) {
         updateSettings(settings.copy(dashboardLocked = locked))
         if (!locked) consoleEditMode = false

@@ -9,7 +9,6 @@ import androidx.compose.ui.input.key.*
  * Uses UiAction and State patterns to decouple from direct ViewModel dependencies
  */
 class KeyEventHandler(
-    private val state: KeyEventState,
     private val onAction: (KeyEventAction) -> Unit
 ) {
     /**
@@ -120,19 +119,9 @@ class KeyEventHandler(
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
             when (event.key) {
                 Key.X -> {
-                    // Exit the application if exit functionality is enabled
+                    // Exit the application.
                     onAction(KeyEventAction.ShowToast("Ctrl + X"))
-                    if (state.exitOnMouseMovementEnabled) {
-                        onAction(KeyEventAction.RequestExit)
-                    } else {
-                        onAction(KeyEventAction.ShowToast("Enable exit with Ctrl + Z"))
-                    }
-                    return true
-                }
-                Key.Z -> {
-                    // Toggle exit on mouse movement functionality
-                    onAction(KeyEventAction.ToggleExitOnMouseMovement)
-                    onAction(KeyEventAction.ShowToast("Ctrl + Z"))
+                    onAction(KeyEventAction.RequestExit)
                     return true
                 }
                 Key.C -> {
@@ -172,10 +161,9 @@ class KeyEventHandler(
  */
 @Composable
 fun rememberKeyEventHandler(
-    state: KeyEventState,
     onAction: (KeyEventAction) -> Unit
 ): KeyEventHandler {
-    return remember(state, onAction) {
-        KeyEventHandler(state, onAction)
+    return remember(onAction) {
+        KeyEventHandler(onAction)
     }
 }

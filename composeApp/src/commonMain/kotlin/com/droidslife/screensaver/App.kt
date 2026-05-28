@@ -27,7 +27,6 @@ import org.koin.compose.koinInject
 
 @Composable
 internal fun App(
-    exitOnMouseMovementEnabled: Boolean = true,
     onExitApplication: () -> Unit = {},
     exitRequested: Boolean = false,
     onExited: () -> Unit = onExitApplication,
