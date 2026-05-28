@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -230,11 +231,13 @@ fun ConsoleMode(
                         ),
                 ) {
                     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
-                        instance.widget.Render(
-                            target = WidgetRenderTarget.Tile,
-                            scope = instance.scope,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        key(instance.scope) {
+                            instance.widget.Render(
+                                target = WidgetRenderTarget.Tile,
+                                scope = instance.scope,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }

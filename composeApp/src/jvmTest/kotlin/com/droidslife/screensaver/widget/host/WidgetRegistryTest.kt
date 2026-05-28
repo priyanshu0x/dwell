@@ -68,6 +68,30 @@ class WidgetRegistryTest {
     }
 
     @Test
+    fun secretVersionChangeRecreatesEnabledWidget() {
+        val factory = FakeWidgetFactory()
+        val registry = WidgetRegistry(listOf(factory), HttpClient(OkHttp))
+        val config = JsonObject(mapOf("apiToken" to JsonPrimitive("widget.test.widget.apiToken")))
+        registry.syncWithSettings(
+            SettingsModel(
+                enabledWidgetIds = setOf("test.widget"),
+                widgetConfigs = mapOf("test.widget" to config),
+                widgetSecretVersions = mapOf("widget.test.widget.apiToken" to 1L),
+            )
+        )
+
+        registry.syncWithSettings(
+            SettingsModel(
+                enabledWidgetIds = setOf("test.widget"),
+                widgetConfigs = mapOf("test.widget" to config),
+                widgetSecretVersions = mapOf("widget.test.widget.apiToken" to 2L),
+            )
+        )
+
+        assertEquals(2, factory.createCount)
+    }
+
+    @Test
     fun factoryCreateFailureDoesNotRegisterWidgetAndCancelsScope() {
         val factory = FakeWidgetFactory(createThrows = true)
         val registry = WidgetRegistry(listOf(factory), HttpClient(OkHttp))

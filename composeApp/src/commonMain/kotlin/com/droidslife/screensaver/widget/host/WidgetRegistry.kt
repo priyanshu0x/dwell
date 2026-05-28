@@ -61,7 +61,11 @@ class WidgetRegistry(
         enable(id, JsonObject(emptyMap()))
     }
 
-    fun enable(id: String, configJson: JsonObject) {
+    fun enable(
+        id: String,
+        configJson: JsonObject,
+        secretVersions: Map<String, Long> = emptyMap(),
+    ) {
         if (_instances.value.containsKey(id)) return
         val descriptor = descriptorById[id] ?: return
         val config = WidgetConfig(configJson) { key ->
@@ -80,7 +84,7 @@ class WidgetRegistry(
             logger.e(error) { "Failed to create widget $id" }
             return
         }
-        _instances.value = _instances.value + (id to WidgetInstance(descriptor, widget, config, scope))
+        _instances.value = _instances.value + (id to WidgetInstance(descriptor, widget, config, secretVersions, scope))
     }
 
     fun disable(id: String) {
@@ -119,12 +123,27 @@ class WidgetRegistry(
 
         enabledIds.forEach { id ->
             val config = settings.widgetConfigs[id] ?: JsonObject(emptyMap())
+            val secretVersions = secretVersionsFor(config, settings)
             val existing = _instances.value[id]
             if (existing == null) {
-                enable(id, config)
-            } else if (existing.config.rawJson != config) {
-                updateConfig(id, config)
+                enable(id, config, secretVersions)
+            } else if (existing.config.rawJson != config || existing.secretVersions != secretVersions) {
+                disable(id)
+                enable(id, config, secretVersions)
             }
         }
+    }
+
+    private fun secretVersionsFor(
+        config: JsonObject,
+        settings: SettingsModel,
+    ): Map<String, Long> =
+        config.values
+            .mapNotNull { (it as? JsonPrimitive)?.content }
+            .filter { it.startsWith(WIDGET_SECRET_PREFIX) }
+            .associateWith { settings.widgetSecretVersions[it] ?: 0L }
+
+    private companion object {
+        const val WIDGET_SECRET_PREFIX = "widget."
     }
 }

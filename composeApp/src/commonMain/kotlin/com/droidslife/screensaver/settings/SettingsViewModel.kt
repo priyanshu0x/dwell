@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -27,13 +26,12 @@ class SettingsViewModel(
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    // Secret writes are serialized through this fair mutex so a per-keystroke
-    // sequence ("t" → "to" → "tok"…) can't land out of order and leave a stale
-    // prefix in storage. [lastSecretWriteJob] tracks the most recent write so
-    // callers can [flushSecretsThen] wait for every queued write to flush before
-    // they read the value back (e.g. rebuilding a widget to pick up a new token).
+    // Secret writes are serialized so a per-keystroke sequence ("t" -> "to" ->
+    // "tok") can't land out of order and leave a stale prefix in storage.
     private val secretWriteMutex = Mutex()
-    private var lastSecretWriteJob: Job? = null
+    private val settingsWriteMutex = Mutex()
+    private var secretWriteSequence = 0L
+    private val latestWidgetSecretSequence = mutableMapOf<Pair<String, String>, Long>()
 
     /**
      * The current settings state.
@@ -155,28 +153,30 @@ class SettingsViewModel(
 
     fun updateWidgetSecret(widgetId: String, key: String, value: String) {
         val secretId = widgetSecretId(widgetId, key)
+        val sequenceKey = widgetId to key
+        val sequence = ++secretWriteSequence
+        latestWidgetSecretSequence[sequenceKey] = sequence
         val currentConfig = settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
         updateSettings(settings.copy(widgetConfigs = settings.widgetConfigs + (widgetId to JsonObject(currentConfig + (key to JsonPrimitive(secretId))))))
-        writeSecret(secretId, value)
-    }
-
-    /**
-     * Suspends until every queued secret write has flushed to storage, then runs
-     * [action]. The widget secret resolver reads from storage at build time, so
-     * callers rebuilding a widget to apply a freshly entered token must wait here
-     * first — otherwise the rebuild races the write and reads a stale value.
-     */
-    fun flushSecretsThen(action: () -> Unit) {
-        viewModelScope.launch {
-            lastSecretWriteJob?.join()
-            action()
+        writeSecret(secretId, value) {
+            if (latestWidgetSecretSequence[sequenceKey] == sequence) {
+                bumpWidgetSecretVersion(secretId)
+            }
         }
     }
 
-    // All secret persistence funnels through here so writes stay serialized (see
-    // [secretWriteMutex]) and observable via [lastSecretWriteJob].
-    private fun writeSecret(secretId: String, value: String) {
-        lastSecretWriteJob = viewModelScope.launch {
+    fun widgetSecretReference(widgetId: String, key: String): String? =
+        (settings.widgetConfigs[widgetId]?.get(key) as? JsonPrimitive)
+            ?.content
+            ?.takeIf { it.isNotBlank() }
+
+    // All secret persistence funnels through here so writes stay serialized.
+    private fun writeSecret(
+        secretId: String,
+        value: String,
+        onSaved: (() -> Unit)? = null,
+    ) {
+        viewModelScope.launch {
             secretWriteMutex.withLock {
                 if (value.isBlank()) {
                     secretStorage.delete(secretId)
@@ -186,7 +186,13 @@ class SettingsViewModel(
                     savedSecretIds += secretId
                 }
             }
+            onSaved?.invoke()
         }
+    }
+
+    private fun bumpWidgetSecretVersion(secretId: String) {
+        val nextVersion = (settings.widgetSecretVersions[secretId] ?: 0L) + 1L
+        updateSettings(settings.copy(widgetSecretVersions = settings.widgetSecretVersions + (secretId to nextVersion)))
     }
 
     fun setIdleTimeoutSeconds(seconds: Int) {
@@ -303,15 +309,16 @@ class SettingsViewModel(
      * Updates the settings in the repository.
      *
      * Eagerly updates the in-memory [settings] state so the dashboard reflects
-     * the change on the next frame; the persistence write happens in parallel.
-     * Without the eager update, a setter triggers a coroutine launch → disk write
-     * → kstore flow re-emit → onEach callback — that round-trip is enough latency
-     * to make the UI feel like the toggle "did nothing" on faster machines.
+     * the change on the next frame. Disk writes stay serialized so dependent
+     * updates (for example a widget secret reference followed by its revision)
+     * cannot be re-emitted out of order.
      */
     private fun updateSettings(newSettings: SettingsModel) {
         settings = newSettings
         viewModelScope.launch {
-            preferencesRepository.updateSettings(newSettings)
+            settingsWriteMutex.withLock {
+                preferencesRepository.updateSettings(newSettings)
+            }
         }
     }
 
