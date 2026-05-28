@@ -45,7 +45,11 @@ class WeatherApiProvider(
 
     override suspend fun current(city: String): CurrentWeather {
         ensureConfigured()
-        val data = api.getWeatherDataByCity(city)
+        val data = try {
+            api.getWeatherDataByCity(city)
+        } catch (e: WeatherApiException) {
+            throw e.toProviderFailure()
+        }
         val iconUrl = data.current.condition.icon.let { if (it.startsWith("//")) "https:$it" else it }
         return CurrentWeather(
             tempC = data.current.tempC,
@@ -60,7 +64,11 @@ class WeatherApiProvider(
 
     override suspend fun forecast(city: String, days: Int): List<DayForecast> {
         ensureConfigured()
-        val response = api.fetchForecast(city, days)
+        val response = try {
+            api.fetchForecast(city, days)
+        } catch (e: WeatherApiException) {
+            throw e.toProviderFailure()
+        }
         return response.forecast.forecastDay.map { day ->
             val icon = day.day.condition.icon.let { if (it.startsWith("//")) "https:$it" else it }
             DayForecast(
@@ -85,9 +93,28 @@ class WeatherApiProvider(
     }
 }
 
-internal fun WeatherApiException.toProviderUnconfiguredOrSelf(): Throwable {
-    val msg = message.orEmpty()
-    return if (msg.contains("key is not configured", ignoreCase = true)) {
-        WeatherProviderUnconfigured(msg)
-    } else this
+internal fun WeatherApiException.toProviderFailure(): Throwable {
+    if (isMissingKey()) {
+        return WeatherProviderUnconfigured(message.orEmpty())
+    }
+    if (isCredentialOrAccountFailure()) {
+        return WeatherProviderCredentialFailure("WeatherAPI key/account problem - update it in settings")
+    }
+    return this
 }
+
+private fun WeatherApiException.isMissingKey(): Boolean {
+    val msg = combinedMessage()
+    return upstreamCode == 1002 || msg.contains("key is not configured") || msg.contains("key not provided")
+}
+
+private fun WeatherApiException.isCredentialOrAccountFailure(): Boolean {
+    if (httpStatusCode == 401 || httpStatusCode == 403) return true
+    if (upstreamCode in setOf(2006, 2007, 2008, 2009)) return true
+    val msg = combinedMessage()
+    return listOf("invalid api key", "api key provided is invalid", "api key has been disabled")
+        .any { msg.contains(it) }
+}
+
+private fun WeatherApiException.combinedMessage(): String =
+    listOfNotNull(message, upstreamMessage, cause?.message).joinToString(" ").lowercase()

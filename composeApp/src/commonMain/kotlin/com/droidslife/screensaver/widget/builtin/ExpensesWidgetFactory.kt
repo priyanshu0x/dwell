@@ -124,7 +124,7 @@ private enum class TxType(val wire: String, val label: String, val glyph: String
     Transfer("transfer", "Transfer", "⇄"),
 }
 
-private enum class Phase { Unconfigured, Loading, Ready, Offline, Error, NeedsSetup }
+private enum class Phase { Unconfigured, Loading, Ready, Offline, AuthFailed, Error, NeedsSetup }
 
 private class ExpensesWidget(
     private val config: WidgetConfig,
@@ -218,6 +218,8 @@ private class ExpensesWidget(
                         EmptyState("Connect to Fastifly", "Open settings (gear above) and add your Fastifly URL + API key.")
                     inputVisible -> AddForm()
                     phase == Phase.Loading && context == null -> EmptyState("Loading…", null)
+                    phase == Phase.AuthFailed && context == null ->
+                        EmptyState("Fastifly credentials rejected", lastError ?: "Update the URL/API key in settings.")
                     phase == Phase.Error && context == null ->
                         EmptyState("Can't reach Fastifly", lastError ?: "Check the URL and API key.")
                     else -> Overview()
@@ -512,12 +514,21 @@ private class ExpensesWidget(
         TxType.Transfer -> "Transfer"
     }
 
+    private fun FastiflyResult.Failure.isCredentialFailure(): Boolean = httpCode == 401 || httpCode == 403
+
+    private fun FastiflyResult.Failure.displayMessage(): String =
+        if (isCredentialFailure()) "Fastifly credentials rejected - update URL/API key in settings" else message
+
     private suspend fun refresh() {
         when (val ctxResult = client.meContext()) {
             FastiflyResult.Disabled -> { phase = Phase.Unconfigured; return }
             is FastiflyResult.Failure -> {
-                lastError = ctxResult.message
-                phase = if (context != null) Phase.Offline else Phase.Error
+                lastError = ctxResult.displayMessage()
+                phase = when {
+                    ctxResult.isCredentialFailure() -> Phase.AuthFailed
+                    context != null -> Phase.Offline
+                    else -> Phase.Error
+                }
                 return
             }
             is FastiflyResult.Success -> context = ctxResult.value
@@ -532,11 +543,14 @@ private class ExpensesWidget(
         if (categoriesResult is FastiflyResult.Success) categories = categoriesResult.value
         if (txnResult is FastiflyResult.Success) recent = txnResult.value
 
-        val anyFailure = listOf(accountsResult, categoriesResult, txnResult).any { it is FastiflyResult.Failure }
-        lastError = (listOf(accountsResult, categoriesResult, txnResult)
-            .firstOrNull { it is FastiflyResult.Failure } as? FastiflyResult.Failure)?.message
+        val failures = listOf(accountsResult, categoriesResult, txnResult)
+            .mapNotNull { it as? FastiflyResult.Failure }
+        val credentialFailure = failures.firstOrNull { it.isCredentialFailure() }
+        val anyFailure = failures.isNotEmpty()
+        lastError = credentialFailure?.displayMessage() ?: failures.firstOrNull()?.message
 
         phase = when {
+            credentialFailure != null -> Phase.AuthFailed
             anyFailure && (accounts.isEmpty() && recent.isEmpty()) -> Phase.Error
             anyFailure -> Phase.Offline
             accounts.isEmpty() || categories.isEmpty() -> Phase.NeedsSetup
@@ -685,6 +699,9 @@ private class ExpensesWidget(
             // The body's empty-state already explains these — no duplicate line.
             Phase.Unconfigured, Phase.Loading, Phase.Error -> null to WidgetStatusSeverity.Info
             Phase.NeedsSetup -> "Set up accounts & categories in Fastifly web" to WidgetStatusSeverity.Warning
+            Phase.AuthFailed ->
+                (if (context == null) null else lastError ?: "Fastifly credentials rejected - update settings") to
+                    WidgetStatusSeverity.Error
             Phase.Offline ->
                 (if (unsynced > 0) "Offline — $unsynced queued" else "Offline — showing cached data") to WidgetStatusSeverity.Warning
             Phase.Ready ->
