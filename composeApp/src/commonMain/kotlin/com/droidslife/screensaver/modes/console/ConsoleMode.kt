@@ -3,7 +3,6 @@ package com.droidslife.screensaver.modes.console
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -126,19 +125,7 @@ fun ConsoleMode(
             ) { id ->
                 val instance = instances[id] ?: return@ConsoleGrid
                 val rect = orderedPlacements.getValue(id)
-                val baseBorder = if (accent.tileBorderTint == Color.Transparent) {
-                    DwellColors.Stroke
-                } else {
-                    // Composite the accent tint over the base stroke so Amber gets a
-                    // barely-perceptible warm cast on borders.
-                    accent.tileBorderTint.compositeOver(DwellColors.Stroke)
-                }
                 val isHovered = hoveredTile == id
-                val targetBorder = if (isHovered) {
-                    // Subtle lift only — too much accent on hover competes
-                    // with the active-drag cyan and made the dashboard noisy.
-                    accent.primary.copy(alpha = 0.22f).compositeOver(baseBorder)
-                } else baseBorder
                 val targetBg = if (isHovered) {
                     Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)
                 } else DwellColors.Surface1
@@ -148,21 +135,13 @@ fun ConsoleMode(
                 // making the effect relaunch (and cancel the tween) every frame
                 // — which is exactly what made hover feel instant.
                 val bgAnim = remember(id) { Animatable(DwellColors.Surface1) }
-                val borderAnim = remember(id) { Animatable(baseBorder) }
                 LaunchedEffect(isHovered) {
                     bgAnim.animateTo(
                         targetValue = targetBg,
                         animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
                     )
                 }
-                LaunchedEffect(isHovered) {
-                    borderAnim.animateTo(
-                        targetValue = targetBorder,
-                        animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
-                    )
-                }
                 val backgroundColor = bgAnim.value
-                val borderColor = borderAnim.value
                 // Clickable adds its own instant Material highlight on hover;
                 // disable it so only our tweened backgroundColor shows.
                 val interactionSource = remember { MutableInteractionSource() }
@@ -171,7 +150,6 @@ fun ConsoleMode(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(DwellRadius.m))
                         .background(backgroundColor)
-                        .border(1.dp, borderColor, RoundedCornerShape(DwellRadius.m))
                         .onPointerEvent(PointerEventType.Enter) { hoveredTile = id }
                         .onPointerEvent(PointerEventType.Exit) {
                             if (hoveredTile == id) hoveredTile = null

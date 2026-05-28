@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,7 +93,11 @@ import com.droidslife.screensaver.todos.providers.TodoDue
 import com.droidslife.screensaver.todos.providers.TodoistProvider
 import com.droidslife.screensaver.todos.providers.TodosProvider
 import com.droidslife.screensaver.todos.providers.TodosSyncStatus
+import com.droidslife.screensaver.ui.DwellActionButton
+import com.droidslife.screensaver.ui.DwellChoiceChip
 import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellControlFrame
+import com.droidslife.screensaver.ui.DwellFormLabel
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.ui.DwellRadius
 import com.droidslife.screensaver.ui.WidgetPrefs
@@ -402,6 +407,7 @@ private class TodosWidget(
                       onSetPriority = { p -> setTaskPriority(todo, p) },
                       onPickDue = { pendingDue = PendingDue(todo, todo.due?.date ?: today) },
                       onToggleSubtask = { sub -> onToggle(sub) },
+                      onToggleTask = { onToggle(todo); detailId = null },
                       onDelete = { onDelete(todo); detailId = null },
                   )
               }
@@ -1280,16 +1286,18 @@ private fun BoxScope.TodoDetailOverlay(
     onSetPriority: (Int) -> Unit,
     onPickDue: () -> Unit,
     onToggleSubtask: (Todo) -> Unit,
+    onToggleTask: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var editingTitle by remember(todo.id, todo.text) { mutableStateOf(false) }
     val overlayFocusRequester = remember { FocusRequester() }
+    val currentOnClose by rememberUpdatedState(onClose)
     DisposableEffect(Unit) {
-        ShortcutPause.acquire()
-        onDispose { ShortcutPause.release() }
+        val pause = ShortcutPause.acquire { currentOnClose() }
+        onDispose { ShortcutPause.release(pause) }
     }
     LaunchedEffect(todo.id) { overlayFocusRequester.requestFocus() }
-    // Softer scrim than a full-window dialog; tapping outside the card dismisses.
+
     Box(
         modifier = Modifier
             .matchParentSize()
@@ -1310,144 +1318,207 @@ private fun BoxScope.TodoDetailOverlay(
                 onClick = onClose,
             ),
     )
+
     Column(
         modifier = Modifier
             .align(Alignment.Center)
-            .fillMaxWidth(0.94f)
-            .heightIn(max = 520.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(DwellColors.Surface0)
-            .border(1.dp, DwellColors.Stroke, RoundedCornerShape(12.dp))
+            .fillMaxWidth(0.90f)
+            .heightIn(max = 500.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(DwellColors.BgVoid)
+            .border(1.dp, DwellColors.Stroke, RoundedCornerShape(14.dp))
             .pointerInput(Unit) {} // swallow taps so clicking the card doesn't dismiss
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-            // Title (editable) + close.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 14.dp, end = 14.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DwellFormLabel("Task")
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
             ) {
-                if (editingTitle) {
-                    TodoEditField(
-                        initial = todo.text,
-                        accent = accent,
-                        onCommit = {
-                            editingTitle = false
-                            onEditText(it)
-                        },
-                        onCancel = { editingTitle = false },
-                        autoFocus = true,
-                        textStyle = TextStyle(
-                            color = DwellColors.TextHigh,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = DwellFonts.interTight(),
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    Text(
-                        text = renderTaskMarkdown(todo.text, accent, interactive = true),
-                        modifier = Modifier.weight(1f),
-                        fontFamily = DwellFonts.interTight(),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = DwellColors.TextHigh,
-                    )
-                    IconButton(
-                        onClick = { editingTitle = true },
-                        modifier = Modifier.size(24.dp),
-                    ) {
-                        Icon(Icons.Filled.Edit, "Edit task", tint = DwellColors.TextLow, modifier = Modifier.size(15.dp))
-                    }
-                }
-                Box(
-                    modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onClose),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.Close, "Close", tint = DwellColors.TextLow, modifier = Modifier.size(15.dp))
-                }
+                Icon(
+                    Icons.Filled.Close,
+                    "Close",
+                    tint = DwellColors.TextLow,
+                    modifier = Modifier.size(14.dp),
+                )
             }
+        }
 
-            // Priority selector (UI P1..P4 map to Todoist 4..1).
-            DetailSectionLabel("PRIORITY")
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(4 to "P1", 3 to "P2", 2 to "P3", 1 to "P4").forEach { (level, label) ->
-                    val selected = todo.priority == level
-                    val priorityColor = priorityIndicatorColor(level)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (selected) priorityColor.copy(alpha = 0.10f) else DwellColors.Surface1)
-                            .border(
-                                1.dp,
-                                if (selected) priorityColor.copy(alpha = 0.72f) else DwellColors.Stroke,
-                                RoundedCornerShape(6.dp),
-                            )
-                            .clickable { onSetPriority(level) }
-                            .padding(horizontal = 8.dp, vertical = 5.dp),
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier
-                                    .size(5.dp)
-                                    .clip(CircleShape)
-                                    .background(priorityColor.copy(alpha = if (selected) 1f else 0.56f)),
-                            )
-                            Text(
-                                text = label,
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DwellControlFrame {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (editingTitle) {
+                        TodoEditField(
+                            initial = todo.text,
+                            accent = accent,
+                            onCommit = {
+                                editingTitle = false
+                                onEditText(it)
+                            },
+                            onCancel = { editingTitle = false },
+                            autoFocus = true,
+                            textStyle = TextStyle(
+                                color = DwellColors.TextHigh,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
                                 fontFamily = DwellFonts.interTight(),
-                                fontSize = 11.sp,
-                                color = if (selected && level != 1) priorityColor else DwellColors.TextMid,
+                            ),
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Text(
+                            text = renderTaskMarkdown(todo.text, accent, interactive = true),
+                            modifier = Modifier.weight(1f),
+                            fontFamily = DwellFonts.interTight(),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DwellColors.TextHigh,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        IconButton(
+                            onClick = { editingTitle = true },
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                "Edit task",
+                                tint = DwellColors.TextLow,
+                                modifier = Modifier.size(14.dp),
                             )
                         }
                     }
                 }
             }
 
-            // Due date.
-            DetailSectionLabel("DUE")
-            val (dueLabel, dueColor) = todo.due
-                ?.let { dueLabelAndColor(it, today, accent) }
-                ?: ("Set a date" to DwellColors.TextLow)
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(DwellColors.Surface1)
-                    .border(1.dp, DwellColors.Stroke, RoundedCornerShape(6.dp))
-                    .clickable(onClick = onPickDue)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = dueLabel,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 12.sp,
-                    color = dueColor,
-                )
+            DwellFormLabel("Priority")
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(
+                    listOf(4 to "P1  Urgent", 3 to "P2  High"),
+                    listOf(2 to "P3  Medium", 1 to "P4  Low"),
+                ).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { (level, label) ->
+                            DwellChoiceChip(
+                                label = label,
+                                selected = todo.priority == level,
+                                color = priorityIndicatorColor(level),
+                                onClick = { onSetPriority(level) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
             }
 
-            if (todo.note.isNotBlank()) {
-                DetailSectionLabel("NOTES")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    DwellFormLabel("Due date")
+                    val (dueLabel, dueColor) = todo.due
+                        ?.let { dueLabelAndColor(it, today, accent) }
+                        ?: ("Set a date" to DwellColors.TextLow)
+                    DwellControlFrame(
+                        modifier = Modifier.clickable(onClick = onPickDue),
+                    ) {
+                        Text(
+                            text = dueLabel,
+                            fontFamily = DwellFonts.interTight(),
+                            fontSize = 14.sp,
+                            color = dueColor,
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    DwellFormLabel("Status")
+                    DwellControlFrame {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .then(
+                                        if (todo.done) Modifier.background(DwellColors.StatusOk)
+                                        else Modifier.border(1.5.dp, DwellColors.TextLow, CircleShape),
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (todo.done) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        null,
+                                        tint = DwellColors.Surface0,
+                                        modifier = Modifier.size(10.dp),
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (todo.done) "Completed" else "Open",
+                                fontFamily = DwellFonts.interTight(),
+                                fontSize = 14.sp,
+                                color = if (todo.done) DwellColors.StatusOk else DwellColors.TextHigh,
+                            )
+                        }
+                    }
+                }
+            }
+
+            DwellFormLabel("Note")
+            DwellControlFrame(minHeight = 56.dp) {
                 Text(
-                    text = renderTaskMarkdown(todo.note, accent, interactive = true),
+                    text = if (todo.note.isBlank()) {
+                        androidx.compose.ui.text.AnnotatedString("No note")
+                    } else {
+                        renderTaskMarkdown(todo.note, accent, interactive = true)
+                    },
                     fontFamily = DwellFonts.interTight(),
                     fontSize = 12.sp,
-                    color = DwellColors.TextMid,
+                    color = if (todo.note.isBlank()) DwellColors.TextLow else DwellColors.TextMid,
                 )
             }
 
             if (subtasks.isNotEmpty()) {
-                DetailSectionLabel("SUBTASKS · ${subtasks.size}")
+                DwellFormLabel("Subtasks (${subtasks.size})")
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     subtasks.forEach { sub ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(5.dp))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(DwellColors.Surface0)
+                                .border(1.dp, DwellColors.Stroke, RoundedCornerShape(10.dp))
                                 .clickable { onToggleSubtask(sub) }
-                                .padding(vertical = 3.dp),
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -1469,7 +1540,7 @@ private fun BoxScope.TodoDetailOverlay(
                                 text = renderTaskMarkdown(sub.text, accent),
                                 modifier = Modifier.weight(1f),
                                 fontFamily = DwellFonts.interTight(),
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = if (sub.done) DwellColors.TextFaint else DwellColors.TextHigh,
                                 textDecoration = if (sub.done) TextDecoration.LineThrough else null,
                                 maxLines = 2,
@@ -1479,27 +1550,36 @@ private fun BoxScope.TodoDetailOverlay(
                     }
                 }
             }
+        }
 
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDelete) {
-                    Text("Delete", color = DwellColors.StatusError, fontFamily = DwellFonts.interTight())
-                }
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(DwellColors.Stroke),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DwellColors.Surface1)
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onClose) {
-                    Text("Done", color = accent, fontFamily = DwellFonts.interTight())
-                }
+                DwellActionButton(
+                    label = "Delete",
+                    onClick = onDelete,
+                    danger = true,
+                )
+                Spacer(Modifier.width(8.dp))
+                DwellActionButton(
+                    label = if (todo.done) "Mark open" else "Mark done",
+                    onClick = onToggleTask,
+                    primary = true,
+                    leadingIcon = Icons.Filled.Check,
+                )
             }
         }
     }
-
-@Composable
-private fun DetailSectionLabel(text: String) {
-    Text(
-        text = text,
-        fontFamily = DwellFonts.interTight(),
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 9.sp,
-        letterSpacing = 1.5.sp,
-        color = DwellColors.TextLow,
-    )
 }
