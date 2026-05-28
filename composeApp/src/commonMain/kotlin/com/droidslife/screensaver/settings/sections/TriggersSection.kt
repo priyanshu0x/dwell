@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +24,21 @@ import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 
-private val IdleTimeoutSteps = listOf(1, 2, 5, 10, 15, 30, 60)
+private data class IdleTimeoutOption(
+    val seconds: Int,
+    val label: String,
+)
+
+private val IdleTimeoutOptions = listOf(
+    IdleTimeoutOption(30, "30s"),
+    IdleTimeoutOption(60, "1m"),
+    IdleTimeoutOption(2 * 60, "2m"),
+    IdleTimeoutOption(5 * 60, "5m"),
+    IdleTimeoutOption(10 * 60, "10m"),
+    IdleTimeoutOption(15 * 60, "15m"),
+    IdleTimeoutOption(30 * 60, "30m"),
+    IdleTimeoutOption(60 * 60, "60m"),
+)
 
 @Composable
 fun TriggersSection(settingsViewModel: SettingsViewModel) {
@@ -37,8 +52,8 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
                 dim = true,
             )
             IdleTimeoutChips(
-                selected = settings.idleTimeoutMinutes,
-                onSelect = settingsViewModel::setIdleTimeoutMinutes,
+                selected = settings.idleTimeoutSeconds,
+                onSelect = settingsViewModel::setIdleTimeoutSeconds,
             )
         }
 
@@ -99,9 +114,12 @@ private fun IdleTimeoutChips(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        IdleTimeoutSteps.forEach { minutes ->
-            val isSelected = selected == minutes
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        IdleTimeoutOptions.forEach { option ->
+            val isSelected = selected == option.seconds
             val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
             val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
             Box(
@@ -110,12 +128,12 @@ private fun IdleTimeoutChips(
                     .background(bg)
                     .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
                     .pointerHoverIcon(PointerIcon.Hand)
-                    .clickable { onSelect(minutes) }
+                    .clickable { onSelect(option.seconds) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "${minutes}m",
+                    text = option.label,
                     color = fg,
                     fontFamily = DwellFonts.jetBrainsMono(),
                     fontWeight = FontWeight.Medium,

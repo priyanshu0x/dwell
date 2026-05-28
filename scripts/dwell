@@ -88,6 +88,7 @@ cheatsheet() {
   M       cycle mode (Cinematic → Ambient → Console)
   V       cycle variant
   Esc     hide to tray
+  Ctrl+Alt+Space  show from tray (Windows)
   Ctrl+,  Settings    F1 / ?  Help    Ctrl+Q  quit
 EOF
 }

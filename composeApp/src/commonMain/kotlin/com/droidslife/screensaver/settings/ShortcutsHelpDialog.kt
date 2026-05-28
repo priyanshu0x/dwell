@@ -99,6 +99,7 @@ private fun HelpPanel(
                 ShortcutGroup("Navigation", listOf(
                     "Esc"             to "Hide dashboard",
                     "Alt"             to "Hide dashboard",
+                    "Ctrl+Alt+Space"  to "Show dashboard from tray (Windows)",
                     "Ctrl+Q · Cmd+Q"  to "Quit Dwell",
                     "S · Ctrl+,"      to "Open Settings",
                     "F1 · ?"          to "Show this help",

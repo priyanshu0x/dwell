@@ -331,6 +331,7 @@ goto :eof
 echo   M       cycle mode ^(Cinematic ^> Ambient ^> Console^)
 echo   V       cycle variant
 echo   Esc     hide to tray
+echo   Ctrl+Alt+Space  show from tray
 echo   Ctrl+,  Settings    F1 / ?  Help    Ctrl+Q  quit
 goto :eof
 

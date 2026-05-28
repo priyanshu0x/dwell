@@ -69,6 +69,7 @@ Every enabled widget visible at once on a 12×6 grid. Press `L` to enter **Edit 
 | Key | Action |
 |---|---|
 | `Esc`, `Alt`, mouse-move, any key (configurable) | Dismiss dashboard to tray |
+| `Ctrl+Alt+Space` | Show dashboard from tray (Windows) |
 | `Ctrl+Q` / `Cmd+Q` | Quit application |
 | `Ctrl+,` | Open Settings sheet |
 | `F1` / `?` | Help dialog |

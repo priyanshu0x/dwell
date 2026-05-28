@@ -83,29 +83,42 @@ private class SettingsFileCodec(
 /**
  * Migrate a raw settings JsonElement before deserialization.
  *
- * Currently rewrites legacy `currentCity` field into the Weather widget's
- * own config under `widgetConfigs["com.droidslife.screensaver.weather"]["city"]`,
- * then drops `currentCity` from the root. Deprecated fields (selectedDesignId,
- * autoPlayEnabled, shuffleEnabled) are simply ignored at decode time because
- * the Json decoder is configured with `ignoreUnknownKeys = true`.
+ * Currently rewrites legacy `currentCity` into the Weather widget config and
+ * `idleTimeoutMinutes` into `idleTimeoutSeconds`. Deprecated fields
+ * (selectedDesignId, autoPlayEnabled, shuffleEnabled) are simply ignored at
+ * decode time because the Json decoder is configured with `ignoreUnknownKeys = true`.
  */
 private fun migrateJson(raw: JsonElement): JsonElement {
     if (raw !is JsonObject) return raw
-    val currentCity = (raw["currentCity"] as? JsonPrimitive)?.contentOrNull
-    if (currentCity.isNullOrBlank()) {
-        // Still strip the field so we don't keep rewriting it.
-        return if (raw.containsKey("currentCity")) JsonObject(raw - "currentCity") else raw
+    var migrated = raw
+
+    val legacyIdleMinutes = (migrated["idleTimeoutMinutes"] as? JsonPrimitive)
+        ?.contentOrNull
+        ?.toIntOrNull()
+    if (legacyIdleMinutes != null && migrated["idleTimeoutSeconds"] == null) {
+        migrated = JsonObject(
+            migrated + ("idleTimeoutSeconds" to JsonPrimitive((legacyIdleMinutes * 60).coerceIn(30, 240 * 60)))
+        )
     }
+    if (migrated.containsKey("idleTimeoutMinutes")) {
+        migrated = JsonObject(migrated - "idleTimeoutMinutes")
+    }
+
+    val currentCity = (migrated["currentCity"] as? JsonPrimitive)?.contentOrNull
+    if (currentCity.isNullOrBlank()) {
+        return if (migrated.containsKey("currentCity")) JsonObject(migrated - "currentCity") else migrated
+    }
+
     val weatherKey = "com.droidslife.screensaver.weather"
-    val widgetConfigs = (raw["widgetConfigs"] as? JsonObject) ?: JsonObject(emptyMap())
+    val widgetConfigs = (migrated["widgetConfigs"] as? JsonObject) ?: JsonObject(emptyMap())
     val existingWeatherCfg = (widgetConfigs[weatherKey] as? JsonObject) ?: JsonObject(emptyMap())
     val merged = if (existingWeatherCfg["city"] != null) {
         // Weather already has a city; just drop currentCity.
-        raw - "currentCity"
+        migrated - "currentCity"
     } else {
         val newWeatherCfg = JsonObject(existingWeatherCfg + ("city" to JsonPrimitive(currentCity)))
         val newWidgetConfigs = JsonObject(widgetConfigs + (weatherKey to newWeatherCfg))
-        (raw - "currentCity") + ("widgetConfigs" to newWidgetConfigs)
+        (migrated - "currentCity") + ("widgetConfigs" to newWidgetConfigs)
     }
     return JsonObject(merged)
 }
