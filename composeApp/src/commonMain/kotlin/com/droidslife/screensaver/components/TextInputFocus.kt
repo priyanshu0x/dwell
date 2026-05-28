@@ -42,16 +42,49 @@ object TextInputFocus {
  * the whole dashboard.
  */
 object ShortcutPause {
-    private var pauseCount by mutableIntStateOf(0)
+    private data class PauseEntry(
+        val id: Long,
+        val onEscape: (() -> Unit)?,
+    )
 
-    val isActive: Boolean get() = pauseCount > 0
+    class Token internal constructor(internal val id: Long)
 
-    fun acquire() {
-        pauseCount++
+    private val pauses = mutableListOf<PauseEntry>()
+    private var nextId = 0L
+    private var activeCount by mutableIntStateOf(0)
+
+    val isActive: Boolean get() = activeCount > 0
+
+    fun acquire(): Token = acquireInternal(onEscape = null)
+
+    fun acquire(onEscape: () -> Unit): Token = acquireInternal(onEscape)
+
+    fun release(token: Token) {
+        val index = pauses.indexOfLast { it.id == token.id }
+        if (index >= 0) {
+            pauses.removeAt(index)
+            activeCount = pauses.size
+        }
     }
 
     fun release() {
-        if (pauseCount > 0) pauseCount--
+        if (pauses.isNotEmpty()) {
+            pauses.removeAt(pauses.lastIndex)
+            activeCount = pauses.size
+        }
+    }
+
+    fun handleEscape(): Boolean {
+        val handler = pauses.asReversed().firstNotNullOfOrNull { it.onEscape } ?: return false
+        handler()
+        return true
+    }
+
+    private fun acquireInternal(onEscape: (() -> Unit)?): Token {
+        val token = Token(++nextId)
+        pauses += PauseEntry(token.id, onEscape)
+        activeCount = pauses.size
+        return token
     }
 }
 

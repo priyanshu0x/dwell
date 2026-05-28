@@ -19,14 +19,17 @@ class KeyEventHandler(
         // While the user is typing in a text field, stand down completely so the
         // field receives plain keys and edit chords (Ctrl+C/X/A) instead of us
         // hijacking them as app shortcuts.
-        if (TextInputFocus.isActive || ShortcutPause.isActive) return false
+        if (TextInputFocus.isActive) return false
 
         if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+            if (ShortcutPause.handleEscape()) return true
             // Contextual: dismiss an open overlay first; only exit when nothing
             // is open. The cascade is resolved by the action handler.
             onAction(KeyEventAction.Escape)
             return true
         }
+
+        if (ShortcutPause.isActive) return false
 
         if (event.type == KeyEventType.KeyDown && event.key == Key.F1) {
             onAction(KeyEventAction.ShowHelp)
