@@ -18,7 +18,13 @@ pushd "%HERE%.." || (
 set "ROOT=%CD%"
 
 set "CMD=%~1"
+if /I "%CMD%"=="--debug" (
+    set "DWELL_DEBUG=1"
+    set "CMD=%~2"
+)
 if "%CMD%"=="" set "CMD=help"
+if /I "%~2"=="--debug" set "DWELL_DEBUG=1"
+if /I "%~2"=="-v" set "DWELL_DEBUG=1"
 set "DWELL_EXIT=0"
 
 if /I "%CMD%"=="help" goto :usage
@@ -56,7 +62,7 @@ if /I "%CMD%"=="show" (
     echo Dwell - opening dashboard.
     call :cheatsheet
     echo.
-    call gradlew.bat :composeApp:run --args="--show" --console=plain
+    call :run_gradle :composeApp:run --args=--show
     goto :end
 )
 if /I "%CMD%"=="daemon" (
@@ -64,7 +70,7 @@ if /I "%CMD%"=="daemon" (
     echo Dwell - starting tray daemon. Look for the icon in your system tray.
     echo   Dashboard auto-opens after the idle timeout ^(Settings ^> Triggers^).
     echo.
-    call gradlew.bat :composeApp:run --args="--daemon" --console=plain
+    call :run_gradle :composeApp:run --args=--daemon
     goto :end
 )
 if /I "%CMD%"=="config" (
@@ -72,14 +78,14 @@ if /I "%CMD%"=="config" (
     echo Dwell - opening dashboard with Settings.
     echo   Tip: add a WeatherAPI key to enable the weather widget.
     echo.
-    call gradlew.bat :composeApp:run --args="/c" --console=plain
+    call :run_gradle :composeApp:run --args=/c
     goto :end
 )
 if /I "%CMD%"=="dev" (
     call :first_build_hint
     echo Dwell - Compose Hot Reload dev mode.
     echo.
-    call gradlew.bat :composeApp:runHot --console=plain
+    call :run_gradle :composeApp:runHot
     goto :end
 )
 echo Unknown command: %CMD%
@@ -87,20 +93,6 @@ echo.
 goto :usage
 
 :bootstrap_java
-:: Try JAVA_HOME first
-if defined JAVA_HOME (
-    if exist "%JAVA_HOME%\bin\java.exe" (
-        set "JVER="
-        set "JMAJ="
-        for /f "tokens=3 delims= " %%v in ('"%JAVA_HOME%\bin\java.exe" -version 2^>^&1 ^| findstr /R "version"') do (
-            set "JVER=%%v"
-        )
-        :: JVER looks like "21.0.1" or "21" - extract major version
-        set "JVER=!JVER:"=!"
-        for /f "tokens=1 delims=." %%m in ("!JVER!") do set "JMAJ=%%m"
-        if defined JMAJ if !JMAJ! GEQ 21 goto :have_java
-    )
-)
 :: Look under %USERPROFILE%\jdks\jdk-21*
 for /d %%d in ("%USERPROFILE%\jdks\jdk-21*") do (
     if exist "%%d\bin\java.exe" (
@@ -113,6 +105,17 @@ for /d %%d in ("%USERPROFILE%\.jdks\*21*") do (
         set "JAVA_HOME=%%d"
         goto :have_java
     )
+)
+for /d %%d in ("%ProgramFiles%\Eclipse Adoptium\jdk-21*" "%ProgramFiles%\Java\jdk-21*") do (
+    if exist "%%d\bin\java.exe" (
+        set "JAVA_HOME=%%d"
+        goto :have_java
+    )
+)
+:: Fall back to JAVA_HOME after known JDK 21 locations. Some shells leave a
+:: trailing space in JAVA_HOME, which makes the version probe noisy in cmd.exe.
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" goto :have_java
 )
 :: Auto-install via PowerShell
 echo. No JDK 21 found. Installing Temurin JDK 21 to %USERPROFILE%\jdks\ ^(~200MB, one-time^)...
@@ -140,6 +143,40 @@ goto :eof
 
 :first_build_hint
 if not exist "composeApp\build\libs" echo First build - fetching dependencies ^(~1-2 min on a fast connection^).
+goto :eof
+
+:resolve_log_file
+if defined DWELL_LOG goto :eof
+if defined LOCALAPPDATA (
+    set "DWELL_LOG_DIR=%LOCALAPPDATA%\Dwell\logs"
+) else if defined TEMP (
+    set "DWELL_LOG_DIR=%TEMP%\Dwell\logs"
+) else (
+    set "DWELL_LOG_DIR=%ROOT%\build\dwell-logs"
+)
+if not exist "!DWELL_LOG_DIR!" mkdir "!DWELL_LOG_DIR!" >nul 2>nul
+if not exist "!DWELL_LOG_DIR!\." (
+    set "DWELL_LOG_DIR=%ROOT%\build\dwell-logs"
+    if not exist "!DWELL_LOG_DIR!" mkdir "!DWELL_LOG_DIR!" >nul 2>nul
+)
+set "DWELL_LOG=!DWELL_LOG_DIR!\launcher.log"
+goto :eof
+
+:run_gradle
+set "GRADLE_JAVA=%JAVA_HOME%\bin\java.exe"
+if not exist "!GRADLE_JAVA!" set "GRADLE_JAVA=java.exe"
+if defined DWELL_DEBUG (
+    "!GRADLE_JAVA!" "-Xmx64m" "-Xms64m" "-Dorg.gradle.appname=gradlew" -jar "%ROOT%\gradle\wrapper\gradle-wrapper.jar" %* --console=plain
+    set "DWELL_EXIT=!ERRORLEVEL!"
+    goto :eof
+)
+call :resolve_log_file
+echo   Starting quietly. For build logs, run with --debug or set DWELL_DEBUG=1.
+"!GRADLE_JAVA!" "-Xmx64m" "-Xms64m" "-Dorg.gradle.appname=gradlew" -jar "%ROOT%\gradle\wrapper\gradle-wrapper.jar" %* --console=plain > "!DWELL_LOG!" 2>&1
+set "DWELL_EXIT=%ERRORLEVEL%"
+if not "%DWELL_EXIT%"=="0" (
+    echo ERROR: Dwell failed to start. Full log: !DWELL_LOG!
+)
 goto :eof
 
 :resolve_bin_dir
@@ -314,9 +351,10 @@ echo   status     Show whether Dwell is running + which JDK / settings is in use
 echo   help       Show this help.
 echo.
 echo First run will auto-install JDK 21 to %%USERPROFILE%%\jdks\.
+echo Add --debug or set DWELL_DEBUG=1 to show Gradle and Kotlin output.
 goto :end
 
 :end
-popd
+popd 2>nul
 set "EXIT_CODE=%DWELL_EXIT%"
 endlocal & exit /b %EXIT_CODE%
