@@ -90,6 +90,12 @@ fun main(args: Array<String>) = application {
         onDispose { tray.remove() }
     }
 
+    DisposableEffect(keepRunningInTray) {
+        val hotkey = WindowsTrayHotkey(onShowDashboard = onShow)
+        if (keepRunningInTray) hotkey.start()
+        onDispose { hotkey.close() }
+    }
+
     // Keep tray checkmarks in sync when settings change (from dashboard or another tray click).
     LaunchedEffect(settings.mode, settings.cinematicVariant, settings.ambientVariant, settings.consoleVariant, settings.startWithSystem) {
         if (showTrayIcon) {

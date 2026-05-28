@@ -100,7 +100,7 @@ class TrayDaemon {
     ): PopupMenu {
         val s = getSettings()
         return PopupMenu().apply {
-            add(MenuItem("Show now").also { it.addActionListener { onShow() } })
+            add(MenuItem("Show now (Ctrl+Alt+Space)").also { it.addActionListener { onShow() } })
             add(MenuItem("Settings…").also { it.addActionListener { onSettings() } })
             addSeparator()
 
