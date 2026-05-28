@@ -15,18 +15,18 @@ import com.droidslife.screensaver.Args
 import com.droidslife.screensaver.LaunchMode
 import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberWindowEventHandlers
-import com.droidslife.screensaver.daemon.IdleState
 import com.droidslife.screensaver.daemon.TrayDaemon
 import com.droidslife.screensaver.daemon.createIdleMonitor
-import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
+import java.awt.Frame
 
 private const val IDLE_AUTO_DISMISS_GRACE_MS = 30_000L
+private const val IDLE_MONITOR_POLL_MS = 1_000L
 
 fun main(args: Array<String>) = application {
     val launchArgs = remember(args.toList()) { Args.parse(args) }
@@ -50,6 +50,7 @@ fun main(args: Array<String>) = application {
     var exitRequested by remember { mutableStateOf(false) }
     var dashboardOpenedByIdle by remember { mutableStateOf(false) }
     var lastIdleAutoShowAtMs by remember { mutableStateOf(0L) }
+    var dashboardActivationRequest by remember { mutableStateOf(0) }
     val requestDashboardExit = { exitRequested = true }
     val keepRunningInTray = launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show
     // `dwell show` must leave an affordance after Esc even if the daemon tray
@@ -70,6 +71,7 @@ fun main(args: Array<String>) = application {
         dashboardVisible = true
         exitRequested = false
         dashboardOpenedByIdle = false
+        dashboardActivationRequest += 1
     }
     val onSettings = {
         dashboardVisible = true
@@ -124,30 +126,33 @@ fun main(args: Array<String>) = application {
         }
     }
 
-    LaunchedEffect(keepRunningInTray, settings.idleTimeoutMinutes) {
+    LaunchedEffect(keepRunningInTray, settings.idleTimeoutSeconds) {
         if (!keepRunningInTray) return@LaunchedEffect
         val idleMonitor = createIdleMonitor()
-        val thresholdMillis = settings.idleTimeoutMinutes * 60_000L
-        idleMonitor
-            .watch(thresholdMillis)
-            .collect { state ->
-                when (state) {
-                    IdleState.Idle -> {
-                        dashboardVisible = true
-                        exitRequested = false
-                        dashboardOpenedByIdle = true
-                        lastIdleAutoShowAtMs = System.currentTimeMillis()
-                    }
-                    IdleState.Active -> if (dashboardVisible && dashboardOpenedByIdle) {
-                        val graceRemaining = IDLE_AUTO_DISMISS_GRACE_MS -
-                            (System.currentTimeMillis() - lastIdleAutoShowAtMs)
-                        if (graceRemaining > 0) delay(graceRemaining)
-                        if (dashboardVisible && dashboardOpenedByIdle && idleMonitor.idleTimeMillis() < thresholdMillis) {
-                            exitRequested = true
-                        }
-                    }
+        val thresholdMillis = settings.idleTimeoutSeconds * 1_000L
+        var autoShownForCurrentIdle = false
+
+        while (true) {
+            val idleMillis = idleMonitor.idleTimeMillis()
+            val now = System.currentTimeMillis()
+            if (idleMillis >= thresholdMillis) {
+                if (!autoShownForCurrentIdle) {
+                    dashboardVisible = true
+                    exitRequested = false
+                    dashboardOpenedByIdle = true
+                    lastIdleAutoShowAtMs = now
+                    dashboardActivationRequest += 1
+                    autoShownForCurrentIdle = true
                 }
+            } else if (dashboardVisible && dashboardOpenedByIdle) {
+                autoShownForCurrentIdle = false
+                val graceElapsed = now - lastIdleAutoShowAtMs >= IDLE_AUTO_DISMISS_GRACE_MS
+                if (graceElapsed) exitRequested = true
+            } else {
+                autoShownForCurrentIdle = false
             }
+            delay(IDLE_MONITOR_POLL_MS)
+        }
     }
 
     if (dashboardVisible) {
@@ -172,6 +177,16 @@ fun main(args: Array<String>) = application {
             transparent = true,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
         ) {
+            LaunchedEffect(dashboardActivationRequest) {
+                if (dashboardActivationRequest > 0) {
+                    if ((window.extendedState and Frame.ICONIFIED) != 0) {
+                        window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
+                    }
+                    window.toFront()
+                    window.requestFocus()
+                }
+            }
+
             ShortcutToast(toastState = windowEvents.toastState)
 
             App(

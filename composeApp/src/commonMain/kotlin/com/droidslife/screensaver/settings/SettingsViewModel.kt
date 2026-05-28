@@ -189,8 +189,8 @@ class SettingsViewModel(
         }
     }
 
-    fun setIdleTimeoutMinutes(minutes: Int) {
-        updateSettings(settings.copy(idleTimeoutMinutes = minutes.coerceIn(1, 240)))
+    fun setIdleTimeoutSeconds(seconds: Int) {
+        updateSettings(settings.copy(idleTimeoutSeconds = seconds.coerceIn(30, 240 * 60)))
     }
 
     fun setTrayIconEnabled(enabled: Boolean) {

@@ -42,9 +42,9 @@ data class SettingsModel(
     val widgetConfigs: Map<String, JsonObject> = emptyMap(),
 
     /**
-     * Minutes of OS idle time before the daemon opens the dashboard.
+     * Seconds of OS idle time before the daemon opens the dashboard.
      */
-    val idleTimeoutMinutes: Int = 5,
+    val idleTimeoutSeconds: Int = 5 * 60,
 
     /**
      * Whether the daemon should try to show a system tray icon.
