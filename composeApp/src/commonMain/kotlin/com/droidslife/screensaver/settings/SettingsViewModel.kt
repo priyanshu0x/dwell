@@ -41,6 +41,9 @@ class SettingsViewModel(
     var settings by mutableStateOf(SettingsModel())
         private set
 
+    var settingsLoaded by mutableStateOf(false)
+        private set
+
     /**
      * Whether the settings dialog is currently open.
      */
@@ -94,6 +97,7 @@ class SettingsViewModel(
         preferencesRepository.getSettings()
             .onEach {
                 settings = it
+                settingsLoaded = true
                 refreshSecretStatuses(it)
             }
             .launchIn(viewModelScope)
