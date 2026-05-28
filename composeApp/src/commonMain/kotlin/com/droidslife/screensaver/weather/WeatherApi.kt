@@ -7,6 +7,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,12 +42,15 @@ class WeatherApi(
     ): WeatherData = withContext(Dispatchers.Default) {
         try {
             val apiKey = apiKey()
-            client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
+            val response = client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
                 parameter("q", "$latitude,$longitude")
                 parameter("key", apiKey)
-            }.body<WeatherData>()
+            }
+            response.ensureSuccess("Failed to load weather for coordinates $latitude,$longitude")
+            response.body<WeatherData>()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            if (e is WeatherApiException) throw e
             throw WeatherApiException("Failed to load weather for coordinates $latitude,$longitude", e)
         }
     }
@@ -58,12 +63,15 @@ class WeatherApi(
     suspend fun getWeatherDataByCity(cityName: String): WeatherData = withContext(Dispatchers.Default) {
         try {
             val apiKey = apiKey()
-            client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
+            val response = client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
                 parameter("q", cityName)
                 parameter("key", apiKey)
-            }.body<WeatherData>()
+            }
+            response.ensureSuccess("Failed to load weather for $cityName")
+            response.body<WeatherData>()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            if (e is WeatherApiException) throw e
             throw WeatherApiException("Failed to load weather for $cityName", e)
         }
     }
@@ -77,15 +85,18 @@ class WeatherApi(
         withContext(Dispatchers.Default) {
             try {
                 val apiKey = apiKey()
-                client.get("${Constants.WeatherApi.BASE_URL}/forecast.json") {
+                val response = client.get("${Constants.WeatherApi.BASE_URL}/forecast.json") {
                     parameter("q", cityName)
                     parameter("days", days)
                     parameter("aqi", "no")
                     parameter("alerts", "no")
                     parameter("key", apiKey)
-                }.body<ForecastResponse>()
+                }
+                response.ensureSuccess("Failed to load forecast for $cityName")
+                response.body<ForecastResponse>()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                if (e is WeatherApiException) throw e
                 throw WeatherApiException("Failed to load forecast for $cityName", e)
             }
         }
@@ -101,10 +112,12 @@ class WeatherApi(
             val response = client.get("${Constants.WeatherApi.BASE_URL}/search.json") {
                 parameter("q", query)
                 parameter("key", apiKey)
-            }.body<String>()
+            }
+            response.ensureSuccess("Failed to search cities for '$query'")
+            val body = response.bodyAsText()
 
             val json = Json { ignoreUnknownKeys = true }
-            val jsonArray = json.parseToJsonElement(response).jsonArray
+            val jsonArray = json.parseToJsonElement(body).jsonArray
 
             jsonArray.map { jsonElement ->
                 val jsonObject = jsonElement.jsonObject
@@ -119,6 +132,7 @@ class WeatherApi(
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            if (e is WeatherApiException) throw e
             throw WeatherApiException("Failed to search cities for '$query'", e)
         }
     }
@@ -129,9 +143,45 @@ class WeatherApi(
             ?: System.getenv("WEATHERAPI")?.trim()?.takeIf { it.isNotBlank() }
             ?: throw WeatherApiException("WeatherAPI key is not configured")
     }
+
+    private suspend fun HttpResponse.ensureSuccess(fallbackMessage: String) {
+        if (status.value in 200..299) return
+        val error = runCatching {
+            errorJson.decodeFromString(WeatherApiErrorEnvelope.serializer(), bodyAsText()).error
+        }.getOrNull()
+        val upstreamMessage = error?.message?.takeIf { it.isNotBlank() }
+        throw WeatherApiException(
+            message = upstreamMessage?.let { "$fallbackMessage: $it" }
+                ?: "$fallbackMessage (HTTP ${status.value} ${status.description})",
+            httpStatusCode = status.value,
+            upstreamCode = error?.code,
+            upstreamMessage = upstreamMessage,
+        )
+    }
+
+    private companion object {
+        val errorJson: Json = Json { ignoreUnknownKeys = true; isLenient = true }
+    }
 }
 
-class WeatherApiException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class WeatherApiException(
+    message: String,
+    cause: Throwable? = null,
+    val httpStatusCode: Int? = null,
+    val upstreamCode: Int? = null,
+    val upstreamMessage: String? = null,
+) : Exception(message, cause)
+
+@Serializable
+private data class WeatherApiErrorEnvelope(
+    val error: WeatherApiError? = null,
+)
+
+@Serializable
+private data class WeatherApiError(
+    val code: Int? = null,
+    val message: String? = null,
+)
 
 /**
  * Data class representing the weather data returned by the WeatherAPI.com API.
