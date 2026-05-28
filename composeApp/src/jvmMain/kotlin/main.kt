@@ -23,7 +23,10 @@ import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
+import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
+
+private const val IDLE_AUTO_DISMISS_GRACE_MS = 30_000L
 
 fun main(args: Array<String>) = application {
     val launchArgs = remember(args.toList()) { Args.parse(args) }
@@ -45,6 +48,8 @@ fun main(args: Array<String>) = application {
     val settings = settingsViewModel.settings
     var dashboardVisible by remember { mutableStateOf(launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
+    var dashboardOpenedByIdle by remember { mutableStateOf(false) }
+    var lastIdleAutoShowAtMs by remember { mutableStateOf(0L) }
     val requestDashboardExit = { exitRequested = true }
     val keepRunningInTray = launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show
     // `dwell show` must leave an affordance after Esc even if the daemon tray
@@ -61,10 +66,15 @@ fun main(args: Array<String>) = application {
 
     val tray = remember { TrayDaemon() }
 
-    val onShow = { dashboardVisible = true; exitRequested = false }
+    val onShow = {
+        dashboardVisible = true
+        exitRequested = false
+        dashboardOpenedByIdle = false
+    }
     val onSettings = {
         dashboardVisible = true
         exitRequested = false
+        dashboardOpenedByIdle = false
         settingsViewModel.openSettingsDialog()
     }
     val onReloadWidgets = {
@@ -114,18 +124,27 @@ fun main(args: Array<String>) = application {
         }
     }
 
-    LaunchedEffect(launchArgs.mode, settings.idleTimeoutMinutes) {
-        if (launchArgs.mode != LaunchMode.Daemon) return@LaunchedEffect
-        createIdleMonitor()
-            .watch(settings.idleTimeoutMinutes * 60_000L)
+    LaunchedEffect(keepRunningInTray, settings.idleTimeoutMinutes) {
+        if (!keepRunningInTray) return@LaunchedEffect
+        val idleMonitor = createIdleMonitor()
+        val thresholdMillis = settings.idleTimeoutMinutes * 60_000L
+        idleMonitor
+            .watch(thresholdMillis)
             .collect { state ->
                 when (state) {
                     IdleState.Idle -> {
                         dashboardVisible = true
                         exitRequested = false
+                        dashboardOpenedByIdle = true
+                        lastIdleAutoShowAtMs = System.currentTimeMillis()
                     }
-                    IdleState.Active -> if (dashboardVisible) {
-                        exitRequested = true
+                    IdleState.Active -> if (dashboardVisible && dashboardOpenedByIdle) {
+                        val graceRemaining = IDLE_AUTO_DISMISS_GRACE_MS -
+                            (System.currentTimeMillis() - lastIdleAutoShowAtMs)
+                        if (graceRemaining > 0) delay(graceRemaining)
+                        if (dashboardVisible && dashboardOpenedByIdle && idleMonitor.idleTimeMillis() < thresholdMillis) {
+                            exitRequested = true
+                        }
                     }
                 }
             }
@@ -162,6 +181,7 @@ fun main(args: Array<String>) = application {
                     if (keepRunningInTray) {
                         dashboardVisible = false
                         exitRequested = false
+                        dashboardOpenedByIdle = false
                     } else {
                         exitApplication()
                     }
