@@ -127,7 +127,7 @@ private class WeatherWidget(
             is WeatherState.Error -> WidgetSummary(
                 primaryValue = "—",
                 primaryLabel = "Weather",
-                subtitle = "Couldn't load",
+                subtitle = weatherErrorCopy(weatherViewModel.syncStatus.value, state.message),
             )
         }
     }
@@ -173,6 +173,7 @@ private fun WeatherStack(
     val subtitle: String
     val valueIsAccent: Boolean
     val trailing: (@Composable () -> Unit)?
+    val syncStatus by weatherViewModel.syncStatus.collectAsState()
     when (state) {
         is WeatherState.Loading -> {
             label = "WEATHER"; value = "—"; subtitle = "Loading…"
@@ -212,7 +213,8 @@ private fun WeatherStack(
             }
         }
         is WeatherState.Error -> {
-            label = "WEATHER"; value = "—"; subtitle = "Couldn't load"
+            label = "WEATHER"; value = "—"
+            subtitle = weatherErrorCopy(syncStatus, state.message)
             valueIsAccent = false
             trailing = {
                 IconButton(
@@ -230,13 +232,14 @@ private fun WeatherStack(
     // Status line is decoupled from `state`: a refresh can fail while we keep
     // rendering the cached Success above, so the user always sees a signal
     // instead of stale data masquerading as live.
-    val syncStatus by weatherViewModel.syncStatus.collectAsState()
     val (statusMessage, statusSeverity) = when (syncStatus) {
         WeatherSyncStatus.Healthy -> null to WidgetStatusSeverity.Info
         WeatherSyncStatus.Offline ->
             "Weather offline — showing last update" to WidgetStatusSeverity.Warning
         WeatherSyncStatus.Unconfigured ->
             "Needs a WeatherAPI.com key — or switch to wttr.in (no key)" to WidgetStatusSeverity.Warning
+        WeatherSyncStatus.CredentialFailed ->
+            "WeatherAPI key/account problem - update it in settings" to WidgetStatusSeverity.Error
         WeatherSyncStatus.Failed ->
             "Weather unavailable — check network/API key" to WidgetStatusSeverity.Error
     }
@@ -283,6 +286,12 @@ private fun WeatherStack(
             severity = statusSeverity,
         )
     }
+}
+
+private fun weatherErrorCopy(syncStatus: WeatherSyncStatus, fallback: String): String = when (syncStatus) {
+    WeatherSyncStatus.CredentialFailed -> "WeatherAPI key/account problem - update it in settings"
+    WeatherSyncStatus.Unconfigured -> "Needs a WeatherAPI.com key"
+    else -> fallback.takeIf { it.isNotBlank() } ?: "Couldn't load"
 }
 
 /**

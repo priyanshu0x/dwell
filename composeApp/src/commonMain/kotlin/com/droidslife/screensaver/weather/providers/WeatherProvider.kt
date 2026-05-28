@@ -55,3 +55,11 @@ interface WeatherProvider {
  * UI state so the user can be guided to Settings.
  */
 class WeatherProviderUnconfigured(message: String) : Exception(message)
+
+/**
+ * Thrown when configured credentials are present, but the upstream rejects
+ * them or the account cannot use the requested API. This is not an offline
+ * condition; retrying with cached data would hide the action the user needs
+ * to take in Settings.
+ */
+class WeatherProviderCredentialFailure(message: String) : Exception(message)

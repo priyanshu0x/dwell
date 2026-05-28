@@ -6,6 +6,7 @@ import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.weather.providers.CurrentWeather
 import com.droidslife.screensaver.weather.providers.WeatherApiProvider
+import com.droidslife.screensaver.weather.providers.WeatherProviderCredentialFailure
 import com.droidslife.screensaver.weather.providers.WeatherProvider
 import com.droidslife.screensaver.weather.providers.WeatherProviderUnconfigured
 import com.droidslife.screensaver.weather.providers.WttrInProvider
@@ -90,6 +91,8 @@ class WeatherRepository(
             throw e
         } catch (e: WeatherProviderUnconfigured) {
             emit(WeatherState.Unconfigured)
+        } catch (e: WeatherProviderCredentialFailure) {
+            emit(WeatherState.Error(e.message ?: "Weather credentials failed"))
         } catch (e: Exception) {
             emit(WeatherState.Error(e.message ?: "Unknown error"))
         }
