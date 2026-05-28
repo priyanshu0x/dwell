@@ -53,8 +53,8 @@ private fun AnnotatedString.Builder.appendMarkdown(text: String, linkColor: Colo
                 val url = link.groupValues[2]
                 val style = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
                 if (interactive) {
-                    // A listener routes through openLink (fast webview → browser);
-                    // providing it also stops the default UriHandler from firing too.
+                    // A listener routes through openLink; providing it also stops
+                    // the default UriHandler from firing too.
                     val link = LinkAnnotation.Url(
                         url = url,
                         styles = TextLinkStyles(style),
