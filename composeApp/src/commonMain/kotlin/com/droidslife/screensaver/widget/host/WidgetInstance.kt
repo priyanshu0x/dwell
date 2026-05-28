@@ -8,5 +8,6 @@ data class WidgetInstance(
     val descriptor: WidgetDescriptor,
     val widget: Widget,
     val config: WidgetConfig,
+    val secretVersions: Map<String, Long>,
     val scope: WidgetScope,
 )
