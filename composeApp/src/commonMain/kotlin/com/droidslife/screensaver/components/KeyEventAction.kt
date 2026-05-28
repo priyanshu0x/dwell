@@ -16,6 +16,14 @@ sealed class KeyEventAction {
     object RequestExit : KeyEventAction()
 
     /**
+     * Escape key pressed. Unlike [RequestExit], this is contextual: it dismisses
+     * whatever overlay is open (dialog, sidebar, edit mode, drawer) and only falls
+     * through to the host exit flow when nothing is open. Resolved in
+     * [rememberWindowEventHandlers] where the overlay state lives.
+     */
+    object Escape : KeyEventAction()
+
+    /**
      * Action to toggle exit on mouse movement functionality.
      */
     object ToggleExitOnMouseMovement : KeyEventAction()
@@ -59,7 +67,7 @@ sealed class KeyEventAction {
     /** Toggle the Cinematic widget drawer. */
     object ToggleDrawer : KeyEventAction()
 
-    /** Toggle Console layout edit mode. */
+    /** Toggle Console arrange mode (the drag/resize overlay). */
     object ToggleConsoleEdit : KeyEventAction()
 
     /** Reload widgets (factories + instances) from disk. */

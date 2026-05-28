@@ -68,6 +68,7 @@ fun ConsoleEditOverlay(
     placements: Map<String, GridRect>,
     sizeConstraints: Map<String, WidgetSize>,
     liveDrags: SnapshotStateMap<String, TileLiveDrag>,
+    ghosts: SnapshotStateMap<String, GridRect>,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
     hoveredTile: String? = null,
@@ -86,9 +87,6 @@ fun ConsoleEditOverlay(
         val cellH = ((innerH - gapPx * (ROWS - 1)) / ROWS).coerceAtLeast(0f)
         val stepX = cellW + gapPx
         val stepY = cellH + gapPx
-
-        // One ghost rect per tile being dragged/resized (null when idle).
-        val ghosts = remember { mutableStateMapOf<String, GridRect>() }
 
         // key(id) so reordering placements (focus z-lift) doesn't tear down
         // an in-flight drag gesture by remounting EditTile from scratch.
@@ -235,10 +233,10 @@ private fun EditTile(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .onPointerEvent(PointerEventType.Enter) { onHover(id) }
-                .onPointerEvent(PointerEventType.Exit) { onHover(null) }
-                // Hover stays default — only the active drag swaps in the
-                // grabbing fist so the user sees they've grabbed the tile.
+                // Move-drag is handled on the tile itself (in ConsoleMode) so a
+                // quick tap still reaches the widget's controls. This overlay box
+                // is purely the visual border + grab cursor while a drag runs, and
+                // must NOT capture pointer events or it would swallow those taps.
                 .then(
                     if (isActive) Modifier.pointerHoverIcon(GrabbingPointerIcon)
                     else Modifier,
@@ -255,47 +253,6 @@ private fun EditTile(
                             width = strokeWidth,
                             pathEffect = if (isActive) dashEffect else null,
                         ),
-                    )
-                }
-                .pointerInput(id, rect, stepX, stepY) {
-                    detectDragGestures(
-                        onDragStart = {
-                            ghosts[id] = rect
-                            liveDrags[id] = TileLiveDrag.Zero
-                            onFocus(id)
-                        },
-                        onDrag = { change, drag ->
-                            change.consume()
-                            val prev = liveDrags[id] ?: TileLiveDrag.Zero
-                            val safeStepX = if (stepX > 0f) stepX else 1f
-                            val safeStepY = if (stepY > 0f) stepY else 1f
-                            // Pixel bounds so the tile can't leave the grid.
-                            val minDx = -rect.col * stepX
-                            val maxDx = (COLS - rect.cols - rect.col) * stepX
-                            val minDy = -rect.row * stepY
-                            val maxDy = (ROWS - rect.rows - rect.row) * stepY
-                            val newDx = (prev.dx + drag.x).coerceIn(minDx, maxDx)
-                            val newDy = (prev.dy + drag.y).coerceIn(minDy, maxDy)
-                            liveDrags[id] = prev.copy(dx = newDx, dy = newDy)
-                            val dCol = (newDx / safeStepX).roundToInt()
-                            val dRow = (newDy / safeStepY).roundToInt()
-                            val newCol = (rect.col + dCol).coerceIn(0, COLS - rect.cols)
-                            val newRow = (rect.row + dRow).coerceIn(0, ROWS - rect.rows)
-                            ghosts[id] = rect.copy(col = newCol, row = newRow)
-                        },
-                        onDragEnd = {
-                            val finalRect = ghosts.remove(id)
-                            liveDrags.remove(id)
-                            if (finalRect != null && finalRect != rect &&
-                                !totallyOverlapsAny(id, finalRect, placements)
-                            ) {
-                                onMove(id, finalRect)
-                            }
-                        },
-                        onDragCancel = {
-                            ghosts.remove(id)
-                            liveDrags.remove(id)
-                        },
                     )
                 },
         ) {
@@ -402,11 +359,11 @@ private fun EditTile(
     }
 }
 
-private fun GridRect.intersects(other: GridRect): Boolean =
+internal fun GridRect.intersects(other: GridRect): Boolean =
     col < other.col + other.cols && other.col < col + cols &&
         row < other.row + other.rows && other.row < row + rows
 
-private fun GridRect.intersectionArea(other: GridRect): Int {
+internal fun GridRect.intersectionArea(other: GridRect): Int {
     if (!intersects(other)) return 0
     val ox = minOf(col + cols, other.col + other.cols) - maxOf(col, other.col)
     val oy = minOf(row + rows, other.row + other.rows) - maxOf(row, other.row)
@@ -421,7 +378,7 @@ private fun overlapsAny(selfId: String, rect: GridRect, placements: Map<String, 
  * covers another). Partial overlaps are allowed — the user can fix them after
  * the drop using the red border as a hint.
  */
-private fun totallyOverlapsAny(
+internal fun totallyOverlapsAny(
     selfId: String,
     rect: GridRect,
     placements: Map<String, GridRect>,

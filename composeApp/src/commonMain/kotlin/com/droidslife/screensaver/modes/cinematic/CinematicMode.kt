@@ -2,10 +2,11 @@ package com.droidslife.screensaver.modes.cinematic
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -32,7 +33,10 @@ import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.weather.WeatherState
+import com.droidslife.screensaver.weather.WeatherViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
+import org.koin.compose.koinInject
 import kotlin.time.Clock
 import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalDateTime
@@ -68,28 +72,38 @@ private fun BoxScope.CinematicForeground(
 ) {
     val settings = settingsViewModel.settings
     val now by produceTicker(includeSeconds = settings.showSeconds)
+    val weatherViewModel = koinInject<WeatherViewModel>()
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val startPad = maxWidth * 0.08f
-        val topPad = maxHeight * 0.26f
-        Column(modifier = Modifier.padding(start = startPad, top = topPad)) {
+    // Clock band at 26 % top, meta band trailing under it. Both pinned to the
+    // same 8 % left gutter so the meta optically lines up with the clock —
+    // the mockup's 8.5 % offset reads as misalignment on the actual viewport.
+    // Anchoring each row with its own fractional Spacer is more robust than
+    // BoxScope.align inside BoxWithConstraints, which produced a top-pinned
+    // meta line in practice.
+    val gutter = 0.08f
+    Column(modifier = Modifier.fillMaxSize()) {
+        Spacer(Modifier.fillMaxHeight(0.26f))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.fillMaxWidth(gutter))
             ClockText(
                 now = now,
                 is24Hour = settings.is24HourFormat,
                 showSeconds = settings.showSeconds,
                 fontFamily = DwellFonts.interTight(),
                 fontWeight = FontWeight.Bold,
-                fontSize = 280.sp,
+                fontSize = 200.sp,
                 color = DwellColors.TextHigh,
+                lineHeight = (200f * 0.85f).sp,
+                letterSpacing = (-0.06).em,
             )
-            if (settings.showDate) {
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    text = formatMetaLine(now),
-                    fontFamily = DwellFonts.interTight(),
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 18.sp,
-                    color = DwellColors.TextHigh.copy(alpha = 0.75f),
+        }
+        if (settings.showDate) {
+            Spacer(Modifier.height(40.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.fillMaxWidth(gutter))
+                CinematicMetaLine(
+                    now = now,
+                    weatherViewModel = weatherViewModel,
                 )
             }
         }
@@ -104,8 +118,55 @@ private fun BoxScope.CinematicForeground(
             fontSize = 9.sp,
             letterSpacing = 2.7.sp,
             color = DwellColors.TextHigh.copy(alpha = 0.32f),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
         )
+    }
+}
+
+// Row with explicit · spans so we can apply the mockup's 12 dp padding +
+// 0.4 opacity around each separator (joinToString gives only one space).
+@Composable
+private fun CinematicMetaLine(
+    now: LocalDateTime,
+    weatherViewModel: WeatherViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val segments = buildList {
+        add(formatMetaLine(now))
+        val state = weatherViewModel.state
+        if (state is WeatherState.Success) {
+            val current = state.current
+            val condition = current.conditionText.takeIf { it.isNotBlank() }
+            add(buildString {
+                append("${current.tempC.toInt()}°")
+                if (condition != null) append(" $condition")
+            })
+        }
+        val city = weatherViewModel.selectedCity?.ifBlank { null }
+        if (city != null) add(city)
+    }
+    val metaColor = DwellColors.TextHigh.copy(alpha = 0.78f)
+    val dotColor = DwellColors.TextHigh.copy(alpha = 0.4f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        segments.forEachIndexed { index, segment ->
+            if (index > 0) {
+                Text(
+                    text = "·",
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 16.sp,
+                    color = dotColor,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+            Text(
+                text = segment,
+                fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                letterSpacing = 0.06.em,
+                color = metaColor,
+            )
+        }
     }
 }
 
@@ -134,6 +195,9 @@ internal fun ClockText(
     fontSize: TextUnit,
     color: Color,
     modifier: Modifier = Modifier,
+    tightLineHeight: Boolean = false,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    lineHeight: TextUnit = TextUnit.Unspecified,
 ) {
     val hour24 = now.hour
     val hour = if (is24Hour) hour24 else (hour24 % 12).let { if (it == 0) 12 else it }
@@ -154,6 +218,12 @@ internal fun ClockText(
     // primary's cap-line (looks tucked next to HH:MM rather than dropped under).
     val secondaryBottomPad = (fontSize.value * 0.20f).dp
 
+    val primaryLineHeight = when {
+        lineHeight != TextUnit.Unspecified -> lineHeight
+        tightLineHeight -> fontSize
+        else -> TextUnit.Unspecified
+    }
+    val secondaryLineHeight = if (tightLineHeight) secondaryFontSize else TextUnit.Unspecified
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Bottom,
@@ -163,6 +233,8 @@ internal fun ClockText(
             fontFamily = fontFamily,
             fontWeight = fontWeight,
             fontSize = fontSize,
+            lineHeight = primaryLineHeight,
+            letterSpacing = letterSpacing,
             color = color,
         )
         if (showSeconds) {
@@ -171,6 +243,7 @@ internal fun ClockText(
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
                 fontSize = secondaryFontSize,
+                lineHeight = secondaryLineHeight,
                 color = secondaryColor,
                 modifier = Modifier.padding(start = 12.dp, bottom = secondaryBottomPad),
             )
@@ -181,6 +254,7 @@ internal fun ClockText(
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
                 fontSize = secondaryFontSize,
+                lineHeight = secondaryLineHeight,
                 color = secondaryColor,
                 modifier = Modifier.padding(start = 12.dp, bottom = secondaryBottomPad),
             )

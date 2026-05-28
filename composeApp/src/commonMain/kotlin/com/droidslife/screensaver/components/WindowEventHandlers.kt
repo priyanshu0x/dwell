@@ -51,6 +51,26 @@ fun rememberWindowEventHandlers(
             is KeyEventAction.RequestExit -> {
                 onExitApplication()
             }
+            is KeyEventAction.Escape -> {
+                // Dismiss the top-most open overlay; exit only when nothing is
+                // open. Order = visual stacking: a per-widget config dialog sits
+                // above the settings sidebar, which sits above transient
+                // edit/drawer overlays.
+                when {
+                    settingsViewModel.openWidgetConfigId != null ->
+                        settingsViewModel.closeWidgetConfig()
+                    settingsViewModel.isSettingsDialogOpen ->
+                        settingsViewModel.closeSettingsDialog()
+                    showHelpDialog ->
+                        showHelpDialog = false
+                    settingsViewModel.consoleEditMode ->
+                        settingsViewModel.updateConsoleEditMode(false)
+                    settingsViewModel.drawerVisible ->
+                        settingsViewModel.updateDrawerVisible(false)
+                    else ->
+                        onExitApplication()
+                }
+            }
             is KeyEventAction.ToggleExitOnMouseMovement -> {
                 settingsViewModel.setDismissOnMouseMovement(!settingsViewModel.settings.dismissOnMouseMovement)
             }

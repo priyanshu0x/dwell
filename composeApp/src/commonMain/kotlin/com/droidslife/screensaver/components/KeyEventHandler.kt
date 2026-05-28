@@ -17,13 +17,15 @@ class KeyEventHandler(
      */
     @OptIn(ExperimentalComposeUiApi::class)
     fun handleWindowKeyEvent(event: KeyEvent): Boolean {
-        if (event.type == KeyEventType.KeyDown && (event.key == Key.AltLeft || event.key == Key.AltRight)) {
-            onAction(KeyEventAction.RequestExit)
-            return true
-        }
+        // While the user is typing in a text field, stand down completely so the
+        // field receives plain keys and edit chords (Ctrl+C/X/A) instead of us
+        // hijacking them as app shortcuts.
+        if (TextInputFocus.isActive) return false
 
         if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-            onAction(KeyEventAction.RequestExit)
+            // Contextual: dismiss an open overlay first; only exit when nothing
+            // is open. The cascade is resolved by the action handler.
+            onAction(KeyEventAction.Escape)
             return true
         }
 
@@ -101,8 +103,14 @@ class KeyEventHandler(
                     return true
                 }
                 Key.L -> {
+                    // Toggles Console arrange mode (drag/resize overlay). The
+                    // handler emits a descriptive toast.
                     onAction(KeyEventAction.ToggleConsoleEdit)
-                    onAction(KeyEventAction.ShowToast("L"))
+                    return true
+                }
+                Key.S -> {
+                    onAction(KeyEventAction.OpenSettings)
+                    onAction(KeyEventAction.ShowToast("S"))
                     return true
                 }
                 else -> { /* fall through */ }

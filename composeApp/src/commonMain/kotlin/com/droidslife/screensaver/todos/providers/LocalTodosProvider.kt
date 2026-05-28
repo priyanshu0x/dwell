@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -99,6 +101,50 @@ class LocalTodosProvider(
         changed?.let { queueUpsert(it) }
     }
 
+    override suspend fun update(id: String, text: String): Result<Unit> = runCatching {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return@runCatching
+        val now = Clock.System.now()
+        var changed: Todo? = null
+        state.value = state.value.map { todo ->
+            if (todo.id == id) {
+                todo.copy(text = trimmed, updatedAt = now).also { changed = it }
+            } else {
+                todo
+            }
+        }
+        persist()
+        changed?.let { queueUpsert(it) }
+    }
+
+    override suspend fun setPriority(id: String, priority: Int): Result<Unit> = runCatching {
+        val now = Clock.System.now()
+        var changed: Todo? = null
+        state.value = state.value.map { todo ->
+            if (todo.id == id) {
+                todo.copy(priority = priority, updatedAt = now).also { changed = it }
+            } else {
+                todo
+            }
+        }
+        persist()
+        changed?.let { queueUpsert(it) }
+    }
+
+    override suspend fun setDue(id: String, due: TodoDue?): Result<Unit> = runCatching {
+        val now = Clock.System.now()
+        var changed: Todo? = null
+        state.value = state.value.map { todo ->
+            if (todo.id == id) {
+                todo.copy(due = due, updatedAt = now).also { changed = it }
+            } else {
+                todo
+            }
+        }
+        persist()
+        changed?.let { queueUpsert(it) }
+    }
+
     override suspend fun delete(id: String): Result<Unit> = runCatching {
         state.value = state.value.filterNot { it.id == id }
         persist()
@@ -178,6 +224,12 @@ private data class StoredTodo(
     val done: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    // Defaults keep older `todos.json` (written before priority/due) decodable.
+    val priority: Int = 1,
+    // Due is stored as primitive ISO strings (not TodoDue) for forward-compat
+    // across kotlinx-datetime revisions, mirroring the epoch-millis time fields.
+    val dueDate: String? = null,
+    val dueTime: String? = null,
 ) {
     fun toDomain(): Todo = Todo(
         id = id,
@@ -185,6 +237,13 @@ private data class StoredTodo(
         done = done,
         createdAt = Instant.fromEpochMilliseconds(createdAt),
         updatedAt = Instant.fromEpochMilliseconds(updatedAt),
+        priority = priority,
+        // Parse defensively: a malformed stored value yields no due rather than throwing.
+        due = dueDate?.let { date ->
+            runCatching {
+                TodoDue(LocalDate.parse(date), dueTime?.let(LocalTime::parse))
+            }.getOrNull()
+        },
     )
 
     companion object {
@@ -194,6 +253,9 @@ private data class StoredTodo(
             done = todo.done,
             createdAt = todo.createdAt.toEpochMilliseconds(),
             updatedAt = todo.updatedAt.toEpochMilliseconds(),
+            priority = todo.priority,
+            dueDate = todo.due?.date?.toString(),
+            dueTime = todo.due?.time?.toString(),
         )
     }
 }

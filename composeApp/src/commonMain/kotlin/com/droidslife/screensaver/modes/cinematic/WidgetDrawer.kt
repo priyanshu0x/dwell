@@ -31,6 +31,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.widget.api.WidgetRenderTarget
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.widgets.DefaultChipRender
 import kotlinx.coroutines.delay
@@ -88,7 +89,12 @@ fun BoxScope.WidgetDrawer(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             enabled.forEach { instance ->
-                DefaultChipRender(instance.widget.summary())
+                val widget = instance.widget
+                if (widget.rendersOwnChip) {
+                    widget.Render(WidgetRenderTarget.Chip, instance.scope, Modifier)
+                } else {
+                    DefaultChipRender(widget.summary())
+                }
             }
         }
     }

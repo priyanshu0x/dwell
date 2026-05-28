@@ -129,7 +129,10 @@ class WttrInProvider(
         /** wttr.in resolves a blank path to the requestor's IP geolocation; we
          *  still send an explicit fallback to keep behavior deterministic when
          *  the host hasn't configured a city. */
-        private const val DEFAULT_CITY = "Mumbai"
+        // Reuses the app-wide single-source-of-truth fallback so we don't have
+        // to chase scattered city strings when the default changes.
+        private val DEFAULT_CITY: String
+            get() = com.droidslife.screensaver.location.FALLBACK_CITY
 
         // Conservative; wttr.in regularly takes 2-3s to respond. Bound via
         // `withTimeout` since the shared Ktor client doesn't install the

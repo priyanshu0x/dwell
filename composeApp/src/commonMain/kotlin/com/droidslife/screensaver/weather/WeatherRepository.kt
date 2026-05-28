@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.weather
 
+import com.droidslife.screensaver.location.FALLBACK_CITY
 import com.droidslife.screensaver.location.LocationService
 import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.SettingsViewModel
@@ -52,6 +53,13 @@ class WeatherRepository(
         }
     }
 
+    /**
+     * Exposed so callers that cache results can key the cache by provider —
+     * switching the source in Settings then doesn't surface stale data from
+     * the previous one.
+     */
+    fun activeProviderId(): String = providerIdFromSettings()
+
     private fun providerIdFromSettings(): String {
         val widgetConfig = settingsViewModel.settings.widgetConfigs[WEATHER_WIDGET_ID]
             ?: return WttrInProvider.ID
@@ -69,7 +77,7 @@ class WeatherRepository(
         try {
             val location = locationService.getCurrentLocation()
             val provider = activeProvider()
-            val current = provider.current(location.city.ifBlank { "Mumbai" })
+            val current = provider.current(location.city.ifBlank { FALLBACK_CITY })
             emit(WeatherState.Success(current, location))
         } catch (e: CancellationException) {
             throw e

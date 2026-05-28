@@ -56,6 +56,19 @@ interface Widget {
     val preferredSpan: Int get() = 1
 
     /**
+     * Opt in to drawing the widget's own compact [WidgetRenderTarget.Chip] in
+     * the Cinematic drawer. When `false` (default) the host renders a text
+     * summary via its default chip renderer.
+     */
+    val rendersOwnChip: Boolean get() = false
+
+    /**
+     * Opt in to drawing the widget's own [WidgetRenderTarget.Minimal] line in
+     * Ambient mode. When `false` (default) the widget is not shown in Ambient.
+     */
+    val rendersOwnMinimal: Boolean get() = false
+
+    /**
      * Called when the dashboard becomes visible.
      *
      * Use this to refresh transient data or resume polling that was paused by

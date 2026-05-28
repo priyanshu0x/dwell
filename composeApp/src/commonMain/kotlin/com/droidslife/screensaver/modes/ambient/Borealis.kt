@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import com.droidslife.screensaver.weather.WeatherViewModel
+import org.koin.compose.koinInject
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -53,6 +55,11 @@ fun Borealis(
 ) {
     val settings = settingsViewModel.settings
     val now by produceTickerBorealis(includeSeconds = settings.showSeconds)
+    // City lives on the Weather widget config; we just read whatever the VM is
+    // showing weather for so the label stays in sync as the user changes it.
+    val weatherViewModel = koinInject<WeatherViewModel>()
+    val cityLabel = weatherViewModel.selectedCity
+        ?: com.droidslife.screensaver.location.FALLBACK_CITY
 
     Box(
         modifier = modifier
@@ -127,7 +134,7 @@ fun Borealis(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "Mumbai", // Phase 9/12 wires actual city from Weather widget config
+                    text = cityLabel,
                     fontFamily = DwellFonts.interTight(),
                     fontWeight = FontWeight.Light,
                     fontSize = 12.sp,
