@@ -1,5 +1,5 @@
 @echo off
-:: Dwell CLI — Windows launch helper.
+:: Dwell CLI - Windows launch helper.
 :: Auto-installs Temurin JDK 21 to %USERPROFILE%\jdks\ if missing, then runs the requested mode.
 ::
 :: Usage:
@@ -11,21 +11,49 @@
 setlocal enableextensions enabledelayedexpansion
 
 set "HERE=%~dp0"
-set "ROOT=%HERE%.."
-pushd "%ROOT%"
+pushd "%HERE%.." || (
+    echo ERROR: Failed to enter project root: %HERE%..
+    exit /b 1
+)
+set "ROOT=%CD%"
 
 set "CMD=%~1"
 if "%CMD%"=="" set "CMD=help"
+set "DWELL_EXIT=0"
 
 if /I "%CMD%"=="help" goto :usage
 if /I "%CMD%"=="-h"   goto :usage
 if /I "%CMD%"=="--help" goto :usage
+if /I "%CMD%"=="install" (
+    call :install
+    goto :end
+)
+if /I "%CMD%"=="uninstall" (
+    call :uninstall
+    goto :end
+)
+if /I "%CMD%"=="register" (
+    call :register
+    goto :end
+)
+if /I "%CMD%"=="unregister" (
+    call :unregister
+    goto :end
+)
+if /I "%CMD%"=="version" (
+    call :version
+    goto :end
+)
+if /I "%CMD%"=="status" (
+    call :status
+    goto :end
+)
 
 call :bootstrap_java || goto :end
 
 if /I "%CMD%"=="show" (
     call :first_build_hint
-    echo Dwell — opening dashboard.
+    echo Dwell - opening dashboard.
     call :cheatsheet
     echo.
     call gradlew.bat :composeApp:run --args="--show" --console=plain
@@ -33,7 +61,7 @@ if /I "%CMD%"=="show" (
 )
 if /I "%CMD%"=="daemon" (
     call :first_build_hint
-    echo Dwell — starting tray daemon. Look for the icon in your system tray.
+    echo Dwell - starting tray daemon. Look for the icon in your system tray.
     echo   Dashboard auto-opens after the idle timeout ^(Settings ^> Triggers^).
     echo.
     call gradlew.bat :composeApp:run --args="--daemon" --console=plain
@@ -41,7 +69,7 @@ if /I "%CMD%"=="daemon" (
 )
 if /I "%CMD%"=="config" (
     call :first_build_hint
-    echo Dwell — opening dashboard with Settings.
+    echo Dwell - opening dashboard with Settings.
     echo   Tip: add a WeatherAPI key to enable the weather widget.
     echo.
     call gradlew.bat :composeApp:run --args="/c" --console=plain
@@ -49,79 +77,11 @@ if /I "%CMD%"=="config" (
 )
 if /I "%CMD%"=="dev" (
     call :first_build_hint
-    echo Dwell — Compose Hot Reload dev mode.
+    echo Dwell - Compose Hot Reload dev mode.
     echo.
     call gradlew.bat :composeApp:runHot --console=plain
     goto :end
 )
-if /I "%CMD%"=="register" (
-    :: Drop a Startup-folder shortcut that runs `dwell.cmd daemon` at login.
-    set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-    powershell -NoProfile -Command ^
-        "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTUP%\Dwell.lnk');" ^
-        "$s.TargetPath = '%HERE%dwell.cmd';" ^
-        "$s.Arguments = 'daemon';" ^
-        "$s.WorkingDirectory = '%ROOT%';" ^
-        "$s.IconLocation = '%ROOT%\composeApp\desktopAppIcons\WindowsIcon.ico';" ^
-        "$s.Save();"
-    if errorlevel 1 (
-        echo ✗ Failed to write Startup shortcut.
-        exit /b 1
-    )
-    echo ✓ Wrote Startup shortcut: %STARTUP%\Dwell.lnk
-    echo   To stop and remove later, run: scripts\dwell.cmd unregister
-    goto :end
-)
-if /I "%CMD%"=="unregister" (
-    set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-    if exist "%STARTUP%\Dwell.lnk" (
-        del "%STARTUP%\Dwell.lnk"
-        echo ✓ Removed Startup shortcut.
-    ) else (
-        echo   No Startup shortcut found.
-    )
-    goto :end
-)
-if /I "%CMD%"=="install" (
-    if not defined DWELL_BIN_DIR set "DWELL_BIN_DIR=%USERPROFILE%\bin"
-    if not exist "%DWELL_BIN_DIR%" mkdir "%DWELL_BIN_DIR%"
-    > "%DWELL_BIN_DIR%\dwell.cmd" echo @echo off
-    >> "%DWELL_BIN_DIR%\dwell.cmd" echo call "%HERE%dwell.cmd" %%*
-    echo ✓ Installed shim: %DWELL_BIN_DIR%\dwell.cmd ^→ %HERE%dwell.cmd
-    echo   Make sure %DWELL_BIN_DIR% is on your PATH so `dwell show` works anywhere.
-    goto :end
-)
-if /I "%CMD%"=="uninstall" (
-    if not defined DWELL_BIN_DIR set "DWELL_BIN_DIR=%USERPROFILE%\bin"
-    if exist "%DWELL_BIN_DIR%\dwell.cmd" (
-        del "%DWELL_BIN_DIR%\dwell.cmd"
-        echo ✓ Removed: %DWELL_BIN_DIR%\dwell.cmd
-    ) else (
-        echo   No shim at %DWELL_BIN_DIR%\dwell.cmd — nothing to remove.
-    )
-    echo   ^(Your settings + widget data at %%USERPROFILE%%\.screensaver remain untouched.^)
-    goto :end
-)
-if /I "%CMD%"=="version" (
-    echo Dwell 1.0.0
-    for /f %%c in ('git -C "%ROOT%" rev-parse --short HEAD 2^>nul') do echo   commit: %%c
-    for /f %%b in ('git -C "%ROOT%" rev-parse --abbrev-ref HEAD 2^>nul') do echo   branch: %%b
-    goto :end
-)
-if /I "%CMD%"=="status" (
-    echo Dwell — status
-    echo   Project root: %ROOT%
-    tasklist /FI "IMAGENAME eq java.exe" /V | findstr /I "MainKt" >nul 2>nul
-    if %ERRORLEVEL%==0 ( echo   Running: yes ) else ( echo   Running: no )
-    if defined JAVA_HOME ( echo   JDK 21:  %JAVA_HOME% ) else ( echo   JDK 21:  not detected )
-    if exist "%USERPROFILE%\.screensaver\settings.json" (
-        echo   Settings: %USERPROFILE%\.screensaver\settings.json
-    ) else (
-        echo   Settings: not yet written ^(first run hasn't completed^)
-    )
-    goto :end
-)
-
 echo Unknown command: %CMD%
 echo.
 goto :usage
@@ -135,7 +95,7 @@ if defined JAVA_HOME (
         for /f "tokens=3 delims= " %%v in ('"%JAVA_HOME%\bin\java.exe" -version 2^>^&1 ^| findstr /R "version"') do (
             set "JVER=%%v"
         )
-        :: JVER looks like "21.0.1" or "21" — extract major version
+        :: JVER looks like "21.0.1" or "21" - extract major version
         set "JVER=!JVER:"=!"
         for /f "tokens=1 delims=." %%m in ("!JVER!") do set "JMAJ=%%m"
         if defined JMAJ if !JMAJ! GEQ 21 goto :have_java
@@ -155,7 +115,7 @@ for /d %%d in ("%USERPROFILE%\.jdks\*21*") do (
     )
 )
 :: Auto-install via PowerShell
-echo. ▶ No JDK 21 found. Installing Temurin JDK 21 to %USERPROFILE%\jdks\ ^(~200MB, one-time^)…
+echo. No JDK 21 found. Installing Temurin JDK 21 to %USERPROFILE%\jdks\ ^(~200MB, one-time^)...
 if not exist "%USERPROFILE%\jdks" mkdir "%USERPROFILE%\jdks"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$url='https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse';" ^
@@ -164,22 +124,169 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "Expand-Archive -Path $zip -DestinationPath '%USERPROFILE%\jdks\' -Force;" ^
     "Remove-Item $zip"
 if errorlevel 1 (
-    echo ✗ Download / extraction failed. Install JDK 21 manually and re-run.
+    echo ERROR: Download / extraction failed. Install JDK 21 manually and re-run.
     exit /b 1
 )
 for /d %%d in ("%USERPROFILE%\jdks\jdk-21*") do set "JAVA_HOME=%%d"
 if not defined JAVA_HOME (
-    echo ✗ JDK extracted but not found. Set JAVA_HOME manually.
+    echo ERROR: JDK extracted but not found. Set JAVA_HOME manually.
     exit /b 1
 )
-echo ✓ JDK 21 installed at %JAVA_HOME%
+echo OK: JDK 21 installed at %JAVA_HOME%
 
 :have_java
 set "PATH=%JAVA_HOME%\bin;%PATH%"
 goto :eof
 
 :first_build_hint
-if not exist "composeApp\build\libs" echo ▶ First build — fetching dependencies ^(~1-2 min on a fast connection^).
+if not exist "composeApp\build\libs" echo First build - fetching dependencies ^(~1-2 min on a fast connection^).
+goto :eof
+
+:resolve_bin_dir
+if defined DWELL_BIN_DIR goto :eof
+if defined USERPROFILE (
+    set "DWELL_BIN_DIR=%USERPROFILE%\bin"
+) else if defined LOCALAPPDATA (
+    set "DWELL_BIN_DIR=%LOCALAPPDATA%\Dwell\bin"
+) else (
+    echo ERROR: USERPROFILE and LOCALAPPDATA are not set. Set DWELL_BIN_DIR and retry.
+    exit /b 1
+)
+goto :eof
+
+:resolve_startup_dir
+if defined APPDATA (
+    set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+) else if defined LOCALAPPDATA (
+    set "STARTUP=%LOCALAPPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+) else (
+    echo ERROR: APPDATA and LOCALAPPDATA are not set. Cannot find Startup folder.
+    exit /b 1
+)
+goto :eof
+
+:register
+call :resolve_startup_dir || (
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+if not exist "!STARTUP!" mkdir "!STARTUP!"
+if errorlevel 1 (
+    echo ERROR: Failed to create Startup folder: !STARTUP!
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+set "DWELL_STARTUP=!STARTUP!"
+set "DWELL_TARGET=%HERE%dwell.cmd"
+set "DWELL_ROOT=%ROOT%"
+set "DWELL_ICON=%ROOT%\composeApp\desktopAppIcons\WindowsIcon.ico"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$startup=$env:DWELL_STARTUP;" ^
+    "$target=$env:DWELL_TARGET;" ^
+    "$root=$env:DWELL_ROOT;" ^
+    "$icon=$env:DWELL_ICON;" ^
+    "$path=Join-Path $startup 'Dwell.lnk';" ^
+    "$shell=New-Object -ComObject WScript.Shell;" ^
+    "$s=$shell.CreateShortcut($path);" ^
+    "$s.TargetPath=$target;" ^
+    "$s.Arguments='daemon';" ^
+    "$s.WorkingDirectory=$root;" ^
+    "$s.IconLocation=$icon;" ^
+    "$s.Save();"
+if errorlevel 1 (
+    echo ERROR: Failed to write Startup shortcut: !STARTUP!\Dwell.lnk
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+echo OK: Wrote Startup shortcut: !STARTUP!\Dwell.lnk
+echo   To stop and remove later, run: scripts\dwell.cmd unregister
+goto :eof
+
+:unregister
+call :resolve_startup_dir || (
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+if exist "!STARTUP!\Dwell.lnk" (
+    del "!STARTUP!\Dwell.lnk"
+    if errorlevel 1 (
+        echo ERROR: Failed to remove Startup shortcut: !STARTUP!\Dwell.lnk
+        set "DWELL_EXIT=1"
+        goto :eof
+    )
+    echo OK: Removed Startup shortcut: !STARTUP!\Dwell.lnk
+) else (
+    echo   No Startup shortcut found at !STARTUP!\Dwell.lnk.
+)
+goto :eof
+
+:version
+echo Dwell 1.0.0
+for /f %%c in ('git -C "%ROOT%" rev-parse --short HEAD 2^>nul') do echo   commit: %%c
+for /f %%b in ('git -C "%ROOT%" rev-parse --abbrev-ref HEAD 2^>nul') do echo   branch: %%b
+goto :eof
+
+:status
+echo Dwell - status
+echo   Project root: %ROOT%
+tasklist /FI "IMAGENAME eq java.exe" /V 2>nul | findstr /I "MainKt" >nul 2>nul
+if errorlevel 1 ( echo   Running: no ) else ( echo   Running: yes )
+if defined JAVA_HOME ( echo   JDK 21:  %JAVA_HOME% ) else ( echo   JDK 21:  not detected )
+if defined USERPROFILE (
+    if exist "%USERPROFILE%\.screensaver\settings.json" (
+        echo   Settings: %USERPROFILE%\.screensaver\settings.json
+    ) else (
+        echo   Settings: not yet written ^(first run hasn't completed^)
+    )
+) else (
+    echo   Settings: unknown ^(USERPROFILE is not set^)
+)
+goto :eof
+
+:install
+call :resolve_bin_dir || (
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+if not exist "!DWELL_BIN_DIR!" mkdir "!DWELL_BIN_DIR!"
+if errorlevel 1 (
+    echo ERROR: Failed to create install directory: !DWELL_BIN_DIR!
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+> "!DWELL_BIN_DIR!\dwell.cmd" echo @echo off
+if errorlevel 1 (
+    echo ERROR: Failed to write shim: !DWELL_BIN_DIR!\dwell.cmd
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+>> "!DWELL_BIN_DIR!\dwell.cmd" echo call "%HERE%dwell.cmd" %%*
+if errorlevel 1 (
+    echo ERROR: Failed to finish shim: !DWELL_BIN_DIR!\dwell.cmd
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+echo OK: Installed shim: !DWELL_BIN_DIR!\dwell.cmd -^> %HERE%dwell.cmd
+echo   Make sure !DWELL_BIN_DIR! is on your PATH so "dwell show" works anywhere.
+goto :eof
+
+:uninstall
+call :resolve_bin_dir || (
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+if exist "!DWELL_BIN_DIR!\dwell.cmd" (
+    del "!DWELL_BIN_DIR!\dwell.cmd"
+    if errorlevel 1 (
+        echo ERROR: Failed to remove: !DWELL_BIN_DIR!\dwell.cmd
+        set "DWELL_EXIT=1"
+        goto :eof
+    )
+    echo OK: Removed: !DWELL_BIN_DIR!\dwell.cmd
+) else (
+    echo   No shim at !DWELL_BIN_DIR!\dwell.cmd - nothing to remove.
+)
+echo   ^(Your settings + widget data at %%USERPROFILE%%\.screensaver remain untouched.^)
 goto :eof
 
 :cheatsheet
@@ -190,7 +297,7 @@ echo   Ctrl+,  Settings    F1 / ?  Help    Ctrl+Q  quit
 goto :eof
 
 :usage
-echo Dwell — screensaver-with-widgets
+echo Dwell - screensaver-with-widgets
 echo.
 echo Usage: scripts\dwell.cmd ^<command^>
 echo.
@@ -211,4 +318,5 @@ goto :end
 
 :end
 popd
-endlocal
+set "EXIT_CODE=%DWELL_EXIT%"
+endlocal & exit /b %EXIT_CODE%

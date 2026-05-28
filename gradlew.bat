@@ -39,6 +39,15 @@ for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 
 @rem Find java.exe
+@rem This build requires Gradle to start on JVM 17+. Prefer a locally installed
+@rem JDK 21 when an older JAVA_HOME or Oracle javapath is still configured.
+for /d %%i in ("%USERPROFILE%\.jdks\*21*" "%USERPROFILE%\jdks\jdk-21*" "%ProgramFiles%\Eclipse Adoptium\jdk-21*" "%ProgramFiles%\Java\jdk-21*") do (
+    if exist "%%~i\bin\java.exe" (
+        set JAVA_EXE=%%~i\bin\java.exe
+        goto execute
+    )
+)
+
 if defined JAVA_HOME goto findJavaFromJavaHome
 
 set JAVA_EXE=java.exe

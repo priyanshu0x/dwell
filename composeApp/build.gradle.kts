@@ -60,6 +60,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.jna)
             implementation(libs.jna.platform)
+            runtimeOnly(libs.slf4j.nop)
         }
 
     }

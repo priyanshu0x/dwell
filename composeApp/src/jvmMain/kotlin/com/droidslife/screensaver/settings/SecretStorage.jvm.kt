@@ -181,7 +181,7 @@ private interface WinCred : StdCallLibrary {
 }
 
 @Suppress("PropertyName")
-private class Credential() : Structure() {
+class Credential() : Structure() {
     @JvmField var Flags: Int = 0
     @JvmField var Type: Int = 0
     @JvmField var TargetName: WString? = null
