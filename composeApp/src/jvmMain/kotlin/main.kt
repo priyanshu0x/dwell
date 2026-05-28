@@ -16,16 +16,17 @@ import com.droidslife.screensaver.LaunchMode
 import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberWindowEventHandlers
 import com.droidslife.screensaver.daemon.TrayDaemon
+import com.droidslife.screensaver.daemon.IdleState
 import com.droidslife.screensaver.daemon.createIdleMonitor
+import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import org.koin.compose.koinInject
 import java.awt.Frame
 
-private const val IDLE_AUTO_DISMISS_GRACE_MS = 30_000L
 private const val IDLE_MONITOR_POLL_MS = 1_000L
 
 fun main(args: Array<String>) = application {
@@ -48,8 +49,6 @@ fun main(args: Array<String>) = application {
     val settings = settingsViewModel.settings
     var dashboardVisible by remember { mutableStateOf(launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
-    var dashboardOpenedByIdle by remember { mutableStateOf(false) }
-    var lastIdleAutoShowAtMs by remember { mutableStateOf(0L) }
     var dashboardActivationRequest by remember { mutableStateOf(0) }
     val requestDashboardExit = { exitRequested = true }
     val keepRunningInTray = launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show
@@ -70,13 +69,11 @@ fun main(args: Array<String>) = application {
     val onShow = {
         dashboardVisible = true
         exitRequested = false
-        dashboardOpenedByIdle = false
         dashboardActivationRequest += 1
     }
     val onSettings = {
         dashboardVisible = true
         exitRequested = false
-        dashboardOpenedByIdle = false
         settingsViewModel.openSettingsDialog()
     }
     val onReloadWidgets = {
@@ -130,28 +127,13 @@ fun main(args: Array<String>) = application {
         if (!keepRunningInTray) return@LaunchedEffect
         val idleMonitor = createIdleMonitor()
         val thresholdMillis = settings.idleTimeoutSeconds * 1_000L
-        var autoShownForCurrentIdle = false
 
-        while (true) {
-            val idleMillis = idleMonitor.idleTimeMillis()
-            val now = System.currentTimeMillis()
-            if (idleMillis >= thresholdMillis) {
-                if (!autoShownForCurrentIdle) {
-                    dashboardVisible = true
-                    exitRequested = false
-                    dashboardOpenedByIdle = true
-                    lastIdleAutoShowAtMs = now
-                    dashboardActivationRequest += 1
-                    autoShownForCurrentIdle = true
-                }
-            } else if (dashboardVisible && dashboardOpenedByIdle) {
-                autoShownForCurrentIdle = false
-                val graceElapsed = now - lastIdleAutoShowAtMs >= IDLE_AUTO_DISMISS_GRACE_MS
-                if (graceElapsed) exitRequested = true
-            } else {
-                autoShownForCurrentIdle = false
+        idleMonitor.watch(thresholdMillis, IDLE_MONITOR_POLL_MS).collect { state ->
+            if (state == IdleState.Idle) {
+                dashboardVisible = true
+                exitRequested = false
+                dashboardActivationRequest += 1
             }
-            delay(IDLE_MONITOR_POLL_MS)
         }
     }
 
@@ -196,7 +178,6 @@ fun main(args: Array<String>) = application {
                     if (keepRunningInTray) {
                         dashboardVisible = false
                         exitRequested = false
-                        dashboardOpenedByIdle = false
                     } else {
                         exitApplication()
                     }
