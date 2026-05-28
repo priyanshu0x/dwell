@@ -9,12 +9,13 @@ data class Args(val mode: LaunchMode) {
             val first = rawArgs.firstOrNull()?.lowercase()
             return Args(
                 mode = when (first) {
-                    "--show", "/s" -> LaunchMode.Show
+                    "--show" -> LaunchMode.Show
+                    "/s" -> LaunchMode.Screensaver
                     "/p" -> LaunchMode.Preview
                     "/c" -> LaunchMode.Config
                     "--daemon" -> LaunchMode.Daemon
                     null -> if (executablePath.endsWith(".scr", ignoreCase = true)) {
-                        LaunchMode.Show
+                        LaunchMode.Screensaver
                     } else {
                         LaunchMode.Daemon
                     }
@@ -28,6 +29,7 @@ data class Args(val mode: LaunchMode) {
 enum class LaunchMode {
     Daemon,
     Show,
+    Screensaver,
     Preview,
     Config,
 }
