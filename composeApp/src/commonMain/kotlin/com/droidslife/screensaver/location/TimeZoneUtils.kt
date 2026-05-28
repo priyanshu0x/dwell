@@ -46,7 +46,7 @@ object TimeZoneUtils {
         "Europe/Stockholm" to "Stockholm",
         "Europe/Oslo" to "Oslo",
 
-        "Asia/Kolkata" to "Mumbai",
+        "Asia/Kolkata" to FALLBACK_CITY,
         "Asia/Tokyo" to "Tokyo",
         "Asia/Shanghai" to "Shanghai",
         "Asia/Hong_Kong" to "Hong Kong",

@@ -1,6 +1,9 @@
 package com.droidslife.screensaver.todos.providers
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlin.time.Instant
 
 /**
@@ -16,6 +19,28 @@ data class Todo(
     val done: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
+    /**
+     * Todoist priority on the API's own scale: 1 = normal (UI "p4") …
+     * 4 = urgent (UI "p1"). Providers without a notion of priority (e.g.
+     * [LocalTodosProvider]) always report 1.
+     */
+    val priority: Int = 1,
+    /** Optional scheduled date, surfaced as an overdue / today / upcoming chip. */
+    val due: TodoDue? = null,
+    /** Parent task id when this is a subtask; null for a top-level task. */
+    val parentId: String? = null,
+    /** Longer description / notes shown in the task detail view. */
+    val note: String = "",
+)
+
+/**
+ * A task's schedule. [date] is always present; [time] is set only when the
+ * task is due at a specific time of day. The widget derives overdue / today /
+ * upcoming by comparing [date] to the local "today".
+ */
+data class TodoDue(
+    val date: LocalDate,
+    val time: LocalTime? = null,
 )
 
 /**
@@ -52,14 +77,53 @@ interface TodosProvider {
      */
     fun watch(): Flow<List<Todo>>
 
+    /**
+     * Live transport/auth health of the provider's background refresh, so the
+     * widget can surface a calm one-line hint instead of the failure only
+     * landing in logs. Defaults to always-healthy for purely local providers;
+     * remote providers override this to report auth / connectivity problems.
+     */
+    fun syncStatus(): Flow<TodosSyncStatus> = flowOf(TodosSyncStatus.Healthy)
+
     /** Append a new task. Result carries the underlying error on failure. */
     suspend fun add(text: String): Result<Unit>
+
+    /** Edit an existing task's text. */
+    suspend fun update(id: String, text: String): Result<Unit>
+
+    /** Set a task's importance (Todoist priority scale: 1 = normal … 4 = urgent). */
+    suspend fun setPriority(id: String, priority: Int): Result<Unit>
+
+    /** Set or clear a task's due date (null clears it). */
+    suspend fun setDue(id: String, due: TodoDue?): Result<Unit>
 
     /** Mark a task done / undone. */
     suspend fun toggleDone(id: String, done: Boolean): Result<Unit>
 
     /** Delete a task. Providers that don't support delete may return failure. */
     suspend fun delete(id: String): Result<Unit>
+}
+
+/**
+ * Health of a provider's background refresh, surfaced as a subtle hint in the
+ * widget. Deliberately small: the widget shows one calm line, never a stack
+ * trace, and keeps showing the last good snapshot underneath.
+ */
+sealed interface TodosSyncStatus {
+    /** Polling is succeeding (or the provider is purely local). */
+    data object Healthy : TodosSyncStatus
+
+    /**
+     * A transient transport problem; the provider keeps retrying on its own
+     * cadence and the last snapshot stays visible. [message] is user-facing.
+     */
+    data class Offline(val message: String) : TodosSyncStatus
+
+    /**
+     * The credentials were rejected (e.g. HTTP 401) — retrying won't help until
+     * the user enters a fresh token. [message] is user-facing.
+     */
+    data class AuthFailed(val message: String) : TodosSyncStatus
 }
 
 /**

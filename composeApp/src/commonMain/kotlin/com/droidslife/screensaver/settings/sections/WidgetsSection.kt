@@ -1,26 +1,34 @@
 package com.droidslife.screensaver.settings.sections
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -34,16 +42,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
+import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.todos.providers.TodoistProvider
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.serialization.json.JsonObject
@@ -108,16 +123,10 @@ fun WidgetsSection(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 14.sp,
                             )
-                            Text(
-                                text = id,
-                                color = DwellColors.TextLow,
-                                fontFamily = DwellFonts.jetBrainsMono(),
-                                fontSize = 10.sp,
-                            )
                             if (descriptor.factory.description.isNotBlank()) {
                                 Text(
                                     text = descriptor.factory.description,
-                                    color = DwellColors.TextMid,
+                                    color = DwellColors.TextLow,
                                     fontFamily = DwellFonts.interTight(),
                                     fontSize = 11.sp,
                                     modifier = Modifier.padding(top = 2.dp),
@@ -205,22 +214,29 @@ fun WidgetsSection(
  * Mirrors the behavior of `SettingsDialog.ConfigFieldRenderer` but uses
  * Dwell-styled primitives. Field types not handled fall back to a "—" notice
  * (and a TODO since they require a richer custom UI).
+ *
+ * `internal` so the per-widget config dialog (opened from a widget's gear
+ * icon) renders the same fields as the Settings → Widgets row.
  */
 @Composable
-private fun WidgetConfigPanel(
+internal fun WidgetConfigPanel(
     schema: List<ConfigField>,
     config: JsonObject,
     savedSecretIds: Set<String>,
     onConfigChange: (JsonObject) -> Unit,
     onSecretChange: (String, String) -> Unit,
+    // Indents the fields under the widget row in the Settings → Widgets list.
+    // The standalone gear dialog already pads its body, so it passes 0.dp.
+    startIndent: Dp = 28.dp,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(start = startIndent),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         schema.forEach { field ->
+            if (shouldHideField(field, config)) return@forEach
             ConfigFieldRow(
                 field = field,
                 config = config,
@@ -231,6 +247,22 @@ private fun WidgetConfigPanel(
                 onSecretChange = onSecretChange,
             )
         }
+    }
+}
+
+// Conditional fields: hide credential inputs that don't apply to the active
+// source so the panel doesn't show dead chrome (e.g. a Todoist token while the
+// Todos widget is on Local).
+private fun shouldHideField(field: ConfigField, config: JsonObject): Boolean {
+    val provider = config["provider"]?.jsonPrimitive?.content
+    return when (field.key) {
+        // WeatherAPI key only matters on the weatherapi source. Absent provider
+        // means the schema default (weatherapi) is active, so keep it visible.
+        "apiKey" -> provider != null && provider != "weatherapi"
+        // Todoist token only matters on the Todoist source. The default source
+        // is Local, so hide it whenever the source isn't explicitly Todoist.
+        "apiToken" -> provider != TodoistProvider.ID
+        else -> false
     }
 }
 
@@ -336,10 +368,11 @@ private fun ConfigFieldRow(
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
                 )
+                val currencyAccent = LocalConsoleAccent.current.primary
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     field.popular.forEach { code ->
                         val isSelected = code == current
-                        val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
+                        val bg = if (isSelected) currencyAccent.copy(alpha = 0.14f) else DwellColors.Surface1
                         val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
                         androidx.compose.foundation.layout.Box(
                             modifier = Modifier
@@ -397,44 +430,55 @@ private fun ChoiceRow(
     onSelect: (String) -> Unit,
     helper: String? = null,
 ) {
+    val accent = LocalConsoleAccent.current.primary
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = label,
-            color = DwellColors.TextHigh,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel(label)
+        // iOS-style segmented control: track is a single Surface1 pill; the
+        // active segment is a smaller rounded pill that "floats" inside it.
+        // No internal dividers — the contrast between the floating pill and
+        // the track does the visual work.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(DwellColors.Surface1)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             options.forEach { (value, displayLabel) ->
                 val isSelected = value == selectedValue
-                val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
-                val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
-                androidx.compose.foundation.layout.Box(
+                val bg by animateColorAsState(
+                    targetValue = if (isSelected) accent.copy(alpha = 0.22f) else Color.Transparent,
+                    animationSpec = tween(120),
+                    label = "seg-bg",
+                )
+                val fg by animateColorAsState(
+                    targetValue = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid,
+                    animationSpec = tween(120),
+                    label = "seg-fg",
+                )
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .weight(1f)
+                        .heightIn(min = 30.dp)
+                        .clip(RoundedCornerShape(6.dp))
                         .background(bg)
-                        .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
                         .clickable { onSelect(value) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = displayLabel,
                         color = fg,
                         fontFamily = DwellFonts.interTight(),
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
                         fontSize = 12.sp,
+                        maxLines = 1,
                     )
                 }
             }
         }
-        if (!helper.isNullOrBlank()) {
-            Text(
-                text = helper,
-                color = DwellColors.TextLow,
-                fontFamily = DwellFonts.interTight(),
-                fontSize = 11.sp,
-            )
-        }
+        if (!helper.isNullOrBlank()) HelperText(helper)
     }
 }
 
@@ -448,51 +492,85 @@ private fun DwellOutlinedTextField(
     password: Boolean = false,
     numeric: Boolean = false,
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = {
-            Text(
-                text = label,
-                color = DwellColors.TextMid,
-                fontFamily = DwellFonts.interTight(),
-                fontSize = 12.sp,
+    val accent = LocalConsoleAccent.current.primary
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    // Border lifts to the accent on focus and recedes to a hair-thin stroke at
+    // rest — the field shouldn't compete with the label visually.
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) accent else DwellColors.Stroke.copy(alpha = 0.5f),
+        animationSpec = tween(durationMillis = 140),
+        label = "field-border",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FieldLabel(label)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(DwellColors.Surface1)
+                .border(1.dp, borderColor, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                interactionSource = interactionSource,
+                textStyle = TextStyle(
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 14.sp,
+                    color = DwellColors.TextHigh,
+                ),
+                cursorBrush = SolidColor(accent),
+                visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+                keyboardOptions = if (numeric) {
+                    KeyboardOptions(keyboardType = KeyboardType.Number)
+                } else {
+                    KeyboardOptions.Default
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 11.dp)
+                    .pausesShortcutsWhileFocused(),
+                decorationBox = { inner ->
+                    if (value.isEmpty() && !placeholder.isNullOrBlank()) {
+                        Text(
+                            text = placeholder,
+                            color = DwellColors.TextFaint,
+                            fontFamily = DwellFonts.interTight(),
+                            fontSize = 14.sp,
+                        )
+                    }
+                    inner()
+                },
             )
-        },
-        placeholder = placeholder?.let {
-            {
-                Text(
-                    text = it,
-                    color = DwellColors.TextFaint,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 13.sp,
-                )
-            }
-        },
-        supportingText = helper?.let {
-            {
-                Text(
-                    text = it,
-                    color = DwellColors.TextLow,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 11.sp,
-                )
-            }
-        },
-        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = if (numeric) {
-            KeyboardOptions(keyboardType = KeyboardType.Number)
-        } else {
-            KeyboardOptions.Default
-        },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = DwellColors.StatusAccent,
-            unfocusedBorderColor = DwellColors.Stroke,
-            focusedTextColor = DwellColors.TextHigh,
-            unfocusedTextColor = DwellColors.TextHigh,
-            cursorColor = DwellColors.StatusAccent,
-        ),
+        }
+        if (!helper.isNullOrBlank()) {
+            HelperText(helper)
+        }
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text = text,
+        color = DwellColors.TextMid,
+        fontFamily = DwellFonts.interTight(),
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+    )
+}
+
+@Composable
+private fun HelperText(text: String) {
+    Text(
+        text = text,
+        color = DwellColors.TextLow,
+        fontFamily = DwellFonts.interTight(),
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
     )
 }

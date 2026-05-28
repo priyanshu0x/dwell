@@ -17,12 +17,13 @@ import com.droidslife.screensaver.widget.builtin.ClockWidgetFactory
 import com.droidslife.screensaver.widget.builtin.IdleCounterWidgetFactory
 import com.droidslife.screensaver.widget.builtin.PomodoroWidgetFactory
 import com.droidslife.screensaver.widget.builtin.TodosWidgetFactory
-import com.droidslife.screensaver.widget.builtin.WeatherForecastWidgetFactory
 import com.droidslife.screensaver.widget.builtin.WeatherWidgetFactory
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.weather.WeatherApi
+import com.droidslife.screensaver.weather.WeatherCacheStore
 import com.droidslife.screensaver.weather.WeatherRepository
 import com.droidslife.screensaver.weather.WeatherViewModel
+import com.droidslife.screensaver.weather.createWeatherCacheStore
 import io.ktor.client.HttpClient
 import org.koin.dsl.module
 
@@ -67,15 +68,17 @@ val appModule = module {
     }
 
     // Weather ViewModel
-    single { WeatherViewModel(get(), get(), get()) }
+    single<WeatherCacheStore> { createWeatherCacheStore() }
+    single { WeatherViewModel(get(), get(), get(), get()) }
 
-    // Backend sync
+    // Backend sync (global) — still backs Todos' local-sync provider. The
+    // Expenses widget builds its own per-widget client from its config instead.
     single<BackendGateway> {
         val settingsViewModel: SettingsViewModel = get()
         val secretStorage: SecretStorage = get()
         BackendClient(
             httpClient = get(),
-            settingsProvider = { settingsViewModel.settings },
+            baseUrlProvider = { settingsViewModel.settings.backendBaseUrl },
             tokenProvider = { secretStorage.read(settingsViewModel.settings.backendApiKeySecretId) },
         )
     }
@@ -84,10 +87,9 @@ val appModule = module {
     single { ClockWidgetFactory(get()) }
     single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
-    single { ExpensesWidgetFactory(get()) }
+    single { ExpensesWidgetFactory() }
     single { CalendarWidgetFactory() }
     single { IdleCounterWidgetFactory() }
-    single { WeatherForecastWidgetFactory(get(), get()) }
     single { PomodoroWidgetFactory() }
 
     // Widget registry
@@ -100,7 +102,6 @@ val appModule = module {
                 get<ExpensesWidgetFactory>(),
                 get<CalendarWidgetFactory>(),
                 get<IdleCounterWidgetFactory>(),
-                get<WeatherForecastWidgetFactory>(),
                 get<PomodoroWidgetFactory>(),
             ),
             get(),

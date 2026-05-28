@@ -1,44 +1,47 @@
 package com.droidslife.screensaver.widget.builtin
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.text.input.ImeAction
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.WidgetStatusLine
+import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.weather.DayForecast
+import com.droidslife.screensaver.weather.ForecastState
 import com.droidslife.screensaver.weather.WeatherState
+import com.droidslife.screensaver.weather.WeatherSyncStatus
 import com.droidslife.screensaver.weather.WeatherViewModel
+import kotlinx.datetime.DayOfWeek
 import com.droidslife.screensaver.weather.providers.WeatherApiProvider
 import com.droidslife.screensaver.weather.providers.WttrInProvider
 import com.droidslife.screensaver.widget.api.ConfigField
@@ -58,12 +61,12 @@ class WeatherWidgetFactory(
 ) : WidgetFactory {
     override val id: String = WIDGET_ID
     override val displayName: String = "Weather"
-    override val description: String = "Current weather for a configured city"
+    override val description: String = "Current conditions + 5-day forecast for a configured city"
     override val category: WidgetCategory = WidgetCategory.INFORMATION
     override val preferredSize: WidgetSize = WidgetSize(
         minCols = 3, minRows = 2,
-        defaultCols = 5, defaultRows = 2,
-        maxCols = 8, maxRows = 3,
+        defaultCols = 3, defaultRows = 2,
+        maxCols = 8, maxRows = 4,
     )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.Enum(
@@ -79,7 +82,7 @@ class WeatherWidgetFactory(
         ConfigField.Text(
             key = "city",
             label = "City",
-            placeholder = "Mumbai",
+            placeholder = "Rewari",
         ),
         ConfigField.Secret(
             key = "apiKey",
@@ -132,7 +135,6 @@ private class WeatherWidget(
     @Composable
     override fun Content(modifier: Modifier) {
         val configuredCity = config.string("city")
-        var pickerOpen by remember { mutableStateOf(false) }
 
         LaunchedEffect(configuredCity) {
             if (configuredCity.isNotBlank()) {
@@ -140,204 +142,236 @@ private class WeatherWidget(
             }
         }
 
-        val openPicker = { pickerOpen = true }
-        val onCityPicked: (String) -> Unit = { city ->
-            val trimmed = city.trim()
-            if (trimmed.isNotBlank() && trimmed != configuredCity) {
-                val merged = config.rawJson + ("city" to JsonPrimitive(trimmed))
-                settingsViewModel.updateWidgetConfig(WIDGET_ID, JsonObject(merged))
-            }
-            pickerOpen = false
+        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+            val forecastState by weatherViewModel.forecast.collectAsState()
+            val days = (forecastState as? ForecastState.Loaded)?.days.orEmpty()
+            val showForecast = days.isNotEmpty() && maxHeight >= 200.dp
+            WeatherStack(
+                weatherViewModel = weatherViewModel,
+                settingsViewModel = settingsViewModel,
+                configuredCity = configuredCity,
+                forecastDays = if (showForecast) days else emptyList(),
+                modifier = Modifier.fillMaxSize(),
+            )
         }
+    }
+}
 
-        when (val state = weatherViewModel.state) {
-            is WeatherState.Loading -> WeatherTile(
-                label = "WEATHER",
-                value = "—",
-                subtitle = "Loading…",
-                modifier = modifier,
-                onLabelClick = openPicker,
-                pickerOpen = pickerOpen,
-                currentCity = configuredCity,
-                onCityPicked = onCityPicked,
-            )
-            is WeatherState.Success -> {
-                val current = state.current
-                val cityName = current.city.ifBlank { configuredCity }
-                val subtitle = buildString {
-                    if (current.conditionText.isNotBlank()) {
-                        append(current.conditionText)
-                    } else {
-                        append("—")
-                    }
-                    current.feelsLikeC?.let { append(" · feels ${it.toInt()}°") }
-                    current.humidity?.let { append(" · humidity ${it}%") }
-                }
-                WeatherTile(
-                    label = if (cityName.isNotBlank()) "WEATHER · ${cityName.uppercase()}" else "WEATHER",
-                    value = "${current.tempC.toInt()}°",
-                    subtitle = subtitle,
-                    valueIsAccent = true,
-                    modifier = modifier,
-                    onLabelClick = openPicker,
-                    pickerOpen = pickerOpen,
-                    currentCity = configuredCity,
-                    onCityPicked = onCityPicked,
-                )
-            }
-            is WeatherState.Unconfigured -> WeatherTile(
-                label = "WEATHER",
-                value = "—",
-                subtitle = "Add a WeatherAPI key to enable",
-                modifier = modifier,
-                onLabelClick = openPicker,
-                pickerOpen = pickerOpen,
-                currentCity = configuredCity,
-                onCityPicked = onCityPicked,
-                trailing = {
-                    TextButton(
-                        onClick = { settingsViewModel.openSettingsDialog() },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 0.dp,
-                            vertical = 0.dp,
-                        ),
-                    ) {
-                        Text(
-                            "Open Settings",
-                            fontSize = 11.sp,
-                            color = DwellColors.StatusAccent,
-                            fontFamily = DwellFonts.interTight(),
-                        )
-                    }
-                },
-            )
-            is WeatherState.Error -> WeatherTile(
-                label = "WEATHER",
-                value = "—",
-                subtitle = "Couldn't load",
-                modifier = modifier,
-                onLabelClick = openPicker,
-                pickerOpen = pickerOpen,
-                currentCity = configuredCity,
-                onCityPicked = onCityPicked,
-                trailing = {
-                    IconButton(
-                        onClick = {
-                            if (configuredCity.isNotBlank()) {
-                                weatherViewModel.loadWeatherDataForCity(configuredCity)
-                            } else {
-                                weatherViewModel.loadWeatherData()
-                            }
-                        },
-                        modifier = Modifier.padding(0.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "Retry",
-                            tint = DwellColors.TextMid,
-                        )
-                    }
-                },
-            )
+@Composable
+private fun WeatherStack(
+    weatherViewModel: WeatherViewModel,
+    settingsViewModel: SettingsViewModel,
+    configuredCity: String,
+    forecastDays: List<DayForecast>,
+    modifier: Modifier = Modifier,
+) {
+    val state = weatherViewModel.state
+    val label: String
+    val value: String
+    val subtitle: String
+    val valueIsAccent: Boolean
+    val trailing: (@Composable () -> Unit)?
+    when (state) {
+        is WeatherState.Loading -> {
+            label = "WEATHER"; value = "—"; subtitle = "Loading…"
+            valueIsAccent = false; trailing = null
         }
+        is WeatherState.Success -> {
+            val c = state.current
+            // Prefer the user-typed city — wttr.in's `nearest_area` resolves
+            // big-city queries to a neighborhood (e.g. Mumbai → Ballard Estate),
+            // which reads as "wrong city" in the label.
+            val cityName = configuredCity.ifBlank { c.city }
+            label = if (cityName.isNotBlank()) "WEATHER · ${cityName.uppercase()}" else "WEATHER"
+            value = "${c.tempC.toInt()}°"
+            valueIsAccent = true
+            subtitle = buildString {
+                append(c.conditionText.ifBlank { "—" })
+                c.feelsLikeC?.let { append(" · feels ${it.toInt()}°") }
+                c.humidity?.let { append(" · humidity ${it}%") }
+            }
+            trailing = null
+        }
+        is WeatherState.Unconfigured -> {
+            label = "WEATHER"; value = "—"
+            subtitle = "Needs a WeatherAPI.com key — or switch to wttr.in (no key) in settings"
+            valueIsAccent = false
+            trailing = {
+                TextButton(
+                    onClick = { settingsViewModel.openWidgetConfig(WIDGET_ID) },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                ) {
+                    Text(
+                        "Open weather settings", fontSize = 11.sp,
+                        color = DwellColors.StatusAccent,
+                        fontFamily = DwellFonts.interTight(),
+                    )
+                }
+            }
+        }
+        is WeatherState.Error -> {
+            label = "WEATHER"; value = "—"; subtitle = "Couldn't load"
+            valueIsAccent = false
+            trailing = {
+                IconButton(
+                    onClick = {
+                        if (configuredCity.isNotBlank()) weatherViewModel.loadWeatherDataForCity(configuredCity)
+                        else weatherViewModel.loadWeatherData()
+                    },
+                    modifier = Modifier.padding(0.dp),
+                ) {
+                    Icon(Icons.Filled.Refresh, "Retry", tint = DwellColors.TextMid)
+                }
+            }
+        }
+    }
+    // Status line is decoupled from `state`: a refresh can fail while we keep
+    // rendering the cached Success above, so the user always sees a signal
+    // instead of stale data masquerading as live.
+    val syncStatus by weatherViewModel.syncStatus.collectAsState()
+    val (statusMessage, statusSeverity) = when (syncStatus) {
+        WeatherSyncStatus.Healthy -> null to WidgetStatusSeverity.Info
+        WeatherSyncStatus.Offline ->
+            "Weather offline — showing last update" to WidgetStatusSeverity.Warning
+        WeatherSyncStatus.Unconfigured ->
+            "Needs a WeatherAPI.com key — or switch to wttr.in (no key)" to WidgetStatusSeverity.Warning
+        WeatherSyncStatus.Failed ->
+            "Weather unavailable — check network/API key" to WidgetStatusSeverity.Error
+    }
+
+    val accent = LocalConsoleAccent.current.primary
+    Column(modifier = modifier) {
+        WidgetHeader(
+            label = label,
+            settingsId = WIDGET_ID,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = value,
+            fontFamily = DwellFonts.jetBrainsMono(),
+            fontWeight = FontWeight.Light,
+            fontSize = 88.sp,
+            lineHeight = 88.sp,
+            letterSpacing = (-0.02).em,
+            color = if (valueIsAccent) accent else DwellColors.TextHigh,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = subtitle,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 14.sp,
+                color = DwellColors.TextMid,
+                maxLines = 2,
+                modifier = Modifier.weight(1f),
+            )
+            trailing?.invoke()
+        }
+        if (forecastDays.isNotEmpty()) {
+            Spacer(Modifier.weight(1f))
+            ForecastStrip(forecastDays, modifier = Modifier.fillMaxWidth())
+        }
+        // Only alongside real data: the Unconfigured/Error branches render their
+        // own full-tile messaging, so a status line there would just repeat it.
+        // With a cached Success showing, the line adds the "stale/offline" context
+        // the state machine can't express on its own.
+        WidgetStatusLine(
+            statusMessage.takeIf { state is WeatherState.Success },
+            severity = statusSeverity,
+        )
     }
 }
 
 /**
- * Console-style tile layout: label pinned top-start, big temperature centered
- * (so it reads at a glance from across the room), subtitle pinned bottom-start.
- * Mirrors the mockup at
- * `.superpowers/brainstorm/1398003-1779392791/content/mode-mockups.html`.
+ * Five-day forecast row appended below the current-weather tile when the
+ * widget is tall enough. Compact day cards (Mon · ☀ · 28°/18°) so the row
+ * fits in ~78 dp.
  */
 @Composable
-private fun WeatherTile(
-    label: String,
-    value: String,
-    subtitle: String,
-    modifier: Modifier = Modifier,
-    valueIsAccent: Boolean = false,
-    trailing: (@Composable () -> Unit)? = null,
-    onLabelClick: (() -> Unit)? = null,
-    pickerOpen: Boolean = false,
-    currentCity: String = "",
-    onCityPicked: (String) -> Unit = {},
-) {
-    val accent = LocalConsoleAccent.current.primary
-    Box(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.align(Alignment.TopStart)) {
-            Text(
-                text = label,
-                fontFamily = DwellFonts.interTight(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 9.sp,
-                letterSpacing = 2.25.sp,
-                color = DwellColors.TextLow,
-                maxLines = 1,
-                modifier = if (onLabelClick != null) {
-                    Modifier
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .clickable(onClick = onLabelClick)
-                } else Modifier,
+private fun ForecastStrip(days: List<DayForecast>, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        days.take(5).forEachIndexed { index, day ->
+            ForecastDayCard(
+                day = day,
+                isToday = index == 0,
+                modifier = Modifier.weight(1f),
             )
-            if (pickerOpen) {
-                CityPickerPopup(
-                    initial = currentCity,
-                    onPick = onCityPicked,
-                    onDismiss = { onCityPicked(currentCity) },
-                )
-            }
-        }
-        Text(
-            text = value,
-            fontFamily = DwellFonts.jetBrainsMono(),
-            fontWeight = FontWeight.Medium,
-            fontSize = 44.sp,
-            color = if (valueIsAccent) accent else DwellColors.TextHigh,
-            maxLines = 1,
-            modifier = Modifier.align(Alignment.Center),
-        )
-        Text(
-            text = subtitle,
-            fontFamily = DwellFonts.interTight(),
-            fontSize = 10.sp,
-            color = DwellColors.TextMid,
-            maxLines = 2,
-            modifier = Modifier.align(Alignment.BottomStart),
-        )
-        if (trailing != null) {
-            Box(modifier = Modifier.align(Alignment.BottomEnd)) {
-                trailing()
-            }
         }
     }
 }
 
 @Composable
-private fun CityPickerPopup(
-    initial: String,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
+private fun ForecastDayCard(
+    day: DayForecast,
+    isToday: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    DropdownMenu(
-        expanded = true,
-        onDismissRequest = onDismiss,
-        modifier = Modifier.background(DwellColors.Surface1),
+    val accent = LocalConsoleAccent.current.primary
+    val bg = if (isToday) accent.copy(alpha = 0.10f) else DwellColors.Surface1.copy(alpha = 0.6f)
+    val border = if (isToday) accent.copy(alpha = 0.45f) else DwellColors.Stroke
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        var text by remember { mutableStateOf(initial) }
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            label = { Text("City") },
-            singleLine = true,
-            keyboardActions = KeyboardActions(onDone = { onPick(text) }),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(min = 200.dp),
+        Text(
+            text = if (isToday) "TODAY" else weekdayShort(day.date.dayOfWeek).uppercase(),
+            fontSize = 10.sp,
+            letterSpacing = 1.6.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isToday) accent else DwellColors.TextLow,
+            fontFamily = DwellFonts.interTight(),
         )
-        listOf("Mumbai", "Delhi", "Bengaluru", "London", "New York", "Tokyo").forEach { suggestion ->
-            DropdownMenuItem(
-                text = { Text(suggestion, color = DwellColors.TextMid) },
-                onClick = { onPick(suggestion) },
+        Text(
+            text = conditionGlyph(day.conditionCode),
+            fontSize = 28.sp,
+            color = DwellColors.TextHigh,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${day.high}°",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = DwellColors.TextHigh,
+                fontFamily = DwellFonts.jetBrainsMono(),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "${day.low}°",
+                fontSize = 13.sp,
+                color = DwellColors.TextLow,
+                fontFamily = DwellFonts.jetBrainsMono(),
             )
         }
     }
+}
+
+private fun weekdayShort(dow: DayOfWeek): String = when (dow) {
+    DayOfWeek.MONDAY -> "Mon"
+    DayOfWeek.TUESDAY -> "Tue"
+    DayOfWeek.WEDNESDAY -> "Wed"
+    DayOfWeek.THURSDAY -> "Thu"
+    DayOfWeek.FRIDAY -> "Fri"
+    DayOfWeek.SATURDAY -> "Sat"
+    DayOfWeek.SUNDAY -> "Sun"
+}
+
+private fun conditionGlyph(code: Int): String = when (code) {
+    1000 -> "☀"
+    1003 -> "⛅"
+    1006, 1009 -> "☁"
+    1030, 1135, 1147 -> "🌫"
+    in 1063..1201 -> "☔"
+    in 1204..1237 -> "🌨"
+    in 1240..1264 -> "☔"
+    in 1273..1282 -> "⛈"
+    else -> "☁"
 }

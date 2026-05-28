@@ -94,15 +94,7 @@ private fun CalendarMonth(modifier: Modifier) {
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            text = monthYear,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 9.sp,
-            letterSpacing = 2.25.sp,
-            color = DwellColors.TextLow,
-            maxLines = 1,
-        )
+        WidgetHeader(label = monthYear)
         Spacer(Modifier.height(4.dp))
         // weekday header row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {

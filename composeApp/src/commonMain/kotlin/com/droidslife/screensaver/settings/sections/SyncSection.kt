@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
@@ -136,7 +137,7 @@ private fun SyncTextField(
         },
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = DwellColors.StatusAccent,
             unfocusedBorderColor = DwellColors.Stroke,

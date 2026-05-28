@@ -35,8 +35,9 @@ import com.droidslife.screensaver.settings.runDwellDoctor
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 
 private const val AppName = "Dwell"
@@ -215,7 +216,7 @@ private fun TextChip(label: String, enabled: Boolean = true, onClick: () -> Unit
 
 private fun formatBuildDate(epochS: Long): String {
     val ldt = Instant.fromEpochSeconds(epochS).toLocalDateTime(TimeZone.currentSystemDefault())
-    val mm = ldt.monthNumber.toString().padStart(2, '0')
+    val mm = ldt.month.number.toString().padStart(2, '0')
     val dd = ldt.day.toString().padStart(2, '0')
     return "${ldt.year}-$mm-$dd"
 }
