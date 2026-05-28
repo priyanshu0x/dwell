@@ -624,7 +624,7 @@ private fun dueLabelAndColor(due: TodoDue, today: LocalDate, accent: Color): Pai
         delta == 0 -> "Today$time" to accent
         delta == 1 -> "Tomorrow$time" to DwellColors.TextMid
         delta in 2..6 -> weekdayShort(due.date.dayOfWeek) to DwellColors.TextMid
-        else -> "${monthShort(due.date.month)} ${due.date.dayOfMonth}" to DwellColors.TextLow
+        else -> "${monthShort(due.date.month)} ${due.date.day}" to DwellColors.TextLow
     }
 }
 
@@ -636,7 +636,6 @@ private fun weekdayShort(day: DayOfWeek): String = when (day) {
     DayOfWeek.FRIDAY -> "Fri"
     DayOfWeek.SATURDAY -> "Sat"
     DayOfWeek.SUNDAY -> "Sun"
-    else -> day.name.take(3)
 }
 
 private fun monthShort(month: Month): String = when (month) {
@@ -652,7 +651,6 @@ private fun monthShort(month: Month): String = when (month) {
     Month.OCTOBER -> "Oct"
     Month.NOVEMBER -> "Nov"
     Month.DECEMBER -> "Dec"
-    else -> month.name.take(3)
 }
 
 /** Inline add bar: a Dwell-styled text field + ADD chip. Enter submits, Esc closes. */
@@ -928,9 +926,6 @@ private fun TodosEmptyState(adding: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-/** Per-quadrant display cap in the matrix; the rest collapse to "+N more". */
-private const val MATRIX_MAX_PER_QUADRANT = 6
-
 /** Header toggle between the list and the Eisenhower matrix (2×2 grid glyph). */
 @Composable
 private fun ViewToggle(matrix: Boolean, accent: Color, onToggle: () -> Unit) {
@@ -1100,26 +1095,27 @@ private fun QuadrantCell(
                 color = DwellColors.TextFaint,
             )
         } else {
-            todos.take(MATRIX_MAX_PER_QUADRANT).forEach { todo ->
-                MatrixChip(
-                    todo = todo,
-                    beingDragged = draggingId == todo.id,
-                    container = container,
-                    subtaskCount = subtaskCountOf(todo),
-                    onDragStart = onDragStart,
-                    onDragMove = onDragMove,
-                    onDragEnd = onDragEnd,
-                    onOpen = { onOpen(todo) },
-                )
-            }
-            if (todos.size > MATRIX_MAX_PER_QUADRANT) {
-                Text(
-                    text = "+${todos.size - MATRIX_MAX_PER_QUADRANT} more",
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 9.sp,
-                    color = DwellColors.TextLow,
-                    modifier = Modifier.padding(top = 1.dp),
-                )
+            // Scroll within the (height-bounded) cell so every task in a busy
+            // quadrant is reachable instead of being capped with "+N more".
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                todos.forEach { todo ->
+                    MatrixChip(
+                        todo = todo,
+                        beingDragged = draggingId == todo.id,
+                        container = container,
+                        subtaskCount = subtaskCountOf(todo),
+                        onDragStart = onDragStart,
+                        onDragMove = onDragMove,
+                        onDragEnd = onDragEnd,
+                        onOpen = { onOpen(todo) },
+                    )
+                }
             }
         }
     }
@@ -1200,7 +1196,7 @@ private fun DueDateDialog(
     onDismiss: () -> Unit,
 ) {
     val state = rememberDatePickerState(
-        initialSelectedDateMillis = initialDate.toEpochDays().toLong() * MILLIS_PER_DAY,
+        initialSelectedDateMillis = initialDate.toEpochDays() * MILLIS_PER_DAY,
     )
     DatePickerDialog(
         onDismissRequest = onDismiss,
