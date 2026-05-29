@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,7 @@ import com.droidslife.screensaver.todos.providers.TodoistProvider
 import com.droidslife.screensaver.weather.providers.WeatherApiProvider
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.host.WidgetRegistry
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -57,6 +59,7 @@ fun WidgetsSection(
     val descriptors by widgetRegistry.descriptors.collectAsState()
     val settings = settingsViewModel.settings
     val enabledIds = settingsViewModel.effectiveEnabledWidgetIds()
+    val coroutineScope = rememberCoroutineScope()
 
     // Track which widgets have their inline config panel expanded.
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
@@ -168,7 +171,9 @@ fun WidgetsSection(
                 label = "Reload widgets from disk",
                 onClick = {
                     widgetRegistry.reload()
-                    widgetRegistry.syncWithSettings(settingsViewModel.settings)
+                    coroutineScope.launch {
+                        widgetRegistry.syncWithSettings(settingsViewModel.settings)
+                    }
                 },
             )
         }

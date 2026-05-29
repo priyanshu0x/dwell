@@ -5,11 +5,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -29,6 +31,7 @@ fun rememberWindowEventHandlers(
 ): WindowEventHandlers {
     val settingsViewModel = koinViewModel<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
+    val coroutineScope = rememberCoroutineScope()
 
     var showHelpDialog by remember { mutableStateOf(false) }
     val toastState = rememberToastState()
@@ -111,7 +114,9 @@ fun rememberWindowEventHandlers(
             }
             is KeyEventAction.ReloadWidgets -> {
                 widgetRegistry.reload()
-                widgetRegistry.syncWithSettings(settingsViewModel.settings)
+                coroutineScope.launch {
+                    widgetRegistry.syncWithSettings(settingsViewModel.settings)
+                }
             }
         }
     }

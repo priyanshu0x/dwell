@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -30,6 +31,7 @@ import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -89,6 +91,7 @@ private fun ApplicationScope.runDwellContent(
 
     val settingsViewModel = koinViewModel<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
+    val coroutineScope = rememberCoroutineScope()
     val settings = settingsViewModel.settings
     var dashboardVisible by remember { mutableStateOf(devMode || launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
@@ -123,7 +126,9 @@ private fun ApplicationScope.runDwellContent(
     }
     val onReloadWidgets = {
         widgetRegistry.reload()
-        widgetRegistry.syncWithSettings(settingsViewModel.settings)
+        coroutineScope.launch {
+            widgetRegistry.syncWithSettings(settingsViewModel.settings)
+        }
     }
 
     DisposableEffect(launchArgs.mode, settings.trayIconEnabled) {
