@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.widget.host
 
 import co.touchlab.kermit.Logger
+import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WIDGET_API_VERSION
 import com.droidslife.screensaver.widget.api.WidgetConfig
@@ -14,7 +15,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -37,6 +39,7 @@ class WidgetRegistry(
             )
         }
     private var descriptorById = emptyMap<String, WidgetDescriptor>()
+    private val syncMutex = Mutex()
 
     private val _descriptors = MutableStateFlow(descriptorById.values.toList())
     private val _instances = MutableStateFlow<Map<String, WidgetInstance>>(emptyMap())
@@ -57,20 +60,21 @@ class WidgetRegistry(
         _descriptors.value = descriptorById.values.toList()
     }
 
-    fun enable(id: String) {
+    suspend fun enable(id: String) {
         enable(id, JsonObject(emptyMap()))
     }
 
-    fun enable(
+    suspend fun enable(
         id: String,
         configJson: JsonObject,
         secretVersions: Map<String, Long> = emptyMap(),
     ) {
         if (_instances.value.containsKey(id)) return
         val descriptor = descriptorById[id] ?: return
+        val secretValues = resolveSecrets(configJson, descriptor.factory.configSchema)
         val config = WidgetConfig(configJson) { key ->
             val secretId = (configJson[key] as? JsonPrimitive)?.content ?: return@WidgetConfig null
-            runBlocking { secretStorage.read(secretId) }
+            secretValues[secretId]
         }
         val scope = WidgetScopeImpl(
             widgetId = id,
@@ -99,7 +103,7 @@ class WidgetRegistry(
         }
     }
 
-    fun updateConfig(id: String, config: JsonObject) {
+    suspend fun updateConfig(id: String, config: JsonObject) {
         val wasEnabled = _instances.value.containsKey(id)
         if (wasEnabled) {
             disable(id)
@@ -107,7 +111,7 @@ class WidgetRegistry(
         }
     }
 
-    fun syncWithSettings(settings: SettingsModel) {
+    suspend fun syncWithSettings(settings: SettingsModel) = syncMutex.withLock {
         // Pomodoro + Idle counter are opt-in (specialty use). Standalone
         // Weather is opt-in because the default Clock tile now includes it.
         val offByDefault = setOf(
@@ -133,6 +137,27 @@ class WidgetRegistry(
                 enable(id, config, secretVersions)
             }
         }
+    }
+
+    private suspend fun resolveSecrets(
+        configJson: JsonObject,
+        configSchema: List<ConfigField>,
+    ): Map<String, String> {
+        val secretKeys = configSchema
+            .filterIsInstance<ConfigField.Secret>()
+            .map { it.key }
+            .toSet()
+        val secretIds = configJson.entries
+            .mapNotNull { (key, element) ->
+                val value = (element as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                value.takeIf { key in secretKeys || it.startsWith(WIDGET_SECRET_PREFIX) }
+            }
+            .distinct()
+        return secretIds.mapNotNull { secretId ->
+            runCatching { secretStorage.read(secretId) }
+                .getOrNull()
+                ?.let { secretId to it }
+        }.toMap()
     }
 
     private fun secretVersionsFor(
