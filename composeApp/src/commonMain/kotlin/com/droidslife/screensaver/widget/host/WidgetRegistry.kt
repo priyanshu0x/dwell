@@ -108,11 +108,12 @@ class WidgetRegistry(
     }
 
     fun syncWithSettings(settings: SettingsModel) {
-        // Pomodoro + Idle counter are opt-in (specialty use). Weather +
-        // forecast are now a single widget that's on by default.
+        // Pomodoro + Idle counter are opt-in (specialty use). Standalone
+        // Weather is opt-in because the default Clock tile now includes it.
         val offByDefault = setOf(
             "com.droidslife.screensaver.pomodoro",
             "com.droidslife.screensaver.idle",
+            "com.droidslife.screensaver.weather",
         )
         val defaultEnabledIds = builtInDescriptors.map { it.id }.toSet() - offByDefault
         val enabledIds = settings.enabledWidgetIds.ifEmpty { defaultEnabledIds }

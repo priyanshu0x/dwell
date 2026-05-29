@@ -55,6 +55,8 @@ class WeatherApiProvider(
             tempC = data.current.tempC,
             feelsLikeC = data.current.feelslikeC,
             humidity = data.current.humidity,
+            windKph = data.current.windKph,
+            visKm = data.current.visKm,
             conditionCode = data.current.condition.code,
             conditionText = data.current.condition.text,
             city = data.location.name.ifBlank { city },

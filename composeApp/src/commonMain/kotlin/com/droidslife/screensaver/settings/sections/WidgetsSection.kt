@@ -40,6 +40,7 @@ import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.ui.DwellTextField
 import com.droidslife.screensaver.todos.providers.TodoistProvider
+import com.droidslife.screensaver.weather.providers.WeatherApiProvider
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.serialization.json.JsonObject
@@ -239,9 +240,10 @@ internal fun WidgetConfigPanel(
 private fun shouldHideField(field: ConfigField, config: JsonObject): Boolean {
     val provider = config["provider"]?.jsonPrimitive?.content
     return when (field.key) {
-        // WeatherAPI key only matters on the weatherapi source. Absent provider
-        // means the schema default (weatherapi) is active, so keep it visible.
-        "apiKey" -> provider != null && provider != "weatherapi"
+        // WeatherAPI keys only matter on the WeatherAPI.com source. Built-in
+        // weather-capable widgets default to wttr.in, so an absent provider
+        // should not expose a dead credential field.
+        "apiKey" -> provider != WeatherApiProvider.ID
         // Todoist token only matters on the Todoist source. The default source
         // is Local, so hide it whenever the source isn't explicitly Todoist.
         "apiToken" -> provider != TodoistProvider.ID
