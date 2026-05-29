@@ -3,9 +3,8 @@ package com.droidslife.screensaver.settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -23,8 +22,7 @@ class SettingsViewModel(
     private val preferencesRepository: PreferencesRepository,
     private val secretStorage: SecretStorage = createSecretStorage(),
     private val startupRegistration: StartupRegistration = createStartupRegistration(),
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+) : ViewModel() {
 
     // Secret writes are serialized so a per-keystroke sequence ("t" -> "to" ->
     // "tok") can't land out of order and leave a stale prefix in storage.

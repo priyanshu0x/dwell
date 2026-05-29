@@ -3,6 +3,8 @@ package com.droidslife.screensaver.weather
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.droidslife.screensaver.location.FALLBACK_CITY
 import com.droidslife.screensaver.location.Location
 import com.droidslife.screensaver.location.TimeZoneUtils
@@ -12,9 +14,6 @@ import com.droidslife.screensaver.weather.providers.WeatherProviderCredentialFai
 import com.droidslife.screensaver.weather.providers.WeatherProviderUnconfigured
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,8 +35,7 @@ class WeatherViewModel(
     private val weatherApi: WeatherApi,
     private val preferencesRepository: PreferencesRepository,
     private val cacheStore: WeatherCacheStore,
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+) : ViewModel() {
 
     /**
      * The current state of weather data.

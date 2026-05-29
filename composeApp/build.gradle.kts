@@ -32,6 +32,8 @@ kotlin {
             implementation(libs.compose.animation)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.components.ui.tooling.preview)
+            implementation(libs.lifecycle.viewmodel)
+            implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.kermit)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)

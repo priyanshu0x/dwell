@@ -13,6 +13,7 @@ kotlinx-datetime = "0.8.0"
 kstore = "1.0.0"
 hot-reload = "1.1.1"
 koin = "4.2.1"
+androidx-lifecycle = "2.9.6"
 charleskorn-kaml = "0.104.0"
 jna = "5.18.1"
 slf4j = "2.0.18"
@@ -52,6 +53,8 @@ compose-material-icons-extended = { module = "org.jetbrains.compose.material:mat
 compose-animation = { module = "org.jetbrains.compose.animation:animation", version.ref = "compose" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
 compose-components-ui-tooling-preview = { module = "org.jetbrains.compose.components:components-ui-tooling-preview", version.ref = "compose" }
+lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 # Koin dependencies
 koin-bom = { module = "io.insert-koin:koin-bom", version.ref = "koin" }
 koin-core = { module = "io.insert-koin:koin-core" }
