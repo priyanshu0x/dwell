@@ -4,6 +4,7 @@ import com.droidslife.screensaver.config.Constants
 import com.droidslife.screensaver.weather.DayForecast
 import com.droidslife.screensaver.weather.WeatherApi
 import com.droidslife.screensaver.weather.WeatherApiException
+import com.droidslife.screensaver.weather.WeatherApiFailure
 import io.ktor.client.HttpClient
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
@@ -99,6 +100,9 @@ internal fun WeatherApiException.toProviderFailure(): Throwable {
     if (isMissingKey()) {
         return WeatherProviderUnconfigured(message.orEmpty())
     }
+    if (failure == WeatherApiFailure.RateLimited || httpStatusCode == 429 || upstreamCode == 2007) {
+        return WeatherProviderRateLimited("WeatherAPI rate limit reached - check plan/key")
+    }
     if (isCredentialOrAccountFailure()) {
         return WeatherProviderCredentialFailure("WeatherAPI key/account problem - update it in settings")
     }
@@ -107,12 +111,16 @@ internal fun WeatherApiException.toProviderFailure(): Throwable {
 
 private fun WeatherApiException.isMissingKey(): Boolean {
     val msg = combinedMessage()
-    return upstreamCode == 1002 || msg.contains("key is not configured") || msg.contains("key not provided")
+    return failure == WeatherApiFailure.MissingKey ||
+        upstreamCode == 1002 ||
+        msg.contains("key is not configured") ||
+        msg.contains("key not provided")
 }
 
 private fun WeatherApiException.isCredentialOrAccountFailure(): Boolean {
+    if (failure == WeatherApiFailure.Unauthorized) return true
     if (httpStatusCode == 401 || httpStatusCode == 403) return true
-    if (upstreamCode in setOf(2006, 2007, 2008, 2009)) return true
+    if (upstreamCode in setOf(2006, 2008, 2009)) return true
     val msg = combinedMessage()
     return listOf("invalid api key", "api key provided is invalid", "api key has been disabled")
         .any { msg.contains(it) }
