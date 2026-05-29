@@ -50,11 +50,15 @@ val appModule = module {
             client = get(),
             secretStorage = secretStorage,
             weatherApiKeyProvider = {
+                val clockWidgetKey = settingsViewModel.widgetSecretReference(
+                    WeatherRepository.CLOCK_WIDGET_ID,
+                    WeatherRepository.WEATHER_API_KEY_FIELD,
+                )?.let { secretStorage.read(it) }
                 val widgetKey = settingsViewModel.widgetSecretReference(
                     WeatherRepository.WEATHER_WIDGET_ID,
                     WeatherRepository.WEATHER_API_KEY_FIELD,
                 )?.let { secretStorage.read(it) }
-                widgetKey ?: secretStorage.read(settingsViewModel.settings.weatherApiKeySecretId)
+                clockWidgetKey ?: widgetKey ?: secretStorage.read(settingsViewModel.settings.weatherApiKeySecretId)
             },
         )
     }
@@ -91,7 +95,7 @@ val appModule = module {
     }
 
     // Built-in widgets
-    single { ClockWidgetFactory(get()) }
+    single { ClockWidgetFactory(get(), get()) }
     single { WeatherWidgetFactory(get(), get()) }
     single { TodosWidgetFactory(get()) }
     single { ExpensesWidgetFactory() }

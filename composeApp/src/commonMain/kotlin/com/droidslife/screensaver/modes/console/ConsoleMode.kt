@@ -50,11 +50,11 @@ private val GAP = 12.dp
 private val PADDING = 32.dp
 
 private val defaultLayouts: Map<String, GridRect> = mapOf(
-    "com.droidslife.screensaver.clock"           to GridRect(0, 0, 7, 4),
-    "com.droidslife.screensaver.weather"         to GridRect(7, 0, 5, 3),
-    "com.droidslife.screensaver.todos"           to GridRect(7, 3, 5, 1),
-    "com.droidslife.screensaver.expenses"        to GridRect(0, 4, 6, 2),
-    "com.droidslife.screensaver.calendar"        to GridRect(6, 4, 6, 2),
+    "com.droidslife.screensaver.clock"           to GridRect(0, 0, 12, 4),
+    "com.droidslife.screensaver.weather"         to GridRect(8, 0, 4, 2), // opt-in standalone fallback
+    "com.droidslife.screensaver.todos"           to GridRect(0, 4, 4, 2),
+    "com.droidslife.screensaver.expenses"        to GridRect(4, 4, 4, 2),
+    "com.droidslife.screensaver.calendar"        to GridRect(8, 4, 4, 2),
     "com.droidslife.screensaver.idle"            to GridRect(8, 4, 4, 2), // opt-in fallback slot
     "com.droidslife.screensaver.pomodoro"        to GridRect(8, 4, 4, 2), // opt-in fallback slot
 )
