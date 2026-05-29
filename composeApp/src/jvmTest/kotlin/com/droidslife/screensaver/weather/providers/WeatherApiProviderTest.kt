@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.weather.providers
 
 import com.droidslife.screensaver.weather.WeatherApiException
+import com.droidslife.screensaver.weather.WeatherApiFailure
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -36,5 +37,19 @@ class WeatherApiProviderTest {
         val error = WeatherApiException("Request timed out")
 
         assertSame(error, error.toProviderFailure())
+    }
+
+    @Test
+    fun rateLimitMapsToRateLimitedFailure() {
+        val mapped = WeatherApiException(
+            message = "API key has exceeded calls per month",
+            httpStatusCode = 429,
+            upstreamCode = 2007,
+            upstreamMessage = "API key has exceeded calls per month",
+            failure = WeatherApiFailure.RateLimited,
+        ).toProviderFailure()
+
+        assertTrue(mapped is WeatherProviderRateLimited)
+        assertEquals("WeatherAPI rate limit reached - check plan/key", mapped.message)
     }
 }

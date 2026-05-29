@@ -1166,6 +1166,7 @@ private fun WeatherDegradedLine(syncStatus: WeatherSyncStatus, state: WeatherSna
         WeatherSyncStatus.Offline -> "Weather offline - showing last update" to WidgetStatusSeverity.Warning
         WeatherSyncStatus.Unconfigured -> "Needs a WeatherAPI.com key - or switch to wttr.in" to WidgetStatusSeverity.Warning
         WeatherSyncStatus.CredentialFailed -> "WeatherAPI key/account problem - update it in settings" to WidgetStatusSeverity.Error
+        WeatherSyncStatus.RateLimited -> "WeatherAPI rate limit reached - showing last update" to WidgetStatusSeverity.Warning
         WeatherSyncStatus.Failed -> "Weather unavailable - check network/API key" to WidgetStatusSeverity.Error
     }
     WidgetStatusLine(
@@ -1370,6 +1371,7 @@ private fun formatTime(hour: Int, minute: Int, second: Int, is24Hour: Boolean, s
 
 private fun weatherErrorCopy(syncStatus: WeatherSyncStatus, fallback: String): String = when (syncStatus) {
     WeatherSyncStatus.CredentialFailed -> "WeatherAPI key/account problem - update it in settings"
+    WeatherSyncStatus.RateLimited -> "WeatherAPI rate limit reached"
     WeatherSyncStatus.Unconfigured -> "Needs a WeatherAPI.com key"
     else -> fallback.takeIf { it.isNotBlank() } ?: "Couldn't load weather"
 }
@@ -1410,4 +1412,3 @@ private fun weekdayShort(dow: DayOfWeek): String = when (dow) {
     DayOfWeek.SATURDAY -> "Sat"
     DayOfWeek.SUNDAY -> "Sun"
 }
-

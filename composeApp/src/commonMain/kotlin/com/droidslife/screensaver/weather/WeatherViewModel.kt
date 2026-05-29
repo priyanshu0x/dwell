@@ -11,6 +11,7 @@ import com.droidslife.screensaver.location.TimeZoneUtils
 import com.droidslife.screensaver.settings.PreferencesRepository
 import com.droidslife.screensaver.weather.providers.CurrentWeather
 import com.droidslife.screensaver.weather.providers.WeatherProviderCredentialFailure
+import com.droidslife.screensaver.weather.providers.WeatherProviderRateLimited
 import com.droidslife.screensaver.weather.providers.WeatherProviderUnconfigured
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
@@ -189,6 +190,10 @@ class WeatherViewModel(
                         if (currentCache[key] == null) state = WeatherState.Error(err.message ?: "Weather credentials failed")
                         _syncStatus.value = WeatherSyncStatus.CredentialFailed
                     }
+                    err is WeatherProviderRateLimited -> {
+                        if (currentCache[key] == null) state = WeatherState.Error(err.message ?: "WeatherAPI rate limit reached")
+                        _syncStatus.value = WeatherSyncStatus.RateLimited
+                    }
                     // Refresh failed but we have a last-good reading: keep it
                     // visible and flag the staleness instead of failing silently.
                     currentCache[key] != null ->
@@ -241,6 +246,7 @@ class WeatherViewModel(
             },
             onFailure = { err ->
                 if (err is WeatherProviderCredentialFailure) _syncStatus.value = WeatherSyncStatus.CredentialFailed
+                if (err is WeatherProviderRateLimited) _syncStatus.value = WeatherSyncStatus.RateLimited
                 if (err is WeatherProviderUnconfigured) _syncStatus.value = WeatherSyncStatus.Unconfigured
                 if (forecastCache[key] != null) return@fold
                 _forecast.value = if (err is WeatherProviderUnconfigured) ForecastState.Unconfigured else ForecastState.Failed
@@ -411,6 +417,9 @@ enum class WeatherSyncStatus {
 
     /** The active provider rejected configured credentials or account access. */
     CredentialFailed,
+
+    /** The active provider is refusing additional calls for the current plan/window. */
+    RateLimited,
 
     /** Fetch failed with no prior data to fall back on. */
     Failed,
