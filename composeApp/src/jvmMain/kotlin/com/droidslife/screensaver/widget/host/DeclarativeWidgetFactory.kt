@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
@@ -27,7 +28,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -60,7 +60,7 @@ private class DeclarativeWidget(
 ) : Widget {
     override val preferredSpan: Int = manifest.preferredSpan.coerceIn(1, 3)
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = DwellJson.IgnoreUnknown
     private val binder = JsonPathBinder()
     private var pollingJob: Job? = null
     private var state by mutableStateOf<DeclarativeState>(DeclarativeState.Loading)

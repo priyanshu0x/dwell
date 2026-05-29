@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.network
 
+import com.droidslife.screensaver.serialization.DwellJson
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
@@ -8,7 +9,6 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
 
 /**
  * Provides a configured Ktor HttpClient for making API requests.
@@ -29,14 +29,7 @@ object KtorClient {
         return HttpClient {
             // Install ContentNegotiation plugin with kotlinx.serialization
             install(ContentNegotiation) {
-                json(Json {
-                    // Configure JSON serializer to ignore unknown keys
-                    ignoreUnknownKeys = true
-                    // Allow serialization of special floating point values (NaN, Infinity)
-                    isLenient = true
-                    // Allow serialization of objects with missing fields
-                    coerceInputValues = true
-                })
+                json(DwellJson.Api)
             }
 
             // Install Logging plugin

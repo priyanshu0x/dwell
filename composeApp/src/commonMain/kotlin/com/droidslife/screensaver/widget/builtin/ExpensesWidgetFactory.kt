@@ -60,6 +60,7 @@ import com.droidslife.screensaver.network.FastiflyClient
 import com.droidslife.screensaver.network.FastiflyResult
 import com.droidslife.screensaver.network.FastiflyTransactionGroup
 import com.droidslife.screensaver.network.MeContext
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.ui.DwellActionButton
 import com.droidslife.screensaver.ui.DwellAnchoredDialog
 import com.droidslife.screensaver.ui.DwellChoiceChip
@@ -81,7 +82,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.random.Random
@@ -177,7 +177,7 @@ private class ExpensesWidget(
     private val client: FastiflyClient,
 ) : Widget {
     override val preferredSpan: Int = 1
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = DwellJson.Persisted
     private val pendingSerializer = ListSerializer(PendingTransaction.serializer())
 
     private var viewState by mutableStateOf(ExpensesViewState.initial(client.isConfigured()))

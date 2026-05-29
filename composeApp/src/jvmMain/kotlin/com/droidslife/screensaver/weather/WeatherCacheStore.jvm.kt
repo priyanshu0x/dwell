@@ -1,9 +1,9 @@
 package com.droidslife.screensaver.weather
 
+import com.droidslife.screensaver.serialization.DwellJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -27,11 +27,7 @@ private class WeatherCacheStoreImpl : WeatherCacheStore {
         ".screensaver",
         "weather-cache.json",
     )
-    private val json = Json {
-        ignoreUnknownKeys = true
-        prettyPrint = false
-        encodeDefaults = true
-    }
+    private val json = DwellJson.Persisted
 
     override fun loadSync(): WeatherCacheSnapshot {
         return runCatching {

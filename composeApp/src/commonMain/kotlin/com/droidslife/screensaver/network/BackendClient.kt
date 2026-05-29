@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.network
 
+import com.droidslife.screensaver.serialization.DwellJson
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -16,7 +17,6 @@ import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -29,7 +29,7 @@ class BackendClient(
     private val baseUrlProvider: () -> String?,
     private val tokenProvider: suspend () -> String?,
 ) : BackendGateway {
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = DwellJson.Persisted
 
     override suspend fun pull(collection: String): BackendResult<List<JsonObject>> {
         val baseUrl = baseUrlOrNull() ?: return BackendResult.Disabled
