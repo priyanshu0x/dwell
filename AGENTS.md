@@ -29,7 +29,7 @@ The app uses Gradle configuration cache and parallel builds (see `gradle.propert
 `Dwell.main` / `DevMainKt.main` → `Window` → `App` (AppTheme + settings/widget sync) → `ModeHost` (Cinematic, Ambient, Console) plus `SettingsSidebar`, `WidgetConfigDialog`, and `ShortcutsHelpDialog` overlays.
 
 ### DI (Koin)
-All graph wiring is in `di/AppModule.kt`. `runDwell(...)` initializes Koin once with `initKoin { modules(appModule) }` inside the Compose application scope. ViewModels are plain classes (not `androidx.lifecycle.ViewModel`) that hold their own `CoroutineScope(SupervisorJob() + Dispatchers.Main)` and expose Compose `MutableState` directly — pulled into composables with `koinInject<T>()`.
+All graph wiring is in `di/AppModule.kt`. `runDwell(...)` initializes Koin once with `initKoin { modules(appModule) }` inside the Compose application scope. `SettingsViewModel` and `WeatherViewModel` extend `androidx.lifecycle.ViewModel`, use `viewModelScope`, and are exposed through `viewModelOf`. Their Koin definitions are backed by app-scoped holders so service singletons and composables share the same instances.
 
 ### Widget system
 Built-in widgets are registered in `di/AppModule.kt` through factory singletons (`ClockWidgetFactory`, `WeatherWidgetFactory`, `TodosWidgetFactory`, `ExpensesWidgetFactory`, `CalendarWidgetFactory`, `IdleCounterWidgetFactory`, `PomodoroWidgetFactory`) and collected by `WidgetRegistry`. Console layout sizing is driven by `WidgetSize`; Cinematic and Ambient use the same widget instances with chip/minimal render targets where a widget opts in.

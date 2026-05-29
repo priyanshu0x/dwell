@@ -25,6 +25,7 @@ import com.droidslife.screensaver.weather.WeatherRepository
 import com.droidslife.screensaver.weather.WeatherViewModel
 import com.droidslife.screensaver.weather.createWeatherCacheStore
 import io.ktor.client.HttpClient
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 /**
@@ -65,7 +66,8 @@ val appModule = module {
 
     // Settings ViewModel (declared before WeatherRepository so the repo can
     // depend on it for resolving the active provider + WeatherAPI key.)
-    single { SettingsViewModel(get(), get(), get()) }
+    single { SettingsViewModelHolder(SettingsViewModel(get(), get(), get())) }
+    viewModelOf(::provideSettingsViewModel)
 
     // Weather Repository — provider-agnostic façade. Picks an adapter per call
     // based on the user's saved widget configuration.
@@ -80,7 +82,8 @@ val appModule = module {
 
     // Weather ViewModel
     single<WeatherCacheStore> { createWeatherCacheStore() }
-    single { WeatherViewModel(get(), get(), get(), get()) }
+    single { WeatherViewModelHolder(WeatherViewModel(get(), get(), get(), get())) }
+    viewModelOf(::provideWeatherViewModel)
 
     // Backend sync (global) — still backs Todos' local-sync provider. The
     // Expenses widget builds its own per-widget client from its config instead.
@@ -120,3 +123,13 @@ val appModule = module {
         )
     }
 }
+
+private class SettingsViewModelHolder(val instance: SettingsViewModel)
+
+private class WeatherViewModelHolder(val instance: WeatherViewModel)
+
+private fun provideSettingsViewModel(holder: SettingsViewModelHolder): SettingsViewModel =
+    holder.instance
+
+private fun provideWeatherViewModel(holder: WeatherViewModelHolder): WeatherViewModel =
+    holder.instance
