@@ -5,16 +5,15 @@ import com.droidslife.screensaver.settings.CinematicVariant
 import com.droidslife.screensaver.settings.ConsoleVariant
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsModel
+import com.droidslife.screensaver.ui.DwellIconLoader
 import java.awt.CheckboxMenuItem
 import java.awt.Image
 import java.awt.Menu
 import java.awt.MenuItem
 import java.awt.PopupMenu
 import java.awt.SystemTray
-import java.awt.Toolkit
 import java.awt.TrayIcon
 import java.awt.image.BufferedImage
-import javax.imageio.ImageIO
 
 /**
  * System-tray entry point for Dwell's daemon mode.
@@ -208,22 +207,7 @@ class TrayDaemon {
         System.getProperty("os.name").orEmpty().lowercase().contains("win")
 
     private fun loadIcon(): Image {
-        // Prefer the bundled brand icon; fall back to the dot-glyph if unavailable.
-        val resourcePaths = listOf(
-            "/icons/tray.png",
-            "/LinuxIcon.png",
-        )
-        for (path in resourcePaths) {
-            javaClass.getResourceAsStream(path)?.use { stream ->
-                runCatching { return ImageIO.read(stream) }
-            }
-        }
-        // File-system fallback (works during gradle :composeApp:run in dev mode)
-        val devFile = java.io.File("composeApp/desktopAppIcons/LinuxIcon.png")
-        if (devFile.exists()) {
-            runCatching { return Toolkit.getDefaultToolkit().getImage(devFile.absolutePath) }
-        }
-        return fallbackImage()
+        return DwellIconLoader.load(javaClass) ?: fallbackImage()
     }
 
     private fun fallbackImage(): BufferedImage {
