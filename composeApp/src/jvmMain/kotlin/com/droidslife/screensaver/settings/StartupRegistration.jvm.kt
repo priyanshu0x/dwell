@@ -57,16 +57,17 @@ private class JvmStartupRegistration : StartupRegistration {
             return
         }
         autostartDir.createDirectories()
-        desktopFile.writeText(
-            """
-            [Desktop Entry]
-            Type=Application
-            Name=Screen Saver App
-            Exec=${desktopExecCommand(appCommand(), "--daemon")}
-            X-GNOME-Autostart-enabled=true
-            Terminal=false
-            """.trimIndent(),
-        )
+        desktopFile.writeText(buildString {
+            appendLine("[Desktop Entry]")
+            appendLine("Type=Application")
+            appendLine("Name=Screen Saver App")
+            appendLine("Exec=${desktopExecCommand(appCommand(), "--daemon")}")
+            appendLine("Icon=dwell-real")
+            appendLine("StartupWMClass=Dwell")
+            appendLine("StartupNotify=true")
+            appendLine("X-GNOME-Autostart-enabled=true")
+            appendLine("Terminal=false")
+        })
     }
 
     private fun appCommand(): String {

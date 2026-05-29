@@ -17,7 +17,17 @@
 set -euo pipefail
 
 # --- Resolve project root (parent of this script's directory) ----------------
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Follow the installed symlink so `dwell show` can run from ~/.local/bin.
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    TARGET="$(readlink "$SCRIPT_PATH")"
+    case "$TARGET" in
+        /*) SCRIPT_PATH="$TARGET" ;;
+        *) SCRIPT_PATH="$SCRIPT_DIR/$TARGET" ;;
+    esac
+done
+HERE="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 
@@ -119,25 +129,56 @@ First run will auto-install JDK 21 to ~/jdks/ and download Gradle dependencies.
 EOF
 }
 
+ensure_linux_desktop_entry() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+    local applications desktop_file class_alias_file icon_dir icon_name icon_file
+    icon_name="dwell-real"
+    icon_dir="$HOME/.local/share/icons/hicolor/512x512/apps"
+    icon_file="$icon_dir/$icon_name.png"
+    applications="$HOME/.local/share/applications"
+    desktop_file="$applications/dwell.desktop"
+    class_alias_file="$applications/Dwell.desktop"
+    mkdir -p "$applications" "$icon_dir"
+    cp "$ROOT/composeApp/desktopAppIcons/LinuxIcon.png" "$icon_file"
+    rm -f "$applications/MainKt.desktop" "$applications/mainkt.desktop" \
+          "$applications/MainKt.MainKt.desktop" "$applications/mainkt.mainkt.desktop"
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+    fi
+    cat > "$desktop_file" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Dwell
+Comment=Idle-triggered desktop dashboard
+Exec=$ROOT/scripts/dwell show
+Icon=$icon_name
+Terminal=false
+Categories=Utility;
+StartupNotify=true
+StartupWMClass=Dwell
+DESKTOP
+    cp "$desktop_file" "$class_alias_file"
+}
+
 # --- Subcommand dispatch -----------------------------------------------------
 cmd="${1:-help}"
 
 case "$cmd" in
     show)
-        bootstrap_java; first_build_hint
+        bootstrap_java; ensure_linux_desktop_entry; first_build_hint
         echo "Dwell — opening dashboard."
         cheatsheet; echo
         exec ./gradlew :composeApp:run --args="--show" --console=plain
         ;;
     daemon)
-        bootstrap_java; first_build_hint
+        bootstrap_java; ensure_linux_desktop_entry; first_build_hint
         echo "Dwell — starting tray daemon. Look for the icon in your system tray."
         echo "  Dashboard auto-opens after the idle timeout (Settings → Triggers)."
         echo
         exec ./gradlew :composeApp:run --args="--daemon" --console=plain
         ;;
     config)
-        bootstrap_java; first_build_hint
+        bootstrap_java; ensure_linux_desktop_entry; first_build_hint
         echo "Dwell — opening dashboard with Settings."
         echo "  Tip: add a WeatherAPI key to enable the weather widget."
         echo
@@ -160,6 +201,7 @@ case "$cmd" in
         # macOS: writes ~/Library/LaunchAgents/dev.dwell.daemon.plist and loads it.
         case "$(uname -s)" in
             Linux)
+                ensure_linux_desktop_entry
                 autostart="$HOME/.config/autostart"
                 systemd_user="$HOME/.config/systemd/user"
                 mkdir -p "$autostart" "$systemd_user"
@@ -169,8 +211,10 @@ Type=Application
 Name=Dwell
 Comment=Idle-triggered screensaver dashboard
 Exec=$ROOT/scripts/dwell daemon
-Icon=$ROOT/composeApp/desktopAppIcons/LinuxIcon.png
+Icon=dwell-real
 X-GNOME-Autostart-enabled=true
+StartupNotify=true
+StartupWMClass=Dwell
 NoDisplay=false
 DESKTOP
                 cat > "$systemd_user/dwell.service" <<UNIT
@@ -262,6 +306,7 @@ PLIST
         mkdir -p "$target_dir"
         target="$target_dir/dwell"
         ln -sfn "$HERE/dwell" "$target"
+        ensure_linux_desktop_entry
         echo "✓ Linked: $target → $HERE/dwell"
         case ":$PATH:" in
             *":$target_dir:"*) echo "  $target_dir is on your PATH. Try: dwell show" ;;
@@ -283,7 +328,7 @@ PLIST
     status)
         echo "Dwell — status"
         echo "  Project root: $ROOT"
-        if pid=$(pgrep -f 'MainKt' 2>/dev/null | head -1); then
+        if pid=$(pgrep -f '[D]well|[M]ainKt' 2>/dev/null | head -1); then
             echo "  Running: PID $pid"
         else
             echo "  Running: no"

@@ -67,7 +67,7 @@ kotlin {
 }
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "Dwell"
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)

@@ -267,7 +267,7 @@ goto :eof
 :status
 echo Dwell - status
 echo   Project root: %ROOT%
-tasklist /FI "IMAGENAME eq java.exe" /V 2>nul | findstr /I "MainKt" >nul 2>nul
+tasklist /FI "IMAGENAME eq java.exe" /V 2>nul | findstr /I "Dwell MainKt" >nul 2>nul
 if errorlevel 1 ( echo   Running: no ) else ( echo   Running: yes )
 if defined JAVA_HOME ( echo   JDK 21:  %JAVA_HOME% ) else ( echo   JDK 21:  not detected )
 if defined USERPROFILE (
