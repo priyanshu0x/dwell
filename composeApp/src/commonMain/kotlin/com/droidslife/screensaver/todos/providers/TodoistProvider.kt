@@ -103,13 +103,22 @@ class TodoistProvider(
 
     override fun syncStatus(): Flow<TodosSyncStatus> = sync.asStateFlow()
 
-    override suspend fun add(text: String): Result<Unit> = runCatchingRequest {
+    override suspend fun add(text: String, priority: Int, due: TodoDue?): Result<Unit> = runCatchingRequest {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return@runCatchingRequest
         val response = http.post(TASKS_URL) {
             authorize()
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(NewTaskBody.serializer(), NewTaskBody(content = trimmed)))
+            setBody(
+                json.encodeToString(
+                    NewTaskBody.serializer(),
+                    NewTaskBody(
+                        content = trimmed,
+                        priority = priority.coerceIn(1, 4),
+                        dueDate = due?.date?.toString(),
+                    ),
+                ),
+            )
         }
         checkStatus(response, "create task")
         val created = json.decodeFromString(TodoistTask.serializer(), response.bodyAsText())
@@ -371,6 +380,8 @@ internal data class TodoistDue(
 @Serializable
 internal data class NewTaskBody(
     val content: String,
+    val priority: Int? = null,
+    @SerialName("due_date") val dueDate: String? = null,
 )
 
 /**

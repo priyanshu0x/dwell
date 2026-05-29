@@ -1,26 +1,19 @@
 package com.droidslife.screensaver.settings.sections
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.ui.DwellChoiceChip
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 
@@ -57,7 +50,7 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Dismiss behavior")
             ToggleRow(
                 label = "Exit on keypress",
@@ -73,7 +66,7 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Startup")
             ToggleRow(
                 label = "Start with system",
@@ -114,32 +107,19 @@ private fun IdleTimeoutChips(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
+    val accent = DwellColors.StatusAccent
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         IdleTimeoutOptions.forEach { option ->
             val isSelected = selected == option.seconds
-            val bg = if (isSelected) DwellColors.StatusAccent.copy(alpha = 0.14f) else DwellColors.Surface1
-            val fg = if (isSelected) DwellColors.TextHigh else DwellColors.TextMid
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(bg)
-                    .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .clickable { onSelect(option.seconds) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = option.label,
-                    color = fg,
-                    fontFamily = DwellFonts.jetBrainsMono(),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
-                )
-            }
+            DwellChoiceChip(
+                label = option.label,
+                selected = isSelected,
+                color = accent,
+                onClick = { onSelect(option.seconds) },
+            )
         }
     }
 }

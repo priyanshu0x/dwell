@@ -16,29 +16,39 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.components.ShortcutPause
 import com.droidslife.screensaver.components.WidgetStatusLine
 import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
@@ -50,8 +60,13 @@ import com.droidslife.screensaver.network.FastiflyClient
 import com.droidslife.screensaver.network.FastiflyResult
 import com.droidslife.screensaver.network.FastiflyTransactionGroup
 import com.droidslife.screensaver.network.MeContext
+import com.droidslife.screensaver.ui.DwellActionButton
+import com.droidslife.screensaver.ui.DwellAnchoredDialog
+import com.droidslife.screensaver.ui.DwellChoiceChip
 import com.droidslife.screensaver.ui.DwellColors
+import com.droidslife.screensaver.ui.DwellControlFrame
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.ui.DwellFormLabel
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
@@ -67,6 +82,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -151,6 +167,7 @@ private class ExpensesWidget(
     private var categoryId by mutableStateOf("")
     private var sourceId by mutableStateOf("")
     private var destId by mutableStateOf("")
+    private var formError by mutableStateOf<String?>(null)
 
     private val currencyFallback: String get() = config.enum("currency", "USD")
     private val currency: String get() = context?.currencyCode?.takeIf { it.isNotBlank() } ?: currencyFallback
@@ -194,40 +211,45 @@ private class ExpensesWidget(
     override fun Content(modifier: Modifier) {
         LaunchedEffect(Unit) { start() }
         val month = monthShort().uppercase()
-        Column(modifier = modifier.fillMaxSize()) {
-            WidgetHeader(label = "EXPENSES · $month", settingsId = WIDGET_ID) {
-                IconButton(
-                    onClick = { if (canAdd()) inputVisible = !inputVisible },
-                    enabled = canAdd(),
-                    modifier = Modifier.size(20.dp),
-                ) {
-                    Icon(
-                        imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
-                        contentDescription = if (inputVisible) "Hide add form" else "Add transaction",
-                        tint = DwellColors.TextLow,
-                    )
+        Box(modifier = modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                WidgetHeader(label = "EXPENSES · $month", settingsId = WIDGET_ID) {
+                    IconButton(
+                        onClick = { if (canAdd()) inputVisible = !inputVisible },
+                        enabled = canAdd(),
+                        modifier = Modifier.size(20.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (inputVisible) Icons.Filled.Close else Icons.Filled.Add,
+                            contentDescription = if (inputVisible) "Hide add form" else "Add transaction",
+                            tint = DwellColors.TextLow,
+                        )
+                    }
                 }
+
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    when {
+                        // Computed at render time from config — never depends on a
+                        // background coroutine — so an unconfigured tile is guaranteed
+                        // to show the connect prompt instead of a stuck "Loading…".
+                        !client.isConfigured() ->
+                            EmptyState("Connect to Fastifly", "Open settings (gear above) and add your Fastifly URL + API key.")
+                        phase == Phase.Loading && context == null -> EmptyState("Loading…", null)
+                        phase == Phase.AuthFailed && context == null ->
+                            EmptyState("Fastifly credentials rejected", lastError ?: "Update the URL/API key in settings.")
+                        phase == Phase.Error && context == null ->
+                            EmptyState("Can't reach Fastifly", lastError ?: "Check the URL and API key.")
+                        else -> Overview()
+                    }
+                }
+
+                val (msg, sev) = statusLine()
+                WidgetStatusLine(msg, severity = sev)
             }
 
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                when {
-                    // Computed at render time from config — never depends on a
-                    // background coroutine — so an unconfigured tile is guaranteed
-                    // to show the connect prompt instead of a stuck "Loading…".
-                    !client.isConfigured() ->
-                        EmptyState("Connect to Fastifly", "Open settings (gear above) and add your Fastifly URL + API key.")
-                    inputVisible -> AddForm()
-                    phase == Phase.Loading && context == null -> EmptyState("Loading…", null)
-                    phase == Phase.AuthFailed && context == null ->
-                        EmptyState("Fastifly credentials rejected", lastError ?: "Update the URL/API key in settings.")
-                    phase == Phase.Error && context == null ->
-                        EmptyState("Can't reach Fastifly", lastError ?: "Check the URL and API key.")
-                    else -> Overview()
-                }
+            if (inputVisible && canAdd()) {
+                AddTransactionDialog(onClose = { inputVisible = false })
             }
-
-            val (msg, sev) = statusLine()
-            WidgetStatusLine(msg, severity = sev)
         }
     }
 
@@ -339,7 +361,97 @@ private class ExpensesWidget(
     // --- Add form ----------------------------------------------------------
 
     @Composable
-    private fun AddForm() {
+    private fun AddTransactionDialog(onClose: () -> Unit) {
+        val currentOnClose by rememberUpdatedState(onClose)
+        DisposableEffect(Unit) {
+            val pause = ShortcutPause.acquire { currentOnClose() }
+            onDispose { ShortcutPause.release(pause) }
+        }
+
+        DwellAnchoredDialog(
+            onDismiss = onClose,
+            minWidth = 520.dp,
+            maxWidth = 620.dp,
+            maxHeight = 520.dp,
+            modifier = Modifier.onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                    onClose()
+                    true
+                } else {
+                    false
+                }
+            },
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 14.dp, end = 14.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DwellFormLabel("Transaction")
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(onClick = onClose),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Close,
+                            "Close",
+                            tint = DwellColors.TextLow,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+
+                AddFormFields(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(DwellColors.Stroke),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DwellColors.DialogControlSurface)
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    formError?.let { message ->
+                        Text(
+                            text = message,
+                            modifier = Modifier.weight(1f).padding(end = 12.dp),
+                            fontFamily = DwellFonts.interTight(),
+                            fontSize = 12.sp,
+                            color = DwellColors.StatusError,
+                            maxLines = 2,
+                        )
+                    } ?: Spacer(Modifier.weight(1f))
+                    DwellActionButton(
+                        label = "Add",
+                        onClick = { submit() },
+                        primary = true,
+                        leadingIcon = Icons.Filled.Check,
+                        minWidth = 78.dp,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun AddFormFields(modifier: Modifier = Modifier) {
         val sources = sourceAccountsFor(txType)
         val usableCategories = expenseCategories()
         val destinations = destinationAccountsFor(txType, sourceId)
@@ -355,69 +467,123 @@ private class ExpensesWidget(
         }
 
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TxType.entries.forEach { type ->
-                    TypeChip(type, selected = txType == type, modifier = Modifier.weight(1f)) { txType = type }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                DwellFormLabel("Type")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    TxType.entries.forEach { type ->
+                        DwellChoiceChip(
+                            label = "${type.glyph} ${type.label}",
+                            selected = txType == type,
+                            color = DwellColors.StatusAccent,
+                            onClick = {
+                                txType = type
+                                clearFormError()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
 
-            OutlinedTextField(
-                value = amountInput,
-                onValueChange = { amountInput = it.filter { c -> c.isDigit() || c == '.' } },
-                label = { Text("Amount (${currency})") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
-            )
-            OutlinedTextField(
-                value = noteInput,
-                onValueChange = { noteInput = it },
-                label = { Text("Description") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                DwellTextInput(
+                    label = "Amount (${currency})",
+                    value = amountInput,
+                    onValueChange = {
+                        amountInput = it.filter { c -> c.isDigit() || c == '.' }
+                        clearFormError()
+                    },
+                    placeholder = "0.00",
+                    modifier = Modifier.weight(1f),
+                )
+                DwellTextInput(
+                    label = "Description",
+                    value = noteInput,
+                    onValueChange = {
+                        noteInput = it
+                        clearFormError()
+                    },
+                    placeholder = defaultDescription(),
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
             when (txType) {
                 TxType.Expense -> {
-                    Picker("Category", usableCategories.map { it.id to it.name }, categoryId) { categoryId = it }
-                    Picker("From account", sources.map { it.id to it.name }, sourceId) { sourceId = it }
+                    FormPair(
+                        left = {
+                            Picker("From account", sources.map { it.id to it.name }, sourceId) {
+                                sourceId = it
+                                clearFormError()
+                            }
+                        },
+                        right = {
+                            Picker("Category", usableCategories.map { it.id to it.name }, categoryId) {
+                                categoryId = it
+                                clearFormError()
+                            }
+                        },
+                    )
                 }
                 TxType.Income -> {
-                    Picker("From (income source)", sources.map { it.id to it.name }, sourceId) { sourceId = it }
-                    Picker("To account", destinations.map { it.id to it.name }, destId) { destId = it }
+                    FormPair(
+                        left = {
+                            Picker("From source", sources.map { it.id to it.name }, sourceId) {
+                                sourceId = it
+                                clearFormError()
+                            }
+                        },
+                        right = {
+                            Picker("To account", destinations.map { it.id to it.name }, destId) {
+                                destId = it
+                                clearFormError()
+                            }
+                        },
+                    )
                 }
                 TxType.Transfer -> {
-                    Picker("From account", sources.map { it.id to it.name }, sourceId) { sourceId = it }
-                    Picker("To account", destinations.map { it.id to it.name }, destId) { destId = it }
+                    FormPair(
+                        left = {
+                            Picker("From account", sources.map { it.id to it.name }, sourceId) {
+                                sourceId = it
+                                clearFormError()
+                            }
+                        },
+                        right = {
+                            Picker("To account", destinations.map { it.id to it.name }, destId) {
+                                destId = it
+                                clearFormError()
+                            }
+                        },
+                    )
                 }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = { submit() }, enabled = canSubmit()) { Text("Add") }
             }
         }
     }
 
     @Composable
-    private fun TypeChip(type: TxType, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-        Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (selected) DwellColors.StatusAccent.copy(alpha = 0.16f) else DwellColors.Surface1)
-                .border(1.dp, if (selected) DwellColors.StatusAccent else DwellColors.Stroke, RoundedCornerShape(8.dp))
-                .clickable(onClick = onClick)
-                .padding(vertical = 8.dp),
-            contentAlignment = Alignment.Center,
+    private fun FormPair(
+        left: @Composable () -> Unit,
+        right: @Composable () -> Unit,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                "${type.glyph} ${type.label}",
-                fontFamily = DwellFonts.interTight(),
-                fontSize = 11.sp,
-                color = if (selected) DwellColors.TextHigh else DwellColors.TextMid,
-                maxLines = 1,
-            )
+            Box(modifier = Modifier.weight(1f)) { left() }
+            Box(modifier = Modifier.weight(1f)) { right() }
         }
     }
 
@@ -425,27 +591,26 @@ private class ExpensesWidget(
     private fun Picker(label: String, options: List<Pair<String, String>>, selectedId: String, onSelect: (String) -> Unit) {
         var expanded by remember { mutableStateOf(false) }
         val selectedLabel = options.firstOrNull { it.first == selectedId }?.second ?: "—"
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(label, fontFamily = DwellFonts.interTight(), fontSize = 10.sp, color = DwellColors.TextLow)
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DwellFormLabel(label)
             Box {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
-                        .clickable(enabled = options.isNotEmpty()) { expanded = true }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                DwellControlFrame(
+                    modifier = Modifier.clickable(enabled = options.isNotEmpty()) { expanded = true },
                 ) {
-                    Text(
-                        if (options.isEmpty()) "None available" else selectedLabel,
-                        fontFamily = DwellFonts.interTight(),
-                        fontSize = 12.sp,
-                        color = if (options.isEmpty()) DwellColors.TextLow else DwellColors.TextHigh,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text("▾", fontFamily = DwellFonts.interTight(), fontSize = 12.sp, color = DwellColors.TextMid)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (options.isEmpty()) "None available" else selectedLabel,
+                            fontFamily = DwellFonts.interTight(),
+                            fontSize = 13.sp,
+                            color = if (options.isEmpty()) DwellColors.TextLow else DwellColors.TextHigh,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text("▾", fontFamily = DwellFonts.interTight(), fontSize = 12.sp, color = DwellColors.TextMid)
+                    }
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     options.forEach { (id, name) ->
@@ -456,20 +621,81 @@ private class ExpensesWidget(
         }
     }
 
+    @Composable
+    private fun DwellTextInput(
+        label: String,
+        value: String,
+        onValueChange: (String) -> Unit,
+        placeholder: String,
+        modifier: Modifier = Modifier,
+    ) {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DwellFormLabel(label)
+            DwellControlFrame {
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    cursorBrush = SolidColor(DwellColors.StatusAccent),
+                    textStyle = TextStyle(
+                        fontFamily = DwellFonts.interTight(),
+                        fontSize = 13.sp,
+                        color = DwellColors.TextHigh,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pausesShortcutsWhileFocused(),
+                    decorationBox = { inner ->
+                        if (value.isBlank()) {
+                            Text(
+                                text = placeholder,
+                                fontFamily = DwellFonts.interTight(),
+                                fontSize = 13.sp,
+                                color = DwellColors.TextFaint,
+                            )
+                        }
+                        inner()
+                    },
+                )
+            }
+        }
+    }
+
     // --- Actions -----------------------------------------------------------
 
     private fun canAdd(): Boolean = phase == Phase.Ready || phase == Phase.Offline
 
-    private fun canSubmit(): Boolean {
-        val minor = parseMinor(amountInput) ?: return false
-        if (minor <= 0L || sourceId.isBlank()) return false
+    private fun submitValidationMessage(): String? {
+        val minor = parseMinor(amountInput)
+        if (context == null) return "Fastifly is still loading. Wait a moment, then try again."
+        if (minor == null || minor <= 0L) return "Enter an amount greater than 0."
+        if (sourceId.isBlank()) {
+            return when (txType) {
+                TxType.Income -> "Choose an income source."
+                else -> "Choose the source account."
+            }
+        }
         return when (txType) {
-            TxType.Expense -> categoryId.isNotBlank()
-            else -> destId.isNotBlank()
+            TxType.Expense -> {
+                val category = categories.firstOrNull { it.id == categoryId }
+                when {
+                    categoryId.isBlank() -> "Choose a category."
+                    category == null -> "Choose an available category."
+                    category.counterpartyAccountId == null -> "Set a counterparty account for this category in Fastifly."
+                    else -> null
+                }
+            }
+            TxType.Income -> if (destId.isBlank()) "Choose the destination account." else null
+            TxType.Transfer -> if (destId.isBlank()) "Choose the destination account." else null
         }
     }
 
     private fun submit() {
+        val validationMessage = submitValidationMessage()
+        if (validationMessage != null) {
+            formError = validationMessage
+            return
+        }
         val ctx = context ?: return
         val minor = parseMinor(amountInput) ?: return
         val source = accounts.firstOrNull { it.id == sourceId } ?: return
@@ -500,12 +726,17 @@ private class ExpensesWidget(
         )
         amountInput = ""
         noteInput = ""
+        formError = null
         inputVisible = false
         scope.coroutineScope.launch {
             pending = pending + item
             writeOutbox(pending)
             pushOutbox()
         }
+    }
+
+    private fun clearFormError() {
+        formError = null
     }
 
     private fun defaultDescription(): String = when (txType) {
@@ -595,8 +826,16 @@ private class ExpensesWidget(
     // --- Derived data ------------------------------------------------------
 
     /** Per-currency assumption of 2 minor digits — adequate for the tile display. */
-    private fun formatMoney(minor: Long, currencyCode: String): String =
-        "$currencyCode ${"%.2f".format(minor / 100.0)}"
+    private fun formatMoney(minor: Long, currencyCode: String): String {
+        val major = minor / 100.0
+        val amount = if (abs(major) >= 1_000.0) formatK(major) else "%.2f".format(major)
+        return "$currencyCode $amount"
+    }
+
+    private fun formatK(value: Double): String {
+        val scaled = (value / 1_000.0 * 10.0).roundToLong() / 10.0
+        return if (scaled % 1.0 == 0.0) "${scaled.toLong()}k" else "%.1fk".format(scaled)
+    }
 
     private fun parseMinor(input: String): Long? {
         val value = input.trim().toDoubleOrNull() ?: return null

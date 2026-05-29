@@ -16,19 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.droidslife.screensaver.modes.console.LocalConsoleAccent
+import com.droidslife.screensaver.ui.DwellActionButton
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 
@@ -69,11 +66,15 @@ internal fun ToggleRow(
     description: String? = null,
     enabled: Boolean = true,
 ) {
+    val shape = RoundedCornerShape(10.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
+            .background(DwellColors.DialogControlSurface.copy(alpha = if (enabled) 1f else 0.55f))
+            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.72f), shape)
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -108,12 +109,12 @@ internal fun DwellSwitch(
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
 ) {
-    val accent = LocalConsoleAccent.current.primary
+    val accent = DwellColors.StatusAccent
     val trackBg by animateColorAsState(
         targetValue = when {
-            !enabled -> DwellColors.Surface1
+            !enabled -> DwellColors.DialogControlSurface
             checked -> accent.copy(alpha = 0.45f)
-            else -> DwellColors.Surface1
+            else -> DwellColors.DialogControlSurface
         },
         animationSpec = tween(160),
         label = "switch-track",
@@ -159,27 +160,52 @@ internal fun RadioRow(
     onClick: () -> Unit,
     description: String? = null,
 ) {
+    val accent = DwellColors.StatusAccent
+    val shape = RoundedCornerShape(10.dp)
+    val background by animateColorAsState(
+        targetValue = if (selected) accent.copy(alpha = 0.10f) else DwellColors.DialogControlSurface,
+        animationSpec = tween(140),
+        label = "settings-radio-bg",
+    )
+    val border by animateColorAsState(
+        targetValue = if (selected) accent.copy(alpha = 0.62f) else DwellColors.Stroke.copy(alpha = 0.72f),
+        animationSpec = tween(140),
+        label = "settings-radio-border",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
+            .background(background)
+            .border(1.dp, border, shape)
             .clickable { onClick() }
-            .padding(vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(
-                selectedColor = DwellColors.StatusAccent,
-                unselectedColor = DwellColors.TextLow,
-            ),
-        )
+        Box(
+            modifier = Modifier
+                .size(15.dp)
+                .clip(CircleShape)
+                .border(1.dp, if (selected) accent else DwellColors.Stroke, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(accent),
+                )
+            }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
                 color = DwellColors.TextHigh,
                 fontFamily = DwellFonts.interTight(),
+                fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
+                modifier = Modifier.padding(start = 10.dp),
             )
             if (description != null) {
                 Text(
@@ -187,6 +213,7 @@ internal fun RadioRow(
                     color = DwellColors.TextMid,
                     fontFamily = DwellFonts.interTight(),
                     fontSize = 11.sp,
+                    modifier = Modifier.padding(start = 10.dp, top = 2.dp),
                 )
             }
         }
@@ -201,33 +228,14 @@ internal fun PillButton(
     accent: Boolean = false,
     enabled: Boolean = true,
 ) {
-    val bg = when {
-        !enabled -> DwellColors.Surface1
-        accent -> DwellColors.StatusAccent.copy(alpha = 0.18f)
-        else -> DwellColors.Surface1
-    }
-    val fg = when {
-        !enabled -> DwellColors.TextLow
-        accent -> DwellColors.StatusAccent
-        else -> DwellColors.TextHigh
-    }
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.Medium,
-            fontSize = 12.sp,
-        )
-    }
+    DwellActionButton(
+        label = label,
+        onClick = onClick,
+        modifier = modifier,
+        primary = accent,
+        enabled = enabled,
+        minWidth = 92.dp,
+    )
 }
 
 @Composable
@@ -235,7 +243,7 @@ internal fun ComingSoonChip(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(DwellColors.Surface1)
+            .background(DwellColors.DialogControlSurface)
             .border(1.dp, DwellColors.Stroke, RoundedCornerShape(6.dp))
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {

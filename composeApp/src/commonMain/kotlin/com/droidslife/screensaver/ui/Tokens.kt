@@ -10,6 +10,8 @@ object DwellColors {
     val BgVoid     = Color(0xFF050507)
     val Surface0   = Color(0xFF0B0B0C)
     val Surface1   = Color(0xFF131316)
+    val DialogSurface = Color(0xFF101012)
+    val DialogControlSurface = Color(0xFF17171A)
     val Stroke     = Color(0xFF1F1F22)
     val TextHigh   = Color(0xFFEAEAEA)
     val TextMid    = Color(0xFF8D92A2)

@@ -32,6 +32,10 @@ class SettingsViewModel(
     private val settingsWriteMutex = Mutex()
     private var secretWriteSequence = 0L
     private val latestWidgetSecretSequence = mutableMapOf<Pair<String, String>, Long>()
+    private var settingsDraftBase: SettingsModel? = null
+    private var pendingBackendApiKey: String? = null
+    private var pendingWeatherApiKey: String? = null
+    private val pendingWidgetSecrets = mutableMapOf<Pair<String, String>, String>()
 
     /**
      * The current settings state.
@@ -154,6 +158,12 @@ class SettingsViewModel(
     fun updateWidgetSecret(widgetId: String, key: String, value: String) {
         val secretId = widgetSecretId(widgetId, key)
         val sequenceKey = widgetId to key
+        if (settingsDraftBase != null) {
+            pendingWidgetSecrets[sequenceKey] = value
+            val currentConfig = settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
+            updateSettings(settings.copy(widgetConfigs = settings.widgetConfigs + (widgetId to JsonObject(currentConfig + (key to JsonPrimitive(secretId))))))
+            return
+        }
         val sequence = ++secretWriteSequence
         latestWidgetSecretSequence[sequenceKey] = sequence
         val currentConfig = settings.widgetConfigs[widgetId] ?: JsonObject(emptyMap())
@@ -205,8 +215,10 @@ class SettingsViewModel(
 
     fun setStartWithSystem(enabled: Boolean) {
         updateSettings(settings.copy(startWithSystem = enabled))
-        viewModelScope.launch {
-            startupRegistration.setEnabled(enabled)
+        if (settingsDraftBase == null) {
+            viewModelScope.launch {
+                startupRegistration.setEnabled(enabled)
+            }
         }
     }
 
@@ -215,10 +227,18 @@ class SettingsViewModel(
     }
 
     fun updateBackendApiKey(value: String) {
+        if (settingsDraftBase != null) {
+            pendingBackendApiKey = value
+            return
+        }
         writeSecret(settings.backendApiKeySecretId, value)
     }
 
     fun updateWeatherApiKey(value: String) {
+        if (settingsDraftBase != null) {
+            pendingWeatherApiKey = value
+            return
+        }
         writeSecret(settings.weatherApiKeySecretId, value)
     }
 
@@ -315,6 +335,7 @@ class SettingsViewModel(
      */
     private fun updateSettings(newSettings: SettingsModel) {
         settings = newSettings
+        if (settingsDraftBase != null) return
         viewModelScope.launch {
             settingsWriteMutex.withLock {
                 preferencesRepository.updateSettings(newSettings)
@@ -326,6 +347,7 @@ class SettingsViewModel(
      * Opens the settings dialog.
      */
     fun openSettingsDialog() {
+        beginSettingsDraft()
         isSettingsDialogOpen = true
     }
 
@@ -333,15 +355,57 @@ class SettingsViewModel(
      * Closes the settings dialog.
      */
     fun closeSettingsDialog() {
+        cancelSettingsDraft()
         isSettingsDialogOpen = false
     }
 
     fun openWidgetConfig(widgetId: String) {
+        beginSettingsDraft()
         openWidgetConfigId = widgetId
     }
 
     fun closeWidgetConfig() {
+        cancelSettingsDraft()
         openWidgetConfigId = null
+    }
+
+    fun beginSettingsDraft() {
+        if (settingsDraftBase == null) {
+            settingsDraftBase = settings
+            pendingBackendApiKey = null
+            pendingWeatherApiKey = null
+            pendingWidgetSecrets.clear()
+        }
+    }
+
+    fun saveSettingsDraft() {
+        val snapshot = settings
+        settingsDraftBase = null
+        viewModelScope.launch {
+            settingsWriteMutex.withLock {
+                preferencesRepository.updateSettings(snapshot)
+            }
+            startupRegistration.setEnabled(snapshot.startWithSystem)
+        }
+        pendingBackendApiKey?.let { writeSecret(snapshot.backendApiKeySecretId, it) }
+        pendingWeatherApiKey?.let { writeSecret(snapshot.weatherApiKeySecretId, it) }
+        pendingWidgetSecrets.forEach { (key, value) ->
+            val (widgetId, configKey) = key
+            val secretId = widgetSecretId(widgetId, configKey)
+            writeSecret(secretId, value) { bumpWidgetSecretVersion(secretId) }
+        }
+        pendingBackendApiKey = null
+        pendingWeatherApiKey = null
+        pendingWidgetSecrets.clear()
+    }
+
+    fun cancelSettingsDraft() {
+        val base = settingsDraftBase ?: return
+        settingsDraftBase = null
+        pendingBackendApiKey = null
+        pendingWeatherApiKey = null
+        pendingWidgetSecrets.clear()
+        settings = base
     }
 
     private suspend fun refreshSecretStatuses(currentSettings: SettingsModel) {
