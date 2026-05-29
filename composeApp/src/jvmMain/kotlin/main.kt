@@ -1,6 +1,8 @@
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,17 +33,27 @@ private const val IDLE_MONITOR_POLL_MS = 1_000L
 
 object Dwell {
     @JvmStatic
-    fun main(args: Array<String>) = runDwell(args)
+    fun main(args: Array<String>) = application {
+        runDwell(args = args)
+    }
 }
 
-fun main(args: Array<String>) = runDwell(args)
+fun main(args: Array<String>) = application {
+    runDwell(args = args)
+}
 
-private fun runDwell(args: Array<String>) = application {
-    val launchArgs = remember(args.toList()) { Args.parse(args) }
+@Composable
+internal fun ApplicationScope.runDwell(
+    args: Array<String> = emptyArray(),
+    devMode: Boolean = false,
+) {
+    val launchArgs = remember(devMode, args.toList()) {
+        if (devMode) Args(LaunchMode.Screensaver) else Args.parse(args)
+    }
 
-    if (launchArgs.mode == LaunchMode.Preview) {
+    if (!devMode && launchArgs.mode == LaunchMode.Preview) {
         exitApplication()
-        return@application
+        return
     }
 
     remember {
@@ -54,11 +66,11 @@ private fun runDwell(args: Array<String>) = application {
     val settingsViewModel = koinInject<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
     val settings = settingsViewModel.settings
-    var dashboardVisible by remember { mutableStateOf(launchArgs.mode != LaunchMode.Daemon) }
+    var dashboardVisible by remember { mutableStateOf(devMode || launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
-    var dashboardActivationRequest by remember { mutableStateOf(0) }
+    var dashboardActivationRequest by remember { mutableIntStateOf(0) }
     val requestDashboardExit = { exitRequested = true }
-    val keepRunningInTray = launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show
+    val keepRunningInTray = !devMode && (launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show)
     // `dwell show` must leave an affordance after Esc even if the daemon tray
     // preference is off; otherwise the app would keep running with no way back.
     val showTrayIcon = keepRunningInTray && (settings.trayIconEnabled || launchArgs.mode == LaunchMode.Show)
@@ -156,13 +168,13 @@ private fun runDwell(args: Array<String>) = application {
             title = "Dwell",
             icon = dwellWindowIcon,
             state = rememberWindowState(
-                placement = WindowPlacement.Fullscreen,
+                placement = if (devMode) WindowPlacement.Maximized else WindowPlacement.Fullscreen,
                 position = WindowPosition(Alignment.Center),
             ),
             onCloseRequest = requestDashboardExit,
             resizable = false,
             // Keep Dwell in the normal window stack so Alt-Tab behaves like a regular app.
-            alwaysOnTop = false,
+            alwaysOnTop = devMode,
             undecorated = true,
             transparent = true,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
