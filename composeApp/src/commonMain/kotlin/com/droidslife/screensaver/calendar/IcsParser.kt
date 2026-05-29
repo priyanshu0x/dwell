@@ -6,6 +6,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.Month
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 
@@ -120,6 +121,9 @@ object IcsParser {
         val dtEndPair = props["DTEND"]
         val summary = props["SUMMARY"]?.second?.let(::unescape).orEmpty()
         val location = props["LOCATION"]?.second?.let(::unescape).orEmpty()
+        // URL is stored raw — calendar feeds emit full https links here; we
+        // don't escape-decode because RFC 5545 §3.8.4.6 says it's already a URI.
+        val url = props["URL"]?.second.orEmpty()
         val uid = props["UID"]?.second ?: "ics-${summary.hashCode()}-$dtStartValue"
 
         val start = parseDateOrDateTime(dtStartValue, dtStartParams) ?: return emptyList()
@@ -152,6 +156,7 @@ object IcsParser {
                 durationDays = durationDays,
                 summary = summary,
                 location = location,
+                url = url,
             )
         }
     }
@@ -163,6 +168,7 @@ object IcsParser {
         durationDays: Int,
         summary: String,
         location: String,
+        url: String,
     ): CalendarEvent {
         val id = "$seriesId::${start.date}"
         val endDate = end?.date?.let {
@@ -177,6 +183,7 @@ object IcsParser {
             start = if (start.allDay) null else start.dateTime,
             end = if (start.allDay) null else end?.dateTime,
             allDay = start.allDay,
+            url = url,
         )
     }
 
@@ -300,9 +307,9 @@ object IcsParser {
         if (datePart.length != 8) return null
         val date = runCatching {
             LocalDate(
-                year = datePart.substring(0, 4).toInt(),
-                monthNumber = datePart.substring(4, 6).toInt(),
-                dayOfMonth = datePart.substring(6, 8).toInt(),
+                datePart.substring(0, 4).toInt(),
+                Month.entries[datePart.substring(4, 6).toInt() - 1],
+                datePart.substring(6, 8).toInt(),
             )
         }.getOrNull() ?: return null
         val rest = value.removeSuffix("Z").drop(8) // either "" or "THHMMSS"
@@ -343,7 +350,6 @@ object IcsParser {
             DayOfWeek.FRIDAY -> 4
             DayOfWeek.SATURDAY -> 5
             DayOfWeek.SUNDAY -> 6
-            else -> 0
         }
         return date.minus(daysFromMonday, DateTimeUnit.DAY)
     }
@@ -356,9 +362,9 @@ object IcsParser {
         if (params["VALUE"]?.equals("DATE", ignoreCase = true) == true || value.length == 8) {
             return runCatching {
                 val d = LocalDate(
-                    year = value.substring(0, 4).toInt(),
-                    monthNumber = value.substring(4, 6).toInt(),
-                    dayOfMonth = value.substring(6, 8).toInt(),
+                    value.substring(0, 4).toInt(),
+                    Month.entries[value.substring(4, 6).toInt() - 1],
+                    value.substring(6, 8).toInt(),
                 )
                 DateOrDateTime(date = d, dateTime = null, allDay = true)
             }.getOrNull()
@@ -368,9 +374,9 @@ object IcsParser {
         return runCatching {
             val clean = value.removeSuffix("Z")
             val date = LocalDate(
-                year = clean.substring(0, 4).toInt(),
-                monthNumber = clean.substring(4, 6).toInt(),
-                dayOfMonth = clean.substring(6, 8).toInt(),
+                clean.substring(0, 4).toInt(),
+                Month.entries[clean.substring(4, 6).toInt() - 1],
+                clean.substring(6, 8).toInt(),
             )
             val time = LocalTime(
                 hour = clean.substring(9, 11).toInt(),

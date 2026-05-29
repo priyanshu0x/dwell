@@ -31,6 +31,11 @@ data class CalendarEvent(
     val end: LocalDateTime? = null,
     /** True when [start]/[end] are null and the event covers whole days. */
     val allDay: Boolean = start == null,
+    /**
+     * Optional public link to the event (Google Cal / Outlook event page).
+     * Used by the widget for tap-through into the source calendar.
+     */
+    val url: String = "",
 )
 
 /**

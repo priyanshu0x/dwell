@@ -1,19 +1,24 @@
 package com.droidslife.screensaver.widget.builtin
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.calendar.CalendarMath
 import com.droidslife.screensaver.calendar.providers.CalendarEvent
 import com.droidslife.screensaver.calendar.providers.CalendarProvider
 import com.droidslife.screensaver.calendar.providers.CalendarSyncStatus
@@ -37,6 +43,7 @@ import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.ui.openLink
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
@@ -46,12 +53,15 @@ import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.api.WidgetSummary
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -65,9 +75,11 @@ class CalendarWidgetFactory : WidgetFactory {
     override val description: String = "Month grid with events from an ICS feed (Google Cal, Outlook, PagerDuty, …)"
     override val category: WidgetCategory = WidgetCategory.PRODUCTIVITY
     override val preferredSize: WidgetSize = WidgetSize(
-        minCols = 3, minRows = 2,
+        // Allow the strip (7×1) and the timeline (2×5) layouts in addition to the
+        // default month grid; Content() chooses by measured size at runtime.
+        minCols = 2, minRows = 1,
         defaultCols = 4, defaultRows = 3,
-        maxCols = 6, maxRows = 5,
+        maxCols = 8, maxRows = 6,
     )
     override val configSchema: List<ConfigField> = listOf(
         ConfigField.Enum(
@@ -96,6 +108,12 @@ class CalendarWidgetFactory : WidgetFactory {
             ),
             default = "15m",
         ),
+        ConfigField.Bool(
+            key = "heatmap",
+            label = "Free/busy heatmap",
+            default = true,
+            help = "Tint each day by how packed it is with meetings.",
+        ),
     )
 
     override fun create(config: WidgetConfig, scope: WidgetScope): Widget =
@@ -107,15 +125,6 @@ private class CalendarWidget(
     private val scope: WidgetScope,
 ) : Widget {
 
-    /**
-     * Picks the provider once per widget instance based on the persisted
-     * config. The host recreates the widget when config changes, so swapping
-     * the URL or the provider tier yields a fresh widget with the new wiring
-     * — we never need to hot-swap providers here.
-     *
-     * A blank ICS URL falls back to the no-op provider and surfaces a hint
-     * via the status flow instead of going dark.
-     */
     private val statusFlow = MutableStateFlow<CalendarSyncStatus>(CalendarSyncStatus.Healthy)
     private val provider: CalendarProvider? = run {
         val pick = config.string("provider").ifBlank { PROVIDER_NONE }
@@ -140,13 +149,15 @@ private class CalendarWidget(
         }
     }
 
+    private val heatmapEnabled: Boolean = config.bool("heatmap", default = true)
+
     /** Cache of the latest snapshot so [summary] (called outside composition) stays cheap. */
     private val summaryCache = MutableStateFlow<List<CalendarEvent>>(emptyList())
 
     override fun summary(): WidgetSummary {
         val today = todayLocal()
         val nowDt = nowLocalDateTime()
-        val next = summaryCache.value.firstOrNull { it.isUpcomingFrom(nowDt) && it.startDate <= today.plusDays(1) }
+        val next = summaryCache.value.firstOrNull { it.isUpcomingFrom(nowDt) && it.startDate <= today.plus(1, DateTimeUnit.DAY) }
         return if (next != null) {
             WidgetSummary(
                 primaryValue = next.shortCountdownFrom(nowDt),
@@ -177,27 +188,60 @@ private class CalendarWidget(
             CalendarSyncStatus.Healthy -> null to WidgetStatusSeverity.Info
         }
 
-        val countsByDay: Map<LocalDate, Int> = remember(events, today.month, today.year) {
-            buildCountsByDay(events, today.year, today.month)
+        val accent = LocalConsoleAccent.current.primary
+        // Use ordinal + 1 to derive the 1-based month — Month.number landed
+        // later than this project's kotlinx-datetime version.
+        val monthNumber = today.month.ordinal + 1
+
+        val countsByDay: Map<LocalDate, Int> = remember(events, monthNumber, today.year) {
+            CalendarMath.countsByDay(events, today.year, monthNumber)
+        }
+        val heatByDay: Map<LocalDate, Int> = remember(events, monthNumber, today.year, heatmapEnabled) {
+            if (heatmapEnabled) CalendarMath.busyMinutesByDay(events, today.year, monthNumber) else emptyMap()
         }
         val upcoming = events.filter { it.isUpcomingFrom(nowDt) }
             .sortedBy { it.start ?: it.startDate.atTime(0, 0) }
 
-        Column(
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            WidgetHeader(
-                label = "${monthShortName(today.month).uppercase()} ${today.year}",
-                settingsId = WIDGET_ID,
-            )
-            Spacer(Modifier.height(4.dp))
-            CalendarMonth(today = today, countsByDay = countsByDay)
-            if (upcoming.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                UpcomingList(events = upcoming, today = today, nowDt = nowDt, accent = LocalConsoleAccent.current.primary)
+        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+            val w = maxWidth
+            val h = maxHeight
+            // The tile system gives us actual pixels; pick a layout by aspect.
+            // These breakpoints leave the month grid as the comfortable default
+            // and only switch when the tile genuinely isn't grid-shaped.
+            val variant = when {
+                h < 110.dp -> CalendarLayout.WEEK_STRIP
+                w < 200.dp && h >= 280.dp -> CalendarLayout.TODAY_TIMELINE
+                else -> CalendarLayout.MONTH_GRID
             }
-            WidgetStatusLine(statusMessage, severity = statusSeverity)
+            when (variant) {
+                CalendarLayout.WEEK_STRIP -> WeekStripContent(
+                    today = today,
+                    nowDt = nowDt,
+                    events = events,
+                    countsByDay = countsByDay,
+                    accent = accent,
+                    statusMessage = statusMessage,
+                    statusSeverity = statusSeverity,
+                )
+                CalendarLayout.TODAY_TIMELINE -> TodayTimelineContent(
+                    today = today,
+                    nowDt = nowDt,
+                    events = upcoming,
+                    accent = accent,
+                    statusMessage = statusMessage,
+                    statusSeverity = statusSeverity,
+                )
+                CalendarLayout.MONTH_GRID -> MonthGridContent(
+                    today = today,
+                    nowDt = nowDt,
+                    upcoming = upcoming,
+                    countsByDay = countsByDay,
+                    heatByDay = heatByDay,
+                    accent = accent,
+                    statusMessage = statusMessage,
+                    statusSeverity = statusSeverity,
+                )
+            }
         }
     }
 
@@ -205,19 +249,48 @@ private class CalendarWidget(
     private fun emptyStatus() = statusFlow
 }
 
+private enum class CalendarLayout { MONTH_GRID, WEEK_STRIP, TODAY_TIMELINE }
+
+// region — Month grid (default)
+
 @Composable
-private fun CalendarMonth(today: LocalDate, countsByDay: Map<LocalDate, Int>) {
-    val firstOfMonth = LocalDate(today.year, today.month, 1)
-    val leadingBlanks = when (firstOfMonth.dayOfWeek) {
-        DayOfWeek.SUNDAY -> 0
-        DayOfWeek.MONDAY -> 1
-        DayOfWeek.TUESDAY -> 2
-        DayOfWeek.WEDNESDAY -> 3
-        DayOfWeek.THURSDAY -> 4
-        DayOfWeek.FRIDAY -> 5
-        DayOfWeek.SATURDAY -> 6
-        else -> 0
+private fun MonthGridContent(
+    today: LocalDate,
+    nowDt: LocalDateTime,
+    upcoming: List<CalendarEvent>,
+    countsByDay: Map<LocalDate, Int>,
+    heatByDay: Map<LocalDate, Int>,
+    accent: Color,
+    statusMessage: String?,
+    statusSeverity: WidgetStatusSeverity,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        WidgetHeader(
+            label = "${monthShortName(today.month).uppercase()} ${today.year}",
+            settingsId = WIDGET_ID,
+        )
+        Spacer(Modifier.height(4.dp))
+        MonthGrid(today = today, countsByDay = countsByDay, heatByDay = heatByDay, accent = accent)
+        if (upcoming.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            UpcomingList(events = upcoming, today = today, nowDt = nowDt, accent = accent, max = 3)
+        }
+        WidgetStatusLine(statusMessage, severity = statusSeverity)
     }
+}
+
+@Composable
+private fun MonthGrid(
+    today: LocalDate,
+    countsByDay: Map<LocalDate, Int>,
+    heatByDay: Map<LocalDate, Int>,
+    accent: Color,
+) {
+    val firstOfMonth = LocalDate(today.year, today.month, 1)
+    val leadingBlanks = sundayFirstLeadingBlanks(firstOfMonth.dayOfWeek)
     val daysInMonth = daysInMonth(today.year, today.month)
     val totalCells = leadingBlanks + daysInMonth
     val rows = (totalCells + 6) / 7
@@ -248,6 +321,8 @@ private fun CalendarMonth(today: LocalDate, countsByDay: Map<LocalDate, Int>) {
                             day = dayNumber,
                             isToday = dayNumber == today.day,
                             eventCount = countsByDay[date] ?: 0,
+                            heatAlpha = CalendarMath.heatAlpha(heatByDay[date] ?: 0),
+                            accent = accent,
                         )
                     } else {
                         Box(modifier = Modifier.padding(horizontal = 2.dp).padding(vertical = 2.dp)) {
@@ -261,9 +336,14 @@ private fun CalendarMonth(today: LocalDate, countsByDay: Map<LocalDate, Int>) {
 }
 
 @Composable
-private fun DayCell(day: Int, isToday: Boolean, eventCount: Int) {
-    val accent = LocalConsoleAccent.current.primary
-    val bg = if (isToday) accent.copy(alpha = 0.10f) else Color.Transparent
+private fun DayCell(day: Int, isToday: Boolean, eventCount: Int, heatAlpha: Float, accent: Color) {
+    // Today wins the visual emphasis: a stronger tint than the heatmap would
+    // otherwise apply to that single cell, so it stays anchored.
+    val bg = when {
+        isToday -> accent.copy(alpha = 0.18f)
+        heatAlpha > 0f -> accent.copy(alpha = heatAlpha)
+        else -> Color.Transparent
+    }
     val textColor = if (isToday) accent else DwellColors.TextFaint
     Column(
         modifier = Modifier
@@ -285,12 +365,6 @@ private fun DayCell(day: Int, isToday: Boolean, eventCount: Int) {
     }
 }
 
-/**
- * Up to three accent dots under a day, density-coding how busy the day is.
- * A row of three dots is the cap — for >3 events we keep three dots but
- * brighten them slightly. Reserves a 4dp lane even when empty so the day-
- * number rows stay aligned across the grid.
- */
 @Composable
 private fun EventDots(count: Int, accent: Color) {
     Row(
@@ -315,22 +389,213 @@ private fun EventDots(count: Int, accent: Color) {
     }
 }
 
-/**
- * Up to three upcoming events shown as compact rows under the grid. Each row
- * is the relative time (or "Now", "Tomorrow"), a tinted dot, the title, and
- * — when there's room — the location.
- */
+// endregion
+
+// region — Week strip (short + wide)
+
+@Composable
+private fun WeekStripContent(
+    today: LocalDate,
+    nowDt: LocalDateTime,
+    events: List<CalendarEvent>,
+    countsByDay: Map<LocalDate, Int>,
+    accent: Color,
+    statusMessage: String?,
+    statusSeverity: WidgetStatusSeverity,
+) {
+    // Show today plus the next 6 days. Anchoring at today (instead of the
+    // start of the week) keeps the most actionable cells leftmost.
+    val days = (0 until 7).map { today.plus(it, DateTimeUnit.DAY) }
+    val firstEventByDay = events
+        .filter { it.isUpcomingFrom(nowDt) }
+        .groupBy { it.startDate }
+        .mapValues { (_, list) -> list.minByOrNull { it.start ?: it.startDate.atTime(0, 0) } }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        WidgetHeader(
+            label = "NEXT 7 DAYS",
+            settingsId = WIDGET_ID,
+        )
+        Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            days.forEach { d ->
+                StripCell(
+                    date = d,
+                    isToday = d == today,
+                    eventCount = countsByDay[d] ?: 0,
+                    firstEventTitle = firstEventByDay[d]?.title,
+                    firstEventUrl = firstEventByDay[d]?.url.orEmpty(),
+                    accent = accent,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+        }
+        WidgetStatusLine(statusMessage, severity = statusSeverity)
+    }
+}
+
+@Composable
+private fun StripCell(
+    date: LocalDate,
+    isToday: Boolean,
+    eventCount: Int,
+    firstEventTitle: String?,
+    firstEventUrl: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val bg = if (isToday) accent.copy(alpha = 0.16f) else DwellColors.Surface1
+    val clickable = firstEventUrl.isNotBlank()
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(bg)
+            .then(if (clickable) Modifier.clickable { openLink(firstEventUrl) } else Modifier)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = weekdayShort(date.dayOfWeek).uppercase(),
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 8.sp,
+            letterSpacing = 1.sp,
+            color = if (isToday) accent else DwellColors.TextLow,
+        )
+        Text(
+            text = date.day.toString(),
+            fontFamily = DwellFonts.jetBrainsMono(),
+            fontSize = 14.sp,
+            fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
+            color = if (isToday) accent else DwellColors.TextHigh,
+        )
+        EventDots(count = eventCount, accent = accent)
+        if (!firstEventTitle.isNullOrBlank()) {
+            Text(
+                text = firstEventTitle,
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 9.sp,
+                color = DwellColors.TextLow,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+// endregion
+
+// region — Today timeline (tall + narrow)
+
+@Composable
+private fun TodayTimelineContent(
+    today: LocalDate,
+    nowDt: LocalDateTime,
+    events: List<CalendarEvent>,
+    accent: Color,
+    statusMessage: String?,
+    statusSeverity: WidgetStatusSeverity,
+) {
+    val todays = events.filter { it.startDate == today }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        WidgetHeader(
+            label = "TODAY · ${monthShortName(today.month).uppercase()} ${today.day}",
+            settingsId = WIDGET_ID,
+        )
+        if (todays.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "No events today",
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 11.sp,
+                    color = DwellColors.TextLow,
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                todays.forEach { e ->
+                    TimelineRow(event = e, nowDt = nowDt, accent = accent)
+                }
+            }
+        }
+        WidgetStatusLine(statusMessage, severity = statusSeverity)
+    }
+}
+
+@Composable
+private fun TimelineRow(event: CalendarEvent, nowDt: LocalDateTime, accent: Color) {
+    val timeLabel = when {
+        event.allDay -> "ALL DAY"
+        event.start != null -> "${event.start.time.hour.toString().padStart(2, '0')}:${event.start.time.minute.toString().padStart(2, '0')}"
+        else -> "—"
+    }
+    val isLive = event.start != null && event.end != null &&
+        nowDt in event.start..event.end
+    val clickable = event.url.isNotBlank()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (isLive) accent.copy(alpha = 0.10f) else Color.Transparent)
+            .then(if (clickable) Modifier.clickable { openLink(event.url) } else Modifier)
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(2.dp)
+                .height(18.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (isLive) accent else accent.copy(alpha = 0.5f)),
+        )
+        Text(
+            text = timeLabel,
+            fontFamily = DwellFonts.jetBrainsMono(),
+            fontSize = 10.sp,
+            color = if (isLive) accent else DwellColors.TextMid,
+            modifier = Modifier.width(46.dp),
+        )
+        Text(
+            text = event.title.ifBlank { "(no title)" },
+            fontFamily = DwellFonts.interTight(),
+            fontSize = 12.sp,
+            color = DwellColors.TextHigh,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+// endregion
+
+// region — Shared upcoming list (under month grid)
+
 @Composable
 private fun UpcomingList(
     events: List<CalendarEvent>,
     today: LocalDate,
     nowDt: LocalDateTime,
     accent: Color,
+    max: Int,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        events.take(3).forEach { e ->
+        events.take(max).forEach { e ->
+            val clickable = e.url.isNotBlank()
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (clickable) Modifier.clickable { openLink(e.url) } else Modifier),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -362,36 +627,24 @@ private fun UpcomingList(
     }
 }
 
-/**
- * Count distinct events covering each day of the current month. Events that
- * span multiple days (vacations, conferences) contribute to every day they
- * touch within the month.
- */
-private fun buildCountsByDay(events: List<CalendarEvent>, year: Int, month: Month): Map<LocalDate, Int> {
-    if (events.isEmpty()) return emptyMap()
-    val out = mutableMapOf<LocalDate, Int>()
-    val monthStart = LocalDate(year, month, 1)
-    val monthEnd = monthStart.plusMonths(1)
-    for (e in events) {
-        if (e.endDate < monthStart || e.startDate >= monthEnd) continue
-        var d = if (e.startDate < monthStart) monthStart else e.startDate
-        val last = if (e.endDate >= monthEnd) monthEnd.plusDays(-1) else e.endDate
-        while (d <= last) {
-            out[d] = (out[d] ?: 0) + 1
-            d = d.plusDays(1)
-        }
-    }
-    return out
+// endregion
+
+// region — Pure helpers
+
+private fun sundayFirstLeadingBlanks(weekday: DayOfWeek): Int = when (weekday) {
+    DayOfWeek.SUNDAY -> 0
+    DayOfWeek.MONDAY -> 1
+    DayOfWeek.TUESDAY -> 2
+    DayOfWeek.WEDNESDAY -> 3
+    DayOfWeek.THURSDAY -> 4
+    DayOfWeek.FRIDAY -> 5
+    DayOfWeek.SATURDAY -> 6
 }
 
 private fun daysInMonth(year: Int, month: Month): Int {
-    val firstNextMonth = if (month == Month.DECEMBER) {
-        LocalDate(year + 1, Month.JANUARY, 1)
-    } else {
-        LocalDate(year, Month.entries[month.ordinal + 1], 1)
-    }
     val first = LocalDate(year, month, 1)
-    return (firstNextMonth.toEpochDays() - first.toEpochDays()).toInt()
+    val firstNext = first.plus(1, DateTimeUnit.MONTH)
+    return (firstNext.toEpochDays() - first.toEpochDays()).toInt()
 }
 
 private fun monthShortName(month: Month): String = when (month) {
@@ -407,7 +660,16 @@ private fun monthShortName(month: Month): String = when (month) {
     Month.OCTOBER -> "Oct"
     Month.NOVEMBER -> "Nov"
     Month.DECEMBER -> "Dec"
-    else -> ""
+}
+
+private fun weekdayShort(day: DayOfWeek): String = when (day) {
+    DayOfWeek.MONDAY -> "Mon"
+    DayOfWeek.TUESDAY -> "Tue"
+    DayOfWeek.WEDNESDAY -> "Wed"
+    DayOfWeek.THURSDAY -> "Thu"
+    DayOfWeek.FRIDAY -> "Fri"
+    DayOfWeek.SATURDAY -> "Sat"
+    DayOfWeek.SUNDAY -> "Sun"
 }
 
 private fun todayLocal(): LocalDate =
@@ -415,20 +677,6 @@ private fun todayLocal(): LocalDate =
 
 private fun nowLocalDateTime(): LocalDateTime =
     Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-
-private fun LocalDate.plusDays(n: Int): LocalDate {
-    val days = (this.toEpochDays() + n)
-    return LocalDate.fromEpochDays(days)
-}
-
-private fun LocalDate.plusMonths(n: Int): LocalDate {
-    val totalMonth = (this.year * 12 + (this.monthNumber - 1)) + n
-    val newYear = totalMonth / 12
-    val newMonth = (totalMonth % 12) + 1
-    val maxDay = daysInMonth(newYear, Month.entries[newMonth - 1])
-    val day = this.day.coerceAtMost(maxDay)
-    return LocalDate(newYear, newMonth, day)
-}
 
 private fun LocalDate.atTime(hour: Int, minute: Int): LocalDateTime =
     LocalDateTime(this, LocalTime(hour, minute))
@@ -439,7 +687,6 @@ private fun CalendarEvent.isUpcomingFrom(nowDt: LocalDateTime): Boolean {
     return end >= nowDt
 }
 
-/** Calendar widgets read time deltas in minutes; bigger spans round to days. */
 private fun CalendarEvent.shortCountdownFrom(nowDt: LocalDateTime): String {
     val start = this.start ?: this.startDate.atTime(0, 0)
     val minutes = minutesBetween(nowDt, start)
@@ -456,16 +703,18 @@ private fun CalendarEvent.shortWhenLabel(today: LocalDate, nowDt: LocalDateTime)
     if (this.allDay || s == null) {
         return when {
             this.startDate == today -> "today"
-            this.startDate == today.plusDays(1) -> "tomorrow"
+            this.startDate == today.plus(1, DateTimeUnit.DAY) -> "tomorrow"
             else -> "${monthShortName(this.startDate.month)} ${this.startDate.day}"
         }.uppercase()
     }
     val deltaMin = minutesBetween(nowDt, s)
+    val hh = s.time.hour.toString().padStart(2, '0')
+    val mm = s.time.minute.toString().padStart(2, '0')
     return when {
         deltaMin <= 0 -> "NOW"
         deltaMin < 60 -> "in ${deltaMin}m"
-        s.date == today -> "${s.time.hour.toString().padStart(2, '0')}:${s.time.minute.toString().padStart(2, '0')}"
-        s.date == today.plusDays(1) -> "tmrw " + "${s.time.hour.toString().padStart(2, '0')}:${s.time.minute.toString().padStart(2, '0')}"
+        s.date == today -> "$hh:$mm"
+        s.date == today.plus(1, DateTimeUnit.DAY) -> "tmrw $hh:$mm"
         else -> "${monthShortName(s.date.month)} ${s.date.day}"
     }
 }
@@ -476,3 +725,5 @@ private fun minutesBetween(a: LocalDateTime, b: LocalDateTime): Int {
     val secB = b.time.toSecondOfDay()
     return (days * 24 * 60) + (secB - secA) / 60
 }
+
+// endregion

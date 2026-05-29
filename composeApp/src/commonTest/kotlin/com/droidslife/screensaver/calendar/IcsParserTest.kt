@@ -151,6 +151,24 @@ class IcsParserTest {
     }
 
     @Test
+    fun parsesEventUrl() {
+        val ics = """
+            BEGIN:VCALENDAR
+            BEGIN:VEVENT
+            UID:url@example.com
+            DTSTART;VALUE=DATE:20260601
+            SUMMARY:Quarterly review
+            URL:https://calendar.google.com/event?eid=abc123
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val events = IcsParser.parse(ics, windowStart, windowEnd)
+
+        assertEquals("https://calendar.google.com/event?eid=abc123", events.single().url)
+    }
+
+    @Test
     fun dropsEventsOutsideWindow() {
         val ics = """
             BEGIN:VCALENDAR
