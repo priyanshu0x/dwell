@@ -65,3 +65,9 @@ class WeatherProviderUnconfigured(message: String) : Exception(message)
  * to take in Settings.
  */
 class WeatherProviderCredentialFailure(message: String) : Exception(message)
+
+/**
+ * Thrown when configured credentials are valid but the upstream refuses more
+ * calls for the current window/plan.
+ */
+class WeatherProviderRateLimited(message: String) : Exception(message)

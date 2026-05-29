@@ -240,6 +240,8 @@ private fun WeatherStack(
             "Needs a WeatherAPI.com key — or switch to wttr.in (no key)" to WidgetStatusSeverity.Warning
         WeatherSyncStatus.CredentialFailed ->
             "WeatherAPI key/account problem - update it in settings" to WidgetStatusSeverity.Error
+        WeatherSyncStatus.RateLimited ->
+            "WeatherAPI rate limit reached - showing last update" to WidgetStatusSeverity.Warning
         WeatherSyncStatus.Failed ->
             "Weather unavailable — check network/API key" to WidgetStatusSeverity.Error
     }
@@ -290,6 +292,7 @@ private fun WeatherStack(
 
 private fun weatherErrorCopy(syncStatus: WeatherSyncStatus, fallback: String): String = when (syncStatus) {
     WeatherSyncStatus.CredentialFailed -> "WeatherAPI key/account problem - update it in settings"
+    WeatherSyncStatus.RateLimited -> "WeatherAPI rate limit reached"
     WeatherSyncStatus.Unconfigured -> "Needs a WeatherAPI.com key"
     else -> fallback.takeIf { it.isNotBlank() } ?: "Couldn't load"
 }
