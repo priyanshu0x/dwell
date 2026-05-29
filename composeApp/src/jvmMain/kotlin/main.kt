@@ -1,4 +1,5 @@
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,6 +12,9 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.*
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.droidslife.screensaver.App
 import com.droidslife.screensaver.Args
 import com.droidslife.screensaver.LaunchMode
@@ -26,7 +30,9 @@ import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
+import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Frame
 
 private const val IDLE_MONITOR_POLL_MS = 1_000L
@@ -47,6 +53,24 @@ internal fun ApplicationScope.runDwell(
     args: Array<String> = emptyArray(),
     devMode: Boolean = false,
 ) {
+    val viewModelStoreOwner = remember { DwellViewModelStoreOwner() }
+    DisposableEffect(viewModelStoreOwner) {
+        onDispose {
+            viewModelStoreOwner.clear()
+            stopKoin()
+        }
+    }
+
+    CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
+        runDwellContent(args = args, devMode = devMode)
+    }
+}
+
+@Composable
+private fun ApplicationScope.runDwellContent(
+    args: Array<String> = emptyArray(),
+    devMode: Boolean = false,
+) {
     val launchArgs = remember(devMode, args.toList()) {
         if (devMode) Args(LaunchMode.Screensaver) else Args.parse(args)
     }
@@ -63,7 +87,7 @@ internal fun ApplicationScope.runDwell(
         true
     }
 
-    val settingsViewModel = koinInject<SettingsViewModel>()
+    val settingsViewModel = koinViewModel<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
     val settings = settingsViewModel.settings
     var dashboardVisible by remember { mutableStateOf(devMode || launchArgs.mode != LaunchMode.Daemon) }
@@ -208,6 +232,14 @@ internal fun ApplicationScope.runDwell(
                 modifier = windowEvents.mouseEventModifier
             )
         }
+    }
+}
+
+private class DwellViewModelStoreOwner : ViewModelStoreOwner {
+    override val viewModelStore = ViewModelStore()
+
+    fun clear() {
+        viewModelStore.clear()
     }
 }
 

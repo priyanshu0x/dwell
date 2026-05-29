@@ -24,6 +24,7 @@ import com.droidslife.screensaver.settings.WidgetConfigDialog
 import com.droidslife.screensaver.theme.AppTheme
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 internal fun App(
@@ -35,7 +36,7 @@ internal fun App(
     onShowHelpDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val settingsViewModel = koinInject<SettingsViewModel>()
+    val settingsViewModel = koinViewModel<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
 
     LaunchedEffect(settingsViewModel.settings, settingsViewModel.settingsLoaded) {

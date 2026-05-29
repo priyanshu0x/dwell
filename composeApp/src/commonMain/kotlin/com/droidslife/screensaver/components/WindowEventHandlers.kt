@@ -11,6 +11,7 @@ import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 data class WindowEventHandlers(
     val keyEventHandler: KeyEventHandler,
@@ -26,7 +27,7 @@ fun rememberWindowEventHandlers(
     onExitApplication: () -> Unit,
     openSettingsOnStart: Boolean = false,
 ): WindowEventHandlers {
-    val settingsViewModel = koinInject<SettingsViewModel>()
+    val settingsViewModel = koinViewModel<SettingsViewModel>()
     val widgetRegistry = koinInject<WidgetRegistry>()
 
     var showHelpDialog by remember { mutableStateOf(false) }
