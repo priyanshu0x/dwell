@@ -2,6 +2,7 @@ package com.droidslife.screensaver.todos.providers
 
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.network.BackendResult
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.storage.SyncRepository
 import com.droidslife.screensaver.widget.api.WidgetLogger
 import com.droidslife.screensaver.widget.api.WidgetStorage
@@ -14,7 +15,6 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
@@ -47,7 +47,7 @@ class LocalTodosProvider(
     override val displayName: String = "Local (this machine)"
     override val requiresApiKey: Boolean = false
 
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = DwellJson.Persisted
     private val serializer = ListSerializer(StoredTodo.serializer())
     private val syncRepository = SyncRepository("todos", storage, backend)
 

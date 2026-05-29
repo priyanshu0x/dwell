@@ -1,6 +1,7 @@
 package com.droidslife.screensaver.weather
 
 import com.droidslife.screensaver.config.Constants
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.WEATHER_API_KEY_SECRET_ID
 import io.ktor.client.HttpClient
@@ -16,7 +17,6 @@ import kotlinx.io.IOException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -105,7 +105,7 @@ class WeatherApi(
             }
             val body = response.bodyAsText()
 
-            val json = Json { ignoreUnknownKeys = true }
+            val json = DwellJson.IgnoreUnknown
             val jsonArray = json.parseToJsonElement(body).jsonArray
 
             jsonArray.map { jsonElement ->
@@ -191,7 +191,7 @@ private suspend fun ResponseException.toWeatherApiException(fallbackMessage: Str
 
 private val credentialErrorCodes = setOf(2006, 2008, 2009)
 
-private val weatherApiErrorJson: Json = Json { ignoreUnknownKeys = true; isLenient = true }
+private val weatherApiErrorJson = DwellJson.Lenient
 
 class WeatherApiException(
     message: String,

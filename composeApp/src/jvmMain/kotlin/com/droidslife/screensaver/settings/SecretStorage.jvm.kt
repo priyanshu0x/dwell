@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.settings
 
+import com.droidslife.screensaver.serialization.DwellJson
 import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -12,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -69,7 +69,7 @@ private fun createOsSecretStore(): OsSecretStore {
 internal class ObfuscatedFileSecretStore(
     private val path: Path = Path.of(System.getProperty("user.home"), ".screensaver", "secrets.dat"),
 ) {
-    private val json = Json { prettyPrint = true }
+    private val json = DwellJson.Pretty
     private val serializer = MapSerializer(String.serializer(), String.serializer())
 
     fun read(id: String): String? = load()[id]?.let(::decode)

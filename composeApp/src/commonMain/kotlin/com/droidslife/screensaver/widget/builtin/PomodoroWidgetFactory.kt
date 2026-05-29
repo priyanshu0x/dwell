@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.widget.api.ConfigField
 import com.droidslife.screensaver.widget.api.Widget
 import com.droidslife.screensaver.widget.api.WidgetCategory
@@ -19,7 +20,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.math.ceil
 import kotlin.time.Clock
 
@@ -92,7 +92,7 @@ private class PomodoroWidget(
     private val config: WidgetConfig,
     private val scope: WidgetScope,
 ) : Widget {
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = DwellJson.Persisted
 
     var state by mutableStateOf(PomodoroState())
         private set

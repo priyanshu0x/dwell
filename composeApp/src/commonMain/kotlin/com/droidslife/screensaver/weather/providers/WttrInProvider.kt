@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.weather.providers
 
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.weather.DayForecast
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -13,7 +14,6 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.math.roundToInt
 
 /**
@@ -42,7 +42,7 @@ class WttrInProvider(
     override val displayName: String = "wttr.in (no key needed)"
     override val requiresApiKey: Boolean = false
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+    private val json = DwellJson.Api
 
     override suspend fun current(city: String): CurrentWeather {
         try {
