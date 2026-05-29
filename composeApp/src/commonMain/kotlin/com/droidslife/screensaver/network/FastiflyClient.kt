@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.network
 
+import com.droidslife.screensaver.serialization.DwellJson
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -19,7 +20,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
  * Thin client for the real Fastifly ledger API, authenticated with a Fastifly
@@ -34,7 +34,7 @@ class FastiflyClient(
     private val baseUrlProvider: () -> String?,
     private val tokenProvider: suspend () -> String?,
 ) {
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = DwellJson.Persisted
 
     fun isConfigured(): Boolean = baseUrlOrNull() != null
 

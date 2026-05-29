@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.settings
 
+import com.droidslife.screensaver.serialization.DwellJson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
@@ -25,11 +26,7 @@ private class PreferencesRepositoryImpl : PreferencesRepository {
         ".screensaver",
         "settings.json",
     )
-    private val json = Json {
-        ignoreUnknownKeys = true
-        prettyPrint = true
-        encodeDefaults = true
-    }
+    private val json = DwellJson.PrettyPersisted
     private val store = storeOf(
         codec = SettingsFileCodec(settingsPath, json),
         default = SettingsModel(),

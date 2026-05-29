@@ -2,10 +2,10 @@ package com.droidslife.screensaver.storage
 
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.network.BackendResult
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.widget.api.WidgetStorage
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 
@@ -14,7 +14,7 @@ class SyncRepository(
     private val storage: WidgetStorage,
     private val backend: BackendGateway,
 ) {
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = DwellJson.Persisted
     private val serializer = ListSerializer(SyncOutboxItem.serializer())
     private val outboxKey = "sync-$collection-outbox.json"
 

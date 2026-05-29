@@ -1,5 +1,6 @@
 package com.droidslife.screensaver.todos.providers
 
+import com.droidslife.screensaver.serialization.DwellJson
 import com.droidslife.screensaver.widget.api.WidgetLogger
 import com.droidslife.screensaver.widget.api.WidgetStorage
 import io.ktor.client.HttpClient
@@ -31,7 +32,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.time.Clock
@@ -81,7 +81,7 @@ class TodoistProvider(
     override val displayName: String = "Todoist"
     override val requiresApiKey: Boolean = true
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+    private val json = DwellJson.Api
     private val cacheSerializer = ListSerializer(CachedTodo.serializer())
     private val state = MutableStateFlow<List<Todo>>(emptyList())
     private val sync = MutableStateFlow<TodosSyncStatus>(TodosSyncStatus.Healthy)
