@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.*
-import javax.imageio.ImageIO
 import com.droidslife.screensaver.App
 import com.droidslife.screensaver.Args
 import com.droidslife.screensaver.LaunchMode
@@ -22,6 +21,7 @@ import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import com.droidslife.screensaver.settings.SettingsViewModel
+import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
 import org.koin.compose.koinInject
@@ -29,7 +29,14 @@ import java.awt.Frame
 
 private const val IDLE_MONITOR_POLL_MS = 1_000L
 
-fun main(args: Array<String>) = application {
+object Dwell {
+    @JvmStatic
+    fun main(args: Array<String>) = runDwell(args)
+}
+
+fun main(args: Array<String>) = runDwell(args)
+
+private fun runDwell(args: Array<String>) = application {
     val launchArgs = remember(args.toList()) { Args.parse(args) }
 
     if (launchArgs.mode == LaunchMode.Preview) {
@@ -55,10 +62,12 @@ fun main(args: Array<String>) = application {
     // `dwell show` must leave an affordance after Esc even if the daemon tray
     // preference is off; otherwise the app would keep running with no way back.
     val showTrayIcon = keepRunningInTray && (settings.trayIconEnabled || launchArgs.mode == LaunchMode.Show)
+    val dwellWindowIcon = remember { loadDwellWindowIcon() }
 
     if (keepRunningInTray && !dashboardVisible) {
         Window(
             title = "Dwell Daemon",
+            icon = dwellWindowIcon,
             visible = false,
             onCloseRequest = {},
         ) {}
@@ -143,7 +152,6 @@ fun main(args: Array<String>) = application {
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
         )
 
-        val dwellWindowIcon = remember { loadDwellWindowIcon() }
         Window(
             title = "Dwell",
             icon = dwellWindowIcon,
@@ -196,13 +204,7 @@ fun main(args: Array<String>) = application {
  * the JVM default if the file isn't present (e.g. during a partial build).
  */
 private fun loadDwellWindowIcon(): Painter? {
-    val candidates = listOf(
-        java.io.File("composeApp/desktopAppIcons/LinuxIcon.png"),
-        java.io.File("desktopAppIcons/LinuxIcon.png"),
-    )
-    val source = candidates.firstOrNull { it.exists() } ?: return null
-    return runCatching {
-        val image = ImageIO.read(source) ?: return null
+    return DwellIconLoader.load()?.let { image ->
         BitmapPainter(image.toComposeImageBitmap())
-    }.getOrNull()
+    }
 }
