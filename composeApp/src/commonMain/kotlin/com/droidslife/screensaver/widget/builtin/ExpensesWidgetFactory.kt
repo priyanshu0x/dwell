@@ -142,6 +142,35 @@ private enum class TxType(val wire: String, val label: String, val glyph: String
 
 private enum class Phase { Unconfigured, Loading, Ready, Offline, AuthFailed, Error, NeedsSetup }
 
+private data class ExpensesViewState(
+    val context: MeContext? = null,
+    val accounts: List<FastiflyAccount> = emptyList(),
+    val categories: List<FastiflyCategory> = emptyList(),
+    val recent: List<FastiflyTransactionGroup> = emptyList(),
+    val pending: List<PendingTransaction> = emptyList(),
+    val phase: Phase,
+    val lastError: String? = null,
+) {
+    fun withCache(snapshot: CacheSnapshot?): ExpensesViewState =
+        if (snapshot == null) {
+            this
+        } else {
+            copy(
+                context = snapshot.context,
+                accounts = snapshot.accounts,
+                categories = snapshot.categories,
+                recent = snapshot.recent,
+            )
+        }
+
+    fun toCacheSnapshot(): CacheSnapshot = CacheSnapshot(context, accounts, categories, recent)
+
+    companion object {
+        fun initial(configured: Boolean): ExpensesViewState =
+            ExpensesViewState(phase = if (configured) Phase.Loading else Phase.Unconfigured)
+    }
+}
+
 private class ExpensesWidget(
     private val config: WidgetConfig,
     private val scope: WidgetScope,
@@ -151,13 +180,14 @@ private class ExpensesWidget(
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val pendingSerializer = ListSerializer(PendingTransaction.serializer())
 
-    private var context by mutableStateOf<MeContext?>(null)
-    private var accounts by mutableStateOf<List<FastiflyAccount>>(emptyList())
-    private var categories by mutableStateOf<List<FastiflyCategory>>(emptyList())
-    private var recent by mutableStateOf<List<FastiflyTransactionGroup>>(emptyList())
-    private var pending by mutableStateOf<List<PendingTransaction>>(emptyList())
-    private var phase by mutableStateOf(if (client.isConfigured()) Phase.Loading else Phase.Unconfigured)
-    private var lastError by mutableStateOf<String?>(null)
+    private var viewState by mutableStateOf(ExpensesViewState.initial(client.isConfigured()))
+    private val context: MeContext? get() = viewState.context
+    private val accounts: List<FastiflyAccount> get() = viewState.accounts
+    private val categories: List<FastiflyCategory> get() = viewState.categories
+    private val recent: List<FastiflyTransactionGroup> get() = viewState.recent
+    private val pending: List<PendingTransaction> get() = viewState.pending
+    private val phase: Phase get() = viewState.phase
+    private val lastError: String? get() = viewState.lastError
 
     // Add-form state
     private var inputVisible by mutableStateOf(false)
@@ -183,17 +213,28 @@ private class ExpensesWidget(
     }
 
     private suspend fun start() {
-        // Resolve the unconfigured state synchronously — before any cancellable
-        // suspension — so an unconfigured tile shows "Connect to Fastifly"
-        // immediately instead of hanging on the initial "Loading…".
+        // The initial view state is already Unconfigured for blank config, so
+        // cache hydration can't delay the "Connect to Fastifly" prompt.
         if (!client.isConfigured()) {
-            phase = Phase.Unconfigured
-            runCatching { loadCache(); pending = readOutbox() }
+            val cached = runCatching { readCache() }
                 .onFailure { scope.log.warn("Expenses cache load failed: ${it.message}") }
+                .getOrNull()
+            val outbox = runCatching { readOutbox() }
+                .onFailure { scope.log.warn("Expenses outbox load failed: ${it.message}") }
+                .getOrDefault(emptyList())
+            viewState = viewState.withCache(cached).copy(
+                pending = outbox,
+                phase = Phase.Unconfigured,
+            )
             return
         }
-        runCatching { loadCache() }.onFailure { scope.log.warn("Expenses cache load failed: ${it.message}") }
-        pending = runCatching { readOutbox() }.getOrDefault(emptyList())
+        val cached = runCatching { readCache() }
+            .onFailure { scope.log.warn("Expenses cache load failed: ${it.message}") }
+            .getOrNull()
+        val outbox = runCatching { readOutbox() }
+            .onFailure { scope.log.warn("Expenses outbox load failed: ${it.message}") }
+            .getOrDefault(emptyList())
+        viewState = viewState.withCache(cached).copy(pending = outbox)
         refresh()
     }
 
@@ -729,8 +770,9 @@ private class ExpensesWidget(
         formError = null
         inputVisible = false
         scope.coroutineScope.launch {
-            pending = pending + item
-            writeOutbox(pending)
+            val updatedPending = pending + item
+            viewState = viewState.copy(pending = updatedPending)
+            writeOutbox(updatedPending)
             pushOutbox()
         }
     }
@@ -752,40 +794,61 @@ private class ExpensesWidget(
 
     private suspend fun refresh() {
         when (val ctxResult = client.meContext()) {
-            FastiflyResult.Disabled -> { phase = Phase.Unconfigured; return }
+            FastiflyResult.Disabled -> {
+                viewState = viewState.copy(phase = Phase.Unconfigured)
+                return
+            }
             is FastiflyResult.Failure -> {
-                lastError = ctxResult.displayMessage()
-                phase = when {
+                val nextPhase = when {
                     ctxResult.isCredentialFailure() -> Phase.AuthFailed
                     context != null -> Phase.Offline
                     else -> Phase.Error
                 }
+                viewState = viewState.copy(
+                    lastError = ctxResult.displayMessage(),
+                    phase = nextPhase,
+                )
                 return
             }
-            is FastiflyResult.Success -> context = ctxResult.value
-        }
-        val ctx = context ?: return
+            is FastiflyResult.Success -> {
+                val ctx = ctxResult.value
+                val accountsResult = client.listAccounts(ctx)
+                val categoriesResult = client.listCategories(ctx)
+                val txnResult = client.listTransactions(ctx, limit = 25, fromOccurredAt = monthStartIso())
 
-        val accountsResult = client.listAccounts(ctx)
-        val categoriesResult = client.listCategories(ctx)
-        val txnResult = client.listTransactions(ctx, limit = 25, fromOccurredAt = monthStartIso())
+                val nextAccounts = when (accountsResult) {
+                    is FastiflyResult.Success -> accountsResult.value
+                    else -> accounts
+                }
+                val nextCategories = when (categoriesResult) {
+                    is FastiflyResult.Success -> categoriesResult.value
+                    else -> categories
+                }
+                val nextRecent = when (txnResult) {
+                    is FastiflyResult.Success -> txnResult.value
+                    else -> recent
+                }
+                val failures = listOf(accountsResult, categoriesResult, txnResult)
+                    .mapNotNull { it as? FastiflyResult.Failure }
+                val credentialFailure = failures.firstOrNull { it.isCredentialFailure() }
+                val anyFailure = failures.isNotEmpty()
+                val nextPhase = when {
+                    credentialFailure != null -> Phase.AuthFailed
+                    anyFailure && (nextAccounts.isEmpty() && nextRecent.isEmpty()) -> Phase.Error
+                    anyFailure -> Phase.Offline
+                    nextAccounts.isEmpty() || nextCategories.isEmpty() -> Phase.NeedsSetup
+                    else -> Phase.Ready
+                }
 
-        if (accountsResult is FastiflyResult.Success) accounts = accountsResult.value
-        if (categoriesResult is FastiflyResult.Success) categories = categoriesResult.value
-        if (txnResult is FastiflyResult.Success) recent = txnResult.value
-
-        val failures = listOf(accountsResult, categoriesResult, txnResult)
-            .mapNotNull { it as? FastiflyResult.Failure }
-        val credentialFailure = failures.firstOrNull { it.isCredentialFailure() }
-        val anyFailure = failures.isNotEmpty()
-        lastError = credentialFailure?.displayMessage() ?: failures.firstOrNull()?.message
-
-        phase = when {
-            credentialFailure != null -> Phase.AuthFailed
-            anyFailure && (accounts.isEmpty() && recent.isEmpty()) -> Phase.Error
-            anyFailure -> Phase.Offline
-            accounts.isEmpty() || categories.isEmpty() -> Phase.NeedsSetup
-            else -> Phase.Ready
+                viewState = viewState.copy(
+                    context = ctx,
+                    accounts = nextAccounts,
+                    categories = nextCategories,
+                    recent = nextRecent,
+                    lastError = credentialFailure?.displayMessage() ?: failures.firstOrNull()?.message,
+                    phase = nextPhase,
+                )
+            }
         }
         saveCache()
         pushOutbox()
@@ -794,7 +857,10 @@ private class ExpensesWidget(
     private suspend fun pushOutbox() {
         val ctx = context ?: return
         val items = readOutbox()
-        if (items.isEmpty()) { pending = emptyList(); return }
+        if (items.isEmpty()) {
+            if (pending.isNotEmpty()) viewState = viewState.copy(pending = emptyList())
+            return
+        }
         var pushed = 0
         var index = 0
         var failure: String? = null
@@ -812,15 +878,19 @@ private class ExpensesWidget(
         }
         val remaining = items.drop(index)
         writeOutbox(remaining)
-        pending = remaining
-        lastError = failure
+        var nextState = viewState.copy(
+            pending = remaining,
+            lastError = failure,
+        )
         if (pushed > 0 && failure == null) {
             // Pull the authoritative server view so the just-synced rows replace
             // their optimistic placeholders.
             client.listTransactions(ctx, limit = 25, fromOccurredAt = monthStartIso()).let {
-                if (it is FastiflyResult.Success) { recent = it.value; saveCache() }
+                if (it is FastiflyResult.Success) nextState = nextState.copy(recent = it.value)
             }
         }
+        viewState = nextState
+        if (pushed > 0 && failure == null) saveCache()
     }
 
     // --- Derived data ------------------------------------------------------
@@ -984,19 +1054,15 @@ private class ExpensesWidget(
     // --- Persistence (offline cache + outbox) ------------------------------
 
     private fun saveCache() {
-        val snapshot = CacheSnapshot(context, accounts, categories, recent)
+        val snapshot = viewState.toCacheSnapshot()
         scope.coroutineScope.launch {
             scope.storage.write(CACHE_KEY, json.encodeToString(CacheSnapshot.serializer(), snapshot))
         }
     }
 
-    private suspend fun loadCache() {
-        val raw = scope.storage.read(CACHE_KEY, String::class.java) ?: return
-        val snapshot = runCatching { json.decodeFromString(CacheSnapshot.serializer(), raw) }.getOrNull() ?: return
-        context = snapshot.context
-        accounts = snapshot.accounts
-        categories = snapshot.categories
-        recent = snapshot.recent
+    private suspend fun readCache(): CacheSnapshot? {
+        val raw = scope.storage.read(CACHE_KEY, String::class.java) ?: return null
+        return runCatching { json.decodeFromString(CacheSnapshot.serializer(), raw) }.getOrNull()
     }
 
     private suspend fun readOutbox(): List<PendingTransaction> =
