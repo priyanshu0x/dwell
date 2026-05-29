@@ -56,6 +56,8 @@ class WttrInProvider(
                 tempC = condition.tempC.toDoubleOrNull() ?: 0.0,
                 feelsLikeC = condition.feelsLikeC?.toDoubleOrNull(),
                 humidity = condition.humidity?.toIntOrNull(),
+                windKph = condition.windspeedKmph?.toDoubleOrNull(),
+                visKm = condition.visibility?.toDoubleOrNull(),
                 conditionCode = condition.weatherCode?.toIntOrNull(),
                 conditionText = condition.weatherDesc.firstOrNull()?.value?.trim().orEmpty(),
                 city = body.cityLabel().ifBlank { resolvedCity },
@@ -191,6 +193,8 @@ internal data class WttrCurrentCondition(
     @SerialName("temp_C") val tempC: String = "0",
     @SerialName("FeelsLikeC") val feelsLikeC: String? = null,
     val humidity: String? = null,
+    val windspeedKmph: String? = null,
+    val visibility: String? = null,
     val weatherCode: String? = null,
     val weatherDesc: List<WttrValue> = emptyList(),
 )
