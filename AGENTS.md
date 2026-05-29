@@ -10,51 +10,51 @@ This is a Kotlin/Compose Multiplatform project with a single `:composeApp` modul
 - Run tray daemon: `./gradlew :composeApp:run` (Windows: `.\gradlew.bat :composeApp:run`)
 - Run with Compose hot-reload (uses `DevMainKt`): `./gradlew :composeApp:runHot`
 - Test (commonTest + jvmTest): `./gradlew :composeApp:jvmTest`
-- Single test class: `./gradlew :composeApp:jvmTest --tests "com.droidslife.screensaver.clock.ClockViewModelTest"`
+- Single test class: `./gradlew :composeApp:jvmTest --tests "com.droidslife.screensaver.ArgsTest"`
 - Package native installer: `./gradlew :composeApp:packageDistributionForCurrentOS` (formats: Dmg, Msi, Deb, Exe — see `composeApp/build.gradle.kts`)
 
 The app uses Gradle configuration cache and parallel builds (see `gradle.properties`) — if you edit Gradle files and see stale-config errors, run with `--no-configuration-cache` once to debug.
 
 ### Runtime requirements
 
-- The WeatherAPI.com integration reads `WEATHERAPI` from the process environment (`System.getenv("WEATHERAPI")` in `weather/WeatherApi.kt`). Without it, every API call falls through `catch` and returns mock data — useful for development, but a silent failure mode. There is no `.env` mechanism; the env var must be set in the shell or run configuration.
+- Weather works out of the box through the default `wttr.in` provider. The optional WeatherAPI.com provider requires an API key stored through widget settings/secrets; if it is missing or invalid, the UI surfaces an unconfigured/error state instead of silently returning mock data.
 
 ## Architecture
 
 ### Entry points
-- `composeApp/src/jvmMain/kotlin/main.kt` — production entry (`MainKt`). Fullscreen, undecorated, always-on-top window with mouse/key handlers that trigger `exitApplication()`.
-- `composeApp/src/jvmMain/kotlin/devMain.kt` — hot-reload entry (`DevMainKt`). Maximized (not fullscreen) and wrapped in `DevelopmentEntryPoint { }`. **It duplicates the key/mouse handling logic from `main.kt` inline rather than reusing `KeyEventHandler`** — when adding new shortcuts, update both files.
+- `composeApp/src/jvmMain/kotlin/main.kt` — production entry (`Dwell`). It owns the shared `ApplicationScope.runDwell(...)` implementation used by both normal and hot-reload launches.
+- `composeApp/src/jvmMain/kotlin/devMain.kt` — hot-reload entry (`DevMainKt`). It calls `runDwell(devMode = true)`, which uses a maximized window and skips daemon/tray/idle plumbing.
 
 ### Composition flow
-`main` → `Window` → `App` (KoinContext + AppTheme) → `DigitalClockApp` (the actual screen-saver UI, including the digit row, weather panel, control icons, and all dialogs).
+`Dwell.main` / `DevMainKt.main` → `Window` → `App` (AppTheme + settings/widget sync) → `ModeHost` (Cinematic, Ambient, Console) plus `SettingsSidebar`, `WidgetConfigDialog`, and `ShortcutsHelpDialog` overlays.
 
 ### DI (Koin)
-All graph wiring is in `di/AppModule.kt`. `initKoin { modules(appModule) }` is called from each entry point before `application { }`. ViewModels are plain classes (not `androidx.lifecycle.ViewModel`) that hold their own `CoroutineScope(SupervisorJob() + Dispatchers.Main)` and expose Compose `MutableState` directly — pulled into composables with `koinInject<T>()`.
+All graph wiring is in `di/AppModule.kt`. `runDwell(...)` initializes Koin once with `initKoin { modules(appModule) }` inside the Compose application scope. ViewModels are plain classes (not `androidx.lifecycle.ViewModel`) that hold their own `CoroutineScope(SupervisorJob() + Dispatchers.Main)` and expose Compose `MutableState` directly — pulled into composables with `koinInject<T>()`.
 
-### Clock-design system
-There are 11 clock designs (`clockdigits/DigitalClockDigit.kt`, `DigitalClockDigit2.kt` … `DigitalClockDigit11.kt`), dispatched by an `Int` in `DigitalClockApp.kt`'s `when (clockViewModel.clockDesign)` block.
-
-**Known inconsistency:** `ClockViewModel.cycleClockDesign()` and `updateClockDesign()` validate against `1..8` only — designs 9, 10, 11 exist in the UI dispatch but cannot be reached via the Ctrl+N shortcut or auto-cycle/shuffle. When adding designs, update both the `when` block in `DigitalClockApp.kt` *and* the range in `ClockViewModel`.
+### Widget system
+Built-in widgets are registered in `di/AppModule.kt` through factory singletons (`ClockWidgetFactory`, `WeatherWidgetFactory`, `TodosWidgetFactory`, `ExpensesWidgetFactory`, `CalendarWidgetFactory`, `IdleCounterWidgetFactory`, `PomodoroWidgetFactory`) and collected by `WidgetRegistry`. Console layout sizing is driven by `WidgetSize`; Cinematic and Ambient use the same widget instances with chip/minimal render targets where a widget opts in.
 
 ### Settings persistence
-`PreferencesRepositoryImpl` is **in-memory only** — it holds a `MutableStateFlow<SettingsModel>` with no disk writes. The `kstore` dependency is included and the file has a TODO comment explaining the intended migration. Settings reset on each restart.
+`PreferencesRepositoryImpl.jvm.kt` persists settings with `kstore` through `SettingsFileCodec`, writing JSON to `~/.screensaver/settings.json`. The codec migrates legacy `currentCity` and `idleTimeoutMinutes` fields before decoding with `ignoreUnknownKeys = true`.
 
-### Keyboard shortcuts (all Ctrl + ...)
-Defined centrally in `components/KeyEventHandler.kt`, dispatched as `KeyEventAction` sealed-class instances handled in `main.kt`'s `onAction` lambda:
+### Keyboard shortcuts
+Defined centrally in `components/KeyEventHandler.kt`, dispatched as `KeyEventAction` sealed-class instances handled by `rememberWindowEventHandlers(...)`:
 
-- N = cycle clock design · P = toggle auto-change · R = toggle shuffle · S = city dialog
-- C = settings dialog · H = help dialog · T = toggle theme
-- Z = toggle exit-on-mouse-movement · X = exit (only when Z-toggle is enabled)
+- Esc = contextual dismiss / hide dashboard
+- F1 or `?` = Help
+- M = cycle mode · 1/2/3 = jump Cinematic/Ambient/Console
+- V = cycle variant · W = toggle Cinematic widget drawer · L = toggle Console edit mode
+- S, Ctrl+, or Cmd+, = Settings
+- Ctrl+R or Cmd+R = reload widgets
+- Ctrl+T = toggle theme
+- Ctrl+X, Ctrl+Q, or Cmd+Q = request exit
 
-`devMain.kt` re-implements this inline (see note above).
-
-### Exit-on-movement behavior
-`main.kt` tracks `lastMousePosition` and only exits when the pointer moves more than `movementThreshold = 5f` pixels — this avoids spurious exits from cursor jitter when the window first gains focus. The same threshold logic is duplicated in `devMain.kt`.
+Window-level shortcuts stand down while `TextInputFocus` is active so form fields receive normal typing and edit chords.
 
 ### Network / data
 - `network/KtorClient.kt` — Ktor client factory (OkHttp engine on JVM, with retry).
-- `weather/WeatherApi.kt` — WeatherAPI.com client. Catches all exceptions and substitutes mock data; **errors are silent in the UI**.
-- `weather/WeatherRepository.kt` + `WeatherViewModel.kt` — state machine (`WeatherState.Loading/Success/Error`, `CitySearchState.*`) consumed in `DigitalClockApp`.
+- `weather/WeatherApi.kt` — WeatherAPI.com client used by `WeatherApiProvider`; failures become `WeatherApiException` and then provider-level unconfigured/credential/error states.
+- `weather/WeatherRepository.kt` + `WeatherViewModel.kt` — provider-aware state machine (`WeatherState.Loading/Success/Error`, `CitySearchState.*`) consumed by the weather and clock/weather widgets.
 - `location/LocationService.kt` + `TimeZoneUtils.kt` — used to derive the displayed timezone from the selected city's `tz_id`.
 
 ### Theming

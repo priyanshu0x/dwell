@@ -10,8 +10,6 @@ import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -39,7 +37,7 @@ class WeatherApi(
     suspend fun getWeatherData(
         latitude: Double,
         longitude: Double
-    ): WeatherData = withContext(Dispatchers.Default) {
+    ): WeatherData {
         try {
             val apiKey = apiKey()
             val response = client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
@@ -47,7 +45,7 @@ class WeatherApi(
                 parameter("key", apiKey)
             }
             response.ensureSuccess("Failed to load weather for coordinates $latitude,$longitude")
-            response.body<WeatherData>()
+            return response.body<WeatherData>()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             if (e is WeatherApiException) throw e
@@ -60,7 +58,7 @@ class WeatherApi(
      * @param cityName The name of the city.
      * @return The weather data for the city.
      */
-    suspend fun getWeatherDataByCity(cityName: String): WeatherData = withContext(Dispatchers.Default) {
+    suspend fun getWeatherDataByCity(cityName: String): WeatherData {
         try {
             val apiKey = apiKey()
             val response = client.get("${Constants.WeatherApi.BASE_URL}${Constants.WeatherApi.CURRENT_WEATHER_ENDPOINT}") {
@@ -68,7 +66,7 @@ class WeatherApi(
                 parameter("key", apiKey)
             }
             response.ensureSuccess("Failed to load weather for $cityName")
-            response.body<WeatherData>()
+            return response.body<WeatherData>()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             if (e is WeatherApiException) throw e
@@ -81,32 +79,31 @@ class WeatherApi(
      * @param cityName The city to forecast.
      * @param days Number of forecast days (1..10 per WeatherAPI).
      */
-    suspend fun fetchForecast(cityName: String, days: Int = 5): ForecastResponse =
-        withContext(Dispatchers.Default) {
-            try {
-                val apiKey = apiKey()
-                val response = client.get("${Constants.WeatherApi.BASE_URL}/forecast.json") {
-                    parameter("q", cityName)
-                    parameter("days", days)
-                    parameter("aqi", "no")
-                    parameter("alerts", "no")
-                    parameter("key", apiKey)
-                }
-                response.ensureSuccess("Failed to load forecast for $cityName")
-                response.body<ForecastResponse>()
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                if (e is WeatherApiException) throw e
-                throw WeatherApiException("Failed to load forecast for $cityName", e)
+    suspend fun fetchForecast(cityName: String, days: Int = 5): ForecastResponse {
+        try {
+            val apiKey = apiKey()
+            val response = client.get("${Constants.WeatherApi.BASE_URL}/forecast.json") {
+                parameter("q", cityName)
+                parameter("days", days)
+                parameter("aqi", "no")
+                parameter("alerts", "no")
+                parameter("key", apiKey)
             }
+            response.ensureSuccess("Failed to load forecast for $cityName")
+            return response.body<ForecastResponse>()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (e is WeatherApiException) throw e
+            throw WeatherApiException("Failed to load forecast for $cityName", e)
         }
+    }
 
     /**
      * Searches for cities matching the given query.
      * @param query The search query.
      * @return A list of city search results.
      */
-    suspend fun searchCity(query: String): List<CitySearchResult> = withContext(Dispatchers.Default) {
+    suspend fun searchCity(query: String): List<CitySearchResult> {
         try {
             val apiKey = apiKey()
             val response = client.get("${Constants.WeatherApi.BASE_URL}/search.json") {
@@ -119,7 +116,7 @@ class WeatherApi(
             val json = Json { ignoreUnknownKeys = true }
             val jsonArray = json.parseToJsonElement(body).jsonArray
 
-            jsonArray.map { jsonElement ->
+            return jsonArray.map { jsonElement ->
                 val jsonObject = jsonElement.jsonObject
                 CitySearchResult(
                     id = jsonObject["id"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
