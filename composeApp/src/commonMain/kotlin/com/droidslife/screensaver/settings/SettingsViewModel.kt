@@ -430,9 +430,9 @@ class SettingsViewModel(
     private companion object {
         val defaultWidgetIds = setOf(
             "com.droidslife.screensaver.clock",
-            "com.droidslife.screensaver.weather",
             "com.droidslife.screensaver.todos",
             "com.droidslife.screensaver.expenses",
+            "com.droidslife.screensaver.calendar",
         )
     }
 }

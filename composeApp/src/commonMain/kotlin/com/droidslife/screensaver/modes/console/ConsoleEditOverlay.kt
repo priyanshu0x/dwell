@@ -336,8 +336,11 @@ private fun EditTile(
                             liveDrags[id] = prev.copy(dw = newDw, dh = newDh)
                             val dCols = (newDw / safeStepX).roundToInt()
                             val dRows = (newDh / safeStepY).roundToInt()
-                            val newCols = (rect.cols + dCols).coerceIn(constraint.minCols, maxCols)
                             val newRows = (rect.rows + dRows).coerceIn(constraint.minRows, maxRows)
+                            // Stricter minCols may apply at certain row counts
+                            // (e.g. Clock+Weather forbids 5×3 — needs ≥6 cols at 3 rows).
+                            val rowAwareMinCols = constraint.effectiveMinCols(newRows)
+                            val newCols = (rect.cols + dCols).coerceIn(rowAwareMinCols, maxCols)
                             ghosts[id] = rect.copy(cols = newCols, rows = newRows)
                         },
                         onDragEnd = {

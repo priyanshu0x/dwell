@@ -58,14 +58,21 @@ class WeatherRepository(
     fun activeProviderId(): String = providerIdFromSettings()
 
     private fun providerIdFromSettings(): String {
-        val widgetConfig = settingsViewModel.settings.widgetConfigs[WEATHER_WIDGET_ID]
-            ?: return WttrInProvider.ID
-        return widgetConfig["provider"]?.let { element ->
+        val configs = settingsViewModel.settings.widgetConfigs
+        val clockProvider = configs[CLOCK_WIDGET_ID]?.get("provider")?.let { element ->
             (element as? JsonPrimitive)?.content
-        } ?: WttrInProvider.ID
+        }?.takeIf { it.isNotBlank() }
+        val weatherProvider = configs[WEATHER_WIDGET_ID]?.get("provider")?.let { element ->
+            (element as? JsonPrimitive)?.content
+        }?.takeIf { it.isNotBlank() }
+        return clockProvider ?: weatherProvider ?: WttrInProvider.ID
     }
 
     private suspend fun weatherApiKey(): String {
+        val clockWidgetKey = settingsViewModel.widgetSecretReference(CLOCK_WIDGET_ID, WEATHER_API_KEY_FIELD)
+            ?.let { secretStorage.read(it) }
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
         val widgetKey = settingsViewModel.widgetSecretReference(WEATHER_WIDGET_ID, WEATHER_API_KEY_FIELD)
             ?.let { secretStorage.read(it) }
             ?.trim()
@@ -73,7 +80,7 @@ class WeatherRepository(
         val legacyKey = secretStorage.read(settingsViewModel.settings.weatherApiKeySecretId)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-        return widgetKey ?: legacyKey.orEmpty()
+        return clockWidgetKey ?: widgetKey ?: legacyKey.orEmpty()
     }
 
     /**
@@ -122,6 +129,7 @@ class WeatherRepository(
     }
 
     companion object {
+        const val CLOCK_WIDGET_ID: String = "com.droidslife.screensaver.clock"
         const val WEATHER_WIDGET_ID: String = "com.droidslife.screensaver.weather"
         const val WEATHER_API_KEY_FIELD: String = "apiKey"
     }
