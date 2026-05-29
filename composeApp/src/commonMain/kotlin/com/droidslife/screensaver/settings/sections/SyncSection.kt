@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,14 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
+import com.droidslife.screensaver.ui.DwellTextField
 
 @Composable
 fun SyncSection(settingsViewModel: SettingsViewModel) {
@@ -42,7 +38,7 @@ fun SyncSection(settingsViewModel: SettingsViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(DwellColors.Surface1)
+                .background(DwellColors.DialogControlSurface)
                 .border(1.dp, DwellColors.Stroke, RoundedCornerShape(10.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
@@ -54,7 +50,7 @@ fun SyncSection(settingsViewModel: SettingsViewModel) {
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Backend")
             // TODO(phase 11+): SettingsModel does not yet hold a `backendEnabled`
             // boolean. When it lands, wire this toggle to it. For now the toggle
@@ -104,46 +100,14 @@ private fun SyncTextField(
     helper: String? = null,
     password: Boolean = false,
 ) {
-    OutlinedTextField(
+    DwellTextField(
+        label = label,
         value = value,
         onValueChange = onValueChange,
-        label = {
-            Text(
-                text = label,
-                color = DwellColors.TextMid,
-                fontFamily = DwellFonts.interTight(),
-                fontSize = 12.sp,
-            )
-        },
-        placeholder = placeholder?.let {
-            {
-                Text(
-                    text = it,
-                    color = DwellColors.TextFaint,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 13.sp,
-                )
-            }
-        },
-        supportingText = helper?.let {
-            {
-                Text(
-                    text = it,
-                    color = DwellColors.TextLow,
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 11.sp,
-                )
-            }
-        },
-        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().pausesShortcutsWhileFocused(),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = DwellColors.StatusAccent,
-            unfocusedBorderColor = DwellColors.Stroke,
-            focusedTextColor = DwellColors.TextHigh,
-            unfocusedTextColor = DwellColors.TextHigh,
-            cursorColor = DwellColors.StatusAccent,
-        ),
+        placeholder = placeholder,
+        helper = helper,
+        password = password,
+        accent = DwellColors.StatusAccent,
+        modifier = Modifier.fillMaxWidth(),
     )
 }

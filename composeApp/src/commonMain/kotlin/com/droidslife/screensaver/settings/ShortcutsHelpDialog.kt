@@ -28,7 +28,7 @@ import com.droidslife.screensaver.ui.DwellRadius
 /**
  * Keyboard shortcut help — modal centered panel grouped by category
  * (Navigation / Mode / Variant / Widgets / System). Matches the Dwell visual
- * language (Surface0/Stroke chrome, Inter Tight headings, JetBrains Mono keys).
+ * language (neutral dialog chrome, Inter Tight headings, JetBrains Mono keys).
  *
  * Closes on Esc, scrim click, or the header X.
  */
@@ -66,7 +66,7 @@ private fun HelpPanel(
             .widthIn(min = 360.dp, max = 480.dp)
             .heightIn(max = 700.dp)
             .clip(RoundedCornerShape(DwellRadius.xl))
-            .background(DwellColors.Surface0)
+            .background(DwellColors.DialogSurface)
             .border(1.dp, DwellColors.Stroke, RoundedCornerShape(DwellRadius.xl)),
     ) {
         Column {
@@ -126,6 +126,7 @@ private fun HelpPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(DwellColors.DialogControlSurface)
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,

@@ -71,7 +71,7 @@ class LocalTodosProvider(
         pushPending()
     }
 
-    override suspend fun add(text: String): Result<Unit> = runCatching {
+    override suspend fun add(text: String, priority: Int, due: TodoDue?): Result<Unit> = runCatching {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return@runCatching
         val now = Clock.System.now()
@@ -81,6 +81,8 @@ class LocalTodosProvider(
             done = false,
             createdAt = now,
             updatedAt = now,
+            priority = priority.coerceIn(1, 4),
+            due = due,
         )
         state.value = state.value + todo
         persist()

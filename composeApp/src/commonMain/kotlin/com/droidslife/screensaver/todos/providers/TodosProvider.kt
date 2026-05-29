@@ -86,7 +86,7 @@ interface TodosProvider {
     fun syncStatus(): Flow<TodosSyncStatus> = flowOf(TodosSyncStatus.Healthy)
 
     /** Append a new task. Result carries the underlying error on failure. */
-    suspend fun add(text: String): Result<Unit>
+    suspend fun add(text: String, priority: Int = 1, due: TodoDue? = null): Result<Unit>
 
     /** Edit an existing task's text. */
     suspend fun update(id: String, text: String): Result<Unit>

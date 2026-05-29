@@ -66,3 +66,7 @@ Custom fonts (Orbitron, Seven-Segment, Technology, IndieFlower) and SVG icons li
 ## Comments
 
 Use industry-standard comments: explain **why** (not what), skip the obvious, keep them short. If removing it wouldn't confuse a future reader, don't write it.
+
+## Form UX
+
+Do not disable form submit/action buttons for validation failures. Keep the action clickable, then show the error and the concrete fix after the user presses it. Put that feedback near the related fields or in the dialog/footer, whichever is clearer for the specific form.
