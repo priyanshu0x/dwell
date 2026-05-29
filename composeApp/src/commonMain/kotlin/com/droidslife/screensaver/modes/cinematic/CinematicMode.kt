@@ -36,7 +36,7 @@ import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.weather.WeatherState
 import com.droidslife.screensaver.weather.WeatherViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
-import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
 import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalDateTime
@@ -72,7 +72,7 @@ private fun BoxScope.CinematicForeground(
 ) {
     val settings = settingsViewModel.settings
     val now by produceTicker(includeSeconds = settings.showSeconds)
-    val weatherViewModel = koinInject<WeatherViewModel>()
+    val weatherViewModel = koinViewModel<WeatherViewModel>()
 
     // Clock band at 26 % top, meta band trailing under it. Both pinned to the
     // same 8 % left gutter so the meta optically lines up with the clock —
