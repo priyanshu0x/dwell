@@ -44,7 +44,9 @@ interface WidgetStorage {
     suspend fun <T : Any> read(key: String, type: Class<T>): T?
 
     /**
-     * Stores [value] at [key], replacing any existing value.
+     * Stores [value] at [key], replacing any existing value. Host implementations
+     * may reject unsupported value types; encode structured state as a String
+     * when portability matters.
      */
     suspend fun <T : Any> write(key: String, value: T)
 
