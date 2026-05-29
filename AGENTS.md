@@ -11,6 +11,7 @@ This is a Kotlin/Compose Multiplatform project with a single `:composeApp` modul
 - Run with Compose hot-reload (uses `DevMainKt`): `./gradlew :composeApp:runHot`
 - Test (commonTest + jvmTest): `./gradlew :composeApp:jvmTest`
 - Single test class: `./gradlew :composeApp:jvmTest --tests "com.droidslife.screensaver.ArgsTest"`
+- Generate Compose compiler reports: `./gradlew :composeApp:compileKotlinJvm -PcomposeCompilerReports=true` (inspect `composeApp/build/compose_compiler/jvm/main/composeApp-module.json`)
 - Package native installer: `./gradlew :composeApp:packageDistributionForCurrentOS` (formats: Dmg, Msi, Deb, Exe — see `composeApp/build.gradle.kts`)
 
 The app uses Gradle configuration cache and parallel builds (see `gradle.properties`) — if you edit Gradle files and see stale-config errors, run with `--no-configuration-cache` once to debug.
