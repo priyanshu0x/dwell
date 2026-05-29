@@ -6,6 +6,9 @@ import org.gradle.api.tasks.bundling.Zip
 val appVersion = "1.0.0"
 val appDisplayName = "Screen Saver App"
 val scrLauncherName = "$appDisplayName.scr"
+val composeCompilerReportsEnabled = providers.gradleProperty("composeCompilerReports")
+    .map(String::toBoolean)
+    .orElse(false)
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -14,6 +17,15 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     id("org.jetbrains.compose.hot-reload")
 }
+
+composeCompiler {
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose_compiler_config.conf"))
+    if (composeCompilerReportsEnabled.get()) {
+        reportsDestination = layout.buildDirectory.dir("compose_compiler")
+        metricsDestination = layout.buildDirectory.dir("compose_compiler")
+    }
+}
+
 kotlin {
     jvmToolchain(21)
 
