@@ -102,6 +102,8 @@ internal fun AppTheme(
     ) {
         val currentIsDark by isDarkState
         SystemAppearance(!currentIsDark)
+        // Theme toggles intentionally recompose the full app tree; this is a
+        // rare user action and matches MaterialTheme's CompositionLocal model.
         MaterialTheme(
             colorScheme = if (currentIsDark) DarkColorScheme else LightColorScheme,
             content = { Surface(content = content) }

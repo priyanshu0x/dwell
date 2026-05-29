@@ -276,7 +276,7 @@ class TodoistProvider(
         pollJob = null
     }
 
-    private inline fun runCatchingRequest(block: () -> Unit): Result<Unit> {
+    private suspend fun runCatchingRequest(block: suspend () -> Unit): Result<Unit> {
         return try {
             block()
             Result.success(Unit)

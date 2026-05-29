@@ -9,8 +9,6 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.http.path
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
@@ -46,13 +44,13 @@ class WttrInProvider(
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
-    override suspend fun current(city: String): CurrentWeather = withContext(Dispatchers.Default) {
+    override suspend fun current(city: String): CurrentWeather {
         try {
             val resolvedCity = city.ifBlank { DEFAULT_CITY }
             val body = fetchJson(resolvedCity)
             val condition = body.current.firstOrNull()
                 ?: error("wttr.in returned an empty current_condition for $resolvedCity")
-            CurrentWeather(
+            return CurrentWeather(
                 tempC = condition.tempC.toDoubleOrNull() ?: 0.0,
                 feelsLikeC = condition.feelsLikeC?.toDoubleOrNull(),
                 humidity = condition.humidity?.toIntOrNull(),
@@ -70,39 +68,38 @@ class WttrInProvider(
         }
     }
 
-    override suspend fun forecast(city: String, days: Int): List<DayForecast> =
-        withContext(Dispatchers.Default) {
-            try {
-                val resolvedCity = city.ifBlank { DEFAULT_CITY }
-                val body = fetchJson(resolvedCity)
-                body.weather.take(days).map { day ->
-                    val descText = day.hourly
-                        // Pick the noon entry (time = "1200") as the headline condition,
-                        // falling back to the first sample if hourly is sparse.
-                        .firstOrNull { it.time == "1200" }
-                        ?.weatherDesc?.firstOrNull()?.value
-                        ?: day.hourly.firstOrNull()?.weatherDesc?.firstOrNull()?.value
-                        ?: ""
-                    val code = day.hourly
-                        .firstOrNull { it.time == "1200" }
-                        ?.weatherCode?.toIntOrNull()
-                        ?: day.hourly.firstOrNull()?.weatherCode?.toIntOrNull()
-                        ?: 0
-                    DayForecast(
-                        date = LocalDate.parse(day.date),
-                        high = day.maxtempC.toDoubleOrNull()?.roundToInt() ?: 0,
-                        low = day.mintempC.toDoubleOrNull()?.roundToInt() ?: 0,
-                        conditionCode = mapWwoToWeatherApiCode(code),
-                        conditionText = descText.trim(),
-                        iconUrl = "",
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                throw RuntimeException("Failed to load forecast for $city from wttr.in", e)
+    override suspend fun forecast(city: String, days: Int): List<DayForecast> {
+        try {
+            val resolvedCity = city.ifBlank { DEFAULT_CITY }
+            val body = fetchJson(resolvedCity)
+            return body.weather.take(days).map { day ->
+                val descText = day.hourly
+                    // Pick the noon entry (time = "1200") as the headline condition,
+                    // falling back to the first sample if hourly is sparse.
+                    .firstOrNull { it.time == "1200" }
+                    ?.weatherDesc?.firstOrNull()?.value
+                    ?: day.hourly.firstOrNull()?.weatherDesc?.firstOrNull()?.value
+                    ?: ""
+                val code = day.hourly
+                    .firstOrNull { it.time == "1200" }
+                    ?.weatherCode?.toIntOrNull()
+                    ?: day.hourly.firstOrNull()?.weatherCode?.toIntOrNull()
+                    ?: 0
+                DayForecast(
+                    date = LocalDate.parse(day.date),
+                    high = day.maxtempC.toDoubleOrNull()?.roundToInt() ?: 0,
+                    low = day.mintempC.toDoubleOrNull()?.roundToInt() ?: 0,
+                    conditionCode = mapWwoToWeatherApiCode(code),
+                    conditionText = descText.trim(),
+                    iconUrl = "",
+                )
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to load forecast for $city from wttr.in", e)
         }
+    }
 
     private suspend fun fetchJson(city: String): WttrInResponse {
         val url = URLBuilder().apply {
@@ -137,8 +134,7 @@ class WttrInProvider(
             get() = com.droidslife.screensaver.location.FALLBACK_CITY
 
         // Conservative; wttr.in regularly takes 2-3s to respond. Bound via
-        // `withTimeout` since the shared Ktor client doesn't install the
-        // HttpTimeout plugin.
+        // `withTimeout` to keep this provider stricter than the shared client.
         private const val REQUEST_TIMEOUT_MS: Long = 5_000
 
         /**
