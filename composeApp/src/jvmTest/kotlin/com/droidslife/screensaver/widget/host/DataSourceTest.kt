@@ -27,7 +27,7 @@ class DataSourceTest {
         )
         val source = SourceManifest(
             type = "command",
-            command = listOf("cmd", "/c", "echo %WIDGET_APIKEY%"),
+            command = envEchoCommand("WIDGET_APIKEY"),
             timeout = "5s",
         ).toDataSource(createTempDirectory(), config, TestScope)
 
@@ -52,6 +52,14 @@ class DataSourceTest {
                 path = "../secret.json",
             ).toDataSource(folder, WidgetConfig(JsonObject(emptyMap())), TestScope)
         }
+    }
+}
+
+private fun envEchoCommand(name: String): List<String> {
+    return if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+        listOf("cmd", "/c", "echo %$name%")
+    } else {
+        listOf("sh", "-c", "printf '%s' \"\$$name\"")
     }
 }
 
