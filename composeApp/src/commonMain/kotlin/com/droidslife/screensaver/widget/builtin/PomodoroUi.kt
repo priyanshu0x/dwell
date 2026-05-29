@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,9 +47,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
+import com.droidslife.screensaver.ui.DwellActionButton
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.min
 
 private fun progressOf(state: PomodoroState): Float =
     if (state.phaseDurationSeconds <= 0) 0f
@@ -90,7 +93,34 @@ fun PomodoroTile(
     val isRunning = state.phase != PomodoroPhase.Idle && !state.paused
     val cycle = displayCycle(state, cyclesUntilLongBreak)
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val tiny = maxWidth < 320.dp || maxHeight < 180.dp
+        val compact = tiny || maxWidth < 420.dp || maxHeight < 230.dp
+        val showFocus = maxWidth >= 280.dp && maxHeight >= 165.dp
+        val showStats = maxWidth >= 380.dp && maxHeight >= 200.dp
+        val showSparkline = maxWidth >= 440.dp && maxHeight >= 225.dp
+        val ringLimit = min(maxWidth.value, maxHeight.value).dp
+        val ringSize = min(
+            maxWidth.value * when {
+                tiny -> 0.42f
+                compact -> 0.48f
+                else -> 0.55f
+            },
+            maxHeight.value * when {
+                tiny -> 0.46f
+                compact -> 0.56f
+                else -> 0.66f
+            },
+        ).dp
+            .coerceAtLeast(if (tiny) 72.dp else 104.dp)
+            .coerceAtMost(ringLimit)
+        val timerSize = when {
+            tiny -> 24.sp
+            compact -> 32.sp
+            else -> 40.sp
+        }
+        val footerMaxWidth = if (showStats) 0.64f else 1f
+
         WidgetHeader(
             label = "POMODORO · $cycle/$cyclesUntilLongBreak",
             settingsId = "com.droidslife.screensaver.pomodoro",
@@ -99,14 +129,25 @@ fun PomodoroTile(
 
         // Center: ring with MM:SS (or READY) and the editable focus label.
         Box(
-            modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.55f).aspectRatio(1f),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(
+                    top = if (tiny) 18.dp else 22.dp,
+                    bottom = if (tiny) 28.dp else 34.dp,
+                )
+                .size(ringSize)
+                .aspectRatio(1f),
             contentAlignment = Alignment.Center,
         ) {
             ProgressRing(
                 progress = progressOf(state),
                 color = if (isRunning) accent else DwellColors.TextLow,
                 track = DwellColors.Stroke,
-                strokeWidth = 5.dp,
+                strokeWidth = when {
+                    tiny -> 3.dp
+                    compact -> 4.dp
+                    else -> 5.dp
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -114,38 +155,57 @@ fun PomodoroTile(
                     text = if (state.phase == PomodoroPhase.Idle) "READY" else formatTime(state.remainingSeconds),
                     fontFamily = DwellFonts.jetBrainsMono(),
                     fontWeight = FontWeight.Medium,
-                    fontSize = 40.sp,
+                    fontSize = timerSize,
                     color = if (isRunning) accent else DwellColors.TextHigh,
                     maxLines = 1,
                 )
-                FocusLabel(state.focusLabel, onLabelChange)
+                if (showFocus) {
+                    FocusLabel(
+                        label = state.focusLabel,
+                        fontSize = if (compact) 10.sp else 11.sp,
+                        onChange = onLabelChange,
+                    )
+                }
             }
         }
 
         // Bottom-left: phase tag + controls.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.align(Alignment.BottomStart),
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(if (tiny) 4.dp else 6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(footerMaxWidth),
         ) {
-            PhaseTag(phaseLabel(state.phase).uppercase())
+            PhaseTag(
+                text = phaseLabel(state.phase).uppercase(),
+                compact = compact,
+                modifier = Modifier.padding(top = if (tiny) 4.dp else 5.dp, end = 2.dp),
+            )
             when (state.phase) {
-                PomodoroPhase.Idle -> ControlChip("Start", accent, onStart)
+                PomodoroPhase.Idle -> ControlChip("Start", primary = true, compact = compact, tiny = tiny, onClick = onStart)
                 else -> {
-                    ControlChip(if (state.paused) "Resume" else "Pause", accent, onPauseResume)
-                    ControlChip("Skip", DwellColors.TextMid, onSkip)
-                    ControlChip("Reset", DwellColors.TextMid, onReset)
+                    ControlChip(if (state.paused) "Resume" else "Pause", primary = true, compact = compact, tiny = tiny, onClick = onPauseResume)
+                    ControlChip("Skip", primary = false, compact = compact, tiny = tiny, onClick = onSkip)
+                    ControlChip("Reset", primary = false, compact = compact, tiny = tiny, onClick = onReset)
                 }
             }
         }
 
         // Bottom-right: today/week counts + 7-day sparkline.
-        StatsFooter(history, modifier = Modifier.align(Alignment.BottomEnd))
+        if (showStats) {
+            StatsFooter(
+                history = history,
+                compact = compact,
+                showSparkline = showSparkline,
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
+        }
     }
 }
 
 @Composable
-private fun FocusLabel(label: String, onChange: (String) -> Unit) {
+private fun FocusLabel(label: String, fontSize: androidx.compose.ui.unit.TextUnit, onChange: (String) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     if (editing) {
         var text by remember { mutableStateOf(label) }
@@ -161,7 +221,7 @@ private fun FocusLabel(label: String, onChange: (String) -> Unit) {
             cursorBrush = SolidColor(DwellColors.TextMid),
             textStyle = TextStyle(
                 color = DwellColors.TextMid,
-                fontSize = 11.sp,
+                fontSize = fontSize,
                 fontFamily = DwellFonts.interTight(),
                 textAlign = TextAlign.Center,
             ),
@@ -179,7 +239,7 @@ private fun FocusLabel(label: String, onChange: (String) -> Unit) {
         Text(
             text = label.ifBlank { "+ add focus" },
             fontFamily = DwellFonts.interTight(),
-            fontSize = 11.sp,
+            fontSize = fontSize,
             color = if (label.isBlank()) DwellColors.TextLow else DwellColors.TextMid,
             maxLines = 1,
             modifier = Modifier.padding(top = 2.dp).clickable { editing = true },
@@ -188,7 +248,12 @@ private fun FocusLabel(label: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun StatsFooter(history: PomodoroHistory, modifier: Modifier = Modifier) {
+private fun StatsFooter(
+    history: PomodoroHistory,
+    compact: Boolean,
+    showSparkline: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val today = todayLocalDate()
     val todayCount = history.countOn(today)
     val weekCount = history.countInLastDays(today, 7)
@@ -197,11 +262,18 @@ private fun StatsFooter(history: PomodoroHistory, modifier: Modifier = Modifier)
             text = "TODAY $todayCount   WEEK $weekCount",
             fontFamily = DwellFonts.interTight(),
             fontWeight = FontWeight.SemiBold,
-            fontSize = 9.sp,
-            letterSpacing = 1.5.sp,
+            fontSize = if (compact) 8.sp else 9.sp,
+            letterSpacing = if (compact) 1.sp else 1.5.sp,
             color = DwellColors.TextLow,
         )
-        Sparkline(history.last7(today), modifier = Modifier.padding(top = 4.dp).size(width = 70.dp, height = 14.dp))
+        if (showSparkline) {
+            Sparkline(
+                history.last7(today),
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .size(width = if (compact) 56.dp else 70.dp, height = if (compact) 11.dp else 14.dp),
+            )
+        }
     }
 }
 
@@ -271,35 +343,35 @@ fun PomodoroMinimalLine(state: PomodoroState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PhaseTag(text: String) {
+private fun PhaseTag(text: String, compact: Boolean, modifier: Modifier = Modifier) {
     Text(
         text = text,
         fontFamily = DwellFonts.interTight(),
         fontWeight = FontWeight.SemiBold,
-        fontSize = 9.sp,
-        letterSpacing = 2.25.sp,
+        fontSize = if (compact) 8.sp else 9.sp,
+        letterSpacing = if (compact) 1.4.sp else 2.25.sp,
         color = DwellColors.TextLow,
+        maxLines = 1,
+        modifier = modifier,
     )
 }
 
 @Composable
-private fun ControlChip(label: String, tint: Color, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(tint.copy(alpha = 0.10f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = label,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 9.sp,
-            letterSpacing = 1.5.sp,
-            color = tint,
-        )
-    }
+private fun ControlChip(label: String, primary: Boolean, compact: Boolean, tiny: Boolean, onClick: () -> Unit) {
+    DwellActionButton(
+        label = label,
+        onClick = onClick,
+        primary = primary,
+        minWidth = when {
+            tiny -> if (label.length > 5) 54.dp else 40.dp
+            compact -> if (label.length > 5) 58.dp else 44.dp
+            else -> if (label.length > 5) 62.dp else 48.dp
+        },
+        height = if (tiny) 22.dp else 24.dp,
+        fontSize = if (tiny) 10.sp else 11.sp,
+        horizontalPadding = if (tiny) 7.dp else 8.dp,
+        cornerRadius = if (tiny) 7.dp else 8.dp,
+    )
 }
 
 /** Position within the current block of N work cycles, 1-indexed, for the header. */

@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ import com.droidslife.screensaver.settings.sections.DisplaySection
 import com.droidslife.screensaver.settings.sections.SyncSection
 import com.droidslife.screensaver.settings.sections.TriggersSection
 import com.droidslife.screensaver.settings.sections.WidgetsSection
+import com.droidslife.screensaver.ui.DwellActionButton
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.ui.DwellMotion
@@ -127,6 +129,14 @@ private fun SidebarPanel(
         val sheetWidth = min(560.dp.value, (maxW.value * 0.40f)).dp.coerceAtLeast(360.dp)
 
         val shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+        val cancelAndDismiss = {
+            settingsViewModel.cancelSettingsDraft()
+            onDismiss()
+        }
+        val saveAndDismiss = {
+            settingsViewModel.saveSettingsDraft()
+            onDismiss()
+        }
 
         Column(
             modifier = Modifier
@@ -134,7 +144,7 @@ private fun SidebarPanel(
                 .fillMaxHeight()
                 .shadow(elevation = 24.dp, shape = shape, clip = false)
                 .clip(shape)
-                .background(DwellColors.Surface0.copy(alpha = 0.97f))
+                .background(DwellColors.DialogSurface.copy(alpha = 0.98f))
                 .border(1.dp, DwellColors.Stroke, shape),
         ) {
             // Header
@@ -152,7 +162,7 @@ private fun SidebarPanel(
                     fontSize = 20.sp,
                     modifier = Modifier.weight(1f),
                 )
-                CloseButton(onClick = onDismiss)
+                CloseButton(onClick = cancelAndDismiss)
             }
 
             // Sticky tab row
@@ -195,6 +205,29 @@ private fun SidebarPanel(
             }
 
             HorizontalDivider(color = DwellColors.Stroke)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DwellColors.DialogControlSurface)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DwellActionButton(
+                    label = "Cancel",
+                    onClick = cancelAndDismiss,
+                    minWidth = 82.dp,
+                )
+                Box(Modifier.width(8.dp))
+                DwellActionButton(
+                    label = "Save",
+                    onClick = saveAndDismiss,
+                    primary = true,
+                    leadingIcon = Icons.Filled.Check,
+                    minWidth = 86.dp,
+                )
+            }
         }
     }
 }

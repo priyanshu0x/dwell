@@ -2,7 +2,6 @@ package com.droidslife.screensaver.settings.sections
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,17 +20,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.BuildInfo
 import com.droidslife.screensaver.settings.openDwellConfigFolder
 import com.droidslife.screensaver.settings.runDwellDoctor
+import com.droidslife.screensaver.ui.DwellActionButton
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import kotlinx.coroutines.launch
@@ -64,7 +61,7 @@ fun AboutSection() {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(DwellColors.Surface1)
+                .background(DwellColors.DialogControlSurface)
                 .border(1.dp, DwellColors.Stroke, RoundedCornerShape(12.dp))
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
@@ -172,7 +169,7 @@ private fun DiagnosticsBlock() {
                     .fillMaxWidth()
                     .heightIn(max = 240.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(DwellColors.Surface1)
+                    .background(DwellColors.DialogControlSurface)
                     .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
@@ -191,27 +188,16 @@ private fun DiagnosticsBlock() {
 
 @Composable
 private fun TextChip(label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    val fg = if (enabled) DwellColors.TextHigh else DwellColors.TextLow
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(DwellColors.Surface1)
-            .border(1.dp, DwellColors.Stroke, RoundedCornerShape(8.dp))
-            .let {
-                if (enabled) it.pointerHoverIcon(PointerIcon.Hand).clickable(onClick = onClick)
-                else it
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = fg,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = FontWeight.Medium,
-            fontSize = 12.sp,
-        )
-    }
+    DwellActionButton(
+        label = label,
+        onClick = onClick,
+        enabled = enabled,
+        minWidth = 118.dp,
+        height = 30.dp,
+        fontSize = 12.sp,
+        horizontalPadding = 10.dp,
+        cornerRadius = 8.dp,
+    )
 }
 
 private fun formatBuildDate(epochS: Long): String {

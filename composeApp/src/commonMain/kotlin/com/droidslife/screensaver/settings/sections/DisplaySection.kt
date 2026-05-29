@@ -18,7 +18,7 @@ fun DisplaySection(settingsViewModel: SettingsViewModel) {
 
     SectionContainer {
         // Mode picker
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Mode")
             RadioRow(
                 label = "Cinematic",
@@ -41,7 +41,7 @@ fun DisplaySection(settingsViewModel: SettingsViewModel) {
         }
 
         // Variant picker — shown for the current mode
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Variant")
             when (settings.mode) {
                 Mode.Cinematic -> {
@@ -87,20 +87,20 @@ fun DisplaySection(settingsViewModel: SettingsViewModel) {
                         label = "Standard",
                         selected = settings.consoleVariant == ConsoleVariant.Standard,
                         onClick = { settingsViewModel.setConsoleVariant(ConsoleVariant.Standard) },
-                        description = "Terminal green accent",
+                        description = "Clean green accent",
                     )
                     RadioRow(
                         label = "Amber",
                         selected = settings.consoleVariant == ConsoleVariant.Amber,
                         onClick = { settingsViewModel.setConsoleVariant(ConsoleVariant.Amber) },
-                        description = "Vintage CRT amber accent",
+                        description = "Warm amber accent",
                     )
                 }
             }
         }
 
         // Clock format
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Clock format")
             RadioRow(
                 label = "12-hour (AM / PM)",
@@ -115,7 +115,7 @@ fun DisplaySection(settingsViewModel: SettingsViewModel) {
         }
 
         // Display options
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader("Display")
             ToggleRow(
                 label = "Show seconds",
