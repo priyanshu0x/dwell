@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +45,7 @@ fun BoxScope.WidgetDrawer(
     registry: WidgetRegistry,
 ) {
     var hoverVisible by remember { mutableStateOf(false) }
-    var lastHover by remember { mutableStateOf(0L) }
+    var lastHover by remember { mutableLongStateOf(0L) }
 
     // Hover-area detector at bottom 10% of screen
     Box(

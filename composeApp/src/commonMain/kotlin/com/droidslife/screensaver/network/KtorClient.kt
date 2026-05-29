@@ -2,6 +2,7 @@ package com.droidslife.screensaver.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
@@ -15,6 +16,9 @@ import kotlinx.serialization.json.Json
 object KtorClient {
     /** Fixed gap between retry attempts (see [create]). */
     private const val RETRY_DELAY_MS: Long = 3_000
+    private const val REQUEST_TIMEOUT_MS: Long = 15_000
+    private const val CONNECT_TIMEOUT_MS: Long = 5_000
+    private const val SOCKET_TIMEOUT_MS: Long = 10_000
 
     /**
      * Creates and returns a configured HttpClient instance.
@@ -38,6 +42,12 @@ object KtorClient {
             // Install Logging plugin
             install(Logging) {
                 level = LogLevel.INFO
+            }
+
+            install(HttpTimeout) {
+                requestTimeoutMillis = REQUEST_TIMEOUT_MS
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS
+                socketTimeoutMillis = SOCKET_TIMEOUT_MS
             }
 
             // Configure default request parameters

@@ -870,8 +870,10 @@ private class ExpensesWidget(
 
     private fun topCategories(): List<Pair<String, Long>> {
         val counterpartyToName = categories
-            .filter { it.counterpartyAccountId != null }
-            .associate { it.counterpartyAccountId!! to it.name }
+            .mapNotNull { category ->
+                category.counterpartyAccountId?.let { accountId -> accountId to category.name }
+            }
+            .toMap()
         val byCategory = mutableMapOf<String, Long>()
         recent.filter { it.type == "expense" }.forEach { group ->
             val accountId = group.journals
