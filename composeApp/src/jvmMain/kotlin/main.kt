@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
@@ -38,10 +39,19 @@ import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Frame
+import java.awt.Rectangle
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.util.prefs.Preferences
 
 private const val IDLE_MONITOR_POLL_MS = 1_000L
+private const val DEV_WINDOW_DEFAULT_WIDTH_PX = 1280
+private const val DEV_WINDOW_DEFAULT_HEIGHT_PX = 800
+private const val DEV_WINDOW_MIN_WIDTH_PX = 480
+private const val DEV_WINDOW_MIN_HEIGHT_PX = 320
+private const val DEV_WINDOW_PREFS_NODE = "/com/droidslife/screensaver/devWindow"
 
 object Dwell {
     @JvmStatic
@@ -196,6 +206,20 @@ private fun ApplicationScope.runDwellContent(
             onExitApplication = requestDashboardExit,
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
         )
+        val density = LocalDensity.current
+        val savedDevWindowBounds = remember(devMode) {
+            if (devMode) loadDevWindowBounds() else null
+        }
+        val devWindowSize = with(density) {
+            savedDevWindowBounds
+                ?.let { DpSize(it.width.toDp(), it.height.toDp()) }
+                ?: DpSize(DEV_WINDOW_DEFAULT_WIDTH_PX.toDp(), DEV_WINDOW_DEFAULT_HEIGHT_PX.toDp())
+        }
+        val devWindowPosition = with(density) {
+            savedDevWindowBounds
+                ?.let { WindowPosition(it.x.toDp(), it.y.toDp()) }
+                ?: WindowPosition(Alignment.Center)
+        }
         var windowMinimized by remember { mutableStateOf(false) }
 
         Window(
@@ -203,8 +227,8 @@ private fun ApplicationScope.runDwellContent(
             icon = dwellWindowIcon,
             state = rememberWindowState(
                 placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
-                position = WindowPosition(Alignment.Center),
-                size = if (devMode) DpSize(1280.dp, 800.dp) else DpSize.Unspecified,
+                position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
+                size = if (devMode) devWindowSize else DpSize.Unspecified,
             ),
             onCloseRequest = requestDashboardExit,
             resizable = devMode,
@@ -241,6 +265,29 @@ private fun ApplicationScope.runDwellContent(
                 }
             }
 
+            DisposableEffect(window, devMode) {
+                if (!devMode) {
+                    onDispose {}
+                } else {
+                    val listener = object : ComponentAdapter() {
+                        override fun componentMoved(event: ComponentEvent) {
+                            saveDevWindowBounds(window)
+                        }
+
+                        override fun componentResized(event: ComponentEvent) {
+                            saveDevWindowBounds(window)
+                        }
+                    }
+
+                    window.addComponentListener(listener)
+                    saveDevWindowBounds(window)
+                    onDispose {
+                        window.removeComponentListener(listener)
+                        saveDevWindowBounds(window)
+                    }
+                }
+            }
+
             LaunchedEffect(dashboardActivationRequest) {
                 if (dashboardActivationRequest > 0) {
                     if ((window.extendedState and Frame.ICONIFIED) != 0) {
@@ -272,6 +319,49 @@ private fun ApplicationScope.runDwellContent(
         }
     }
 }
+
+private data class DevWindowBounds(
+    val x: Int,
+    val y: Int,
+    val width: Int,
+    val height: Int,
+)
+
+private fun loadDevWindowBounds(): DevWindowBounds? {
+    return runCatching {
+        val prefs = devWindowPrefs()
+        val width = prefs.getInt("width", 0)
+        val height = prefs.getInt("height", 0)
+        if (width < DEV_WINDOW_MIN_WIDTH_PX || height < DEV_WINDOW_MIN_HEIGHT_PX) return@runCatching null
+        DevWindowBounds(
+            x = prefs.getInt("x", 0),
+            y = prefs.getInt("y", 0),
+            width = width,
+            height = height,
+        )
+    }.getOrNull()
+}
+
+private fun saveDevWindowBounds(window: Frame) {
+    if ((window.extendedState and Frame.ICONIFIED) != 0) return
+    val bounds = window.bounds
+    if (bounds.width < DEV_WINDOW_MIN_WIDTH_PX || bounds.height < DEV_WINDOW_MIN_HEIGHT_PX) return
+    saveDevWindowBounds(bounds)
+}
+
+private fun saveDevWindowBounds(bounds: Rectangle) {
+    runCatching {
+        devWindowPrefs().apply {
+            putInt("x", bounds.x)
+            putInt("y", bounds.y)
+            putInt("width", bounds.width)
+            putInt("height", bounds.height)
+        }
+    }
+}
+
+private fun devWindowPrefs(): Preferences =
+    Preferences.userRoot().node(DEV_WINDOW_PREFS_NODE)
 
 private class DwellViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore = ViewModelStore()
