@@ -9,9 +9,13 @@ import java.util.concurrent.TimeUnit
 
 internal class LinuxIdleMonitor : IdleMonitor {
     override fun idleTimeMillis(): Long {
-        return when (System.getenv("XDG_SESSION_TYPE")?.lowercase()) {
-            "wayland" -> waylandIdleMillis() ?: 0L
-            else -> x11IdleMillis() ?: xprintIdleMillis() ?: 0L
+        val sessionType = System.getenv("XDG_SESSION_TYPE")?.lowercase()
+        val hasWaylandDisplay = !System.getenv("WAYLAND_DISPLAY").isNullOrBlank()
+        return when {
+            sessionType == "wayland" || hasWaylandDisplay ->
+                waylandIdleMillis() ?: x11IdleMillis() ?: xprintIdleMillis() ?: 0L
+            else ->
+                x11IdleMillis() ?: xprintIdleMillis() ?: waylandIdleMillis() ?: 0L
         }
     }
 
@@ -29,7 +33,7 @@ internal class LinuxIdleMonitor : IdleMonitor {
                 "org.gnome.Mutter.IdleMonitor.GetIdletime",
             ).redirectErrorStream(true).start()
             if (!process.waitFor(800, TimeUnit.MILLISECONDS) || process.exitValue() != 0) return@runCatching null
-            Regex("\\d+").find(process.inputStream.readBytes().decodeToString())?.value?.toLongOrNull()
+            parseGnomeIdleMillis(process.inputStream.readBytes().decodeToString())
         }.getOrNull()
     }
 
@@ -54,6 +58,14 @@ internal class LinuxIdleMonitor : IdleMonitor {
             process.inputStream.readBytes().decodeToString().trim().toLongOrNull()
         }.getOrNull()
     }
+}
+
+internal fun parseGnomeIdleMillis(output: String): Long? {
+    return Regex("""uint64\s+(\d+)""")
+        .find(output)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.toLongOrNull()
 }
 
 private interface X11 : Library {
