@@ -115,7 +115,10 @@ class BackendClient(
             BackendResult.Success(block())
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            BackendResult.Failure(error.message ?: "Backend request failed", error)
+            BackendResult.Failure(
+                if (error.isTransientNetworkFailure()) error.networkFailureSummary("Backend") else error.message ?: "Backend request failed",
+                error,
+            )
         }
     }
 }

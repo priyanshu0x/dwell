@@ -142,15 +142,18 @@ class FastiflyClient(
     private suspend inline fun <T> call(crossinline block: suspend () -> T): FastiflyResult<T> {
         if (baseUrlOrNull() == null) return FastiflyResult.Disabled
         return try {
-            // The shared Ktor client has no request timeout, so a stalled
-            // connection would hang the widget on "Loading…" forever. Bound it.
+            // Bound the full multi-request sequence so expensive sync calls
+            // cannot keep the widget stuck on a loading state.
             FastiflyResult.Success(withTimeout(REQUEST_TIMEOUT_MS) { block() })
         } catch (timeout: TimeoutCancellationException) {
-            FastiflyResult.Failure("Request timed out", null)
+            FastiflyResult.Failure(timeout.networkFailureSummary("Fastifly"), null)
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             val code = (error as? FastiflyHttpException)?.code
-            FastiflyResult.Failure(error.message ?: "Fastifly request failed", code)
+            FastiflyResult.Failure(
+                if (error.isTransientNetworkFailure()) error.networkFailureSummary("Fastifly") else error.message ?: "Fastifly request failed",
+                code,
+            )
         }
     }
 

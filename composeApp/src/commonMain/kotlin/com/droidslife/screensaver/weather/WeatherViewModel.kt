@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.droidslife.screensaver.location.FALLBACK_CITY
 import com.droidslife.screensaver.location.Location
 import com.droidslife.screensaver.location.TimeZoneUtils
+import com.droidslife.screensaver.network.isTransientNetworkFailure
+import com.droidslife.screensaver.network.networkFailureSummary
 import com.droidslife.screensaver.settings.PreferencesRepository
 import com.droidslife.screensaver.weather.providers.CurrentWeather
 import com.droidslife.screensaver.weather.providers.WeatherProviderCredentialFailure
@@ -198,6 +200,10 @@ class WeatherViewModel(
                     // visible and flag the staleness instead of failing silently.
                     currentCache[key] != null ->
                         _syncStatus.value = WeatherSyncStatus.Offline
+                    err.isTransientNetworkFailure() -> {
+                        state = WeatherState.Error(err.networkFailureSummary("Weather"))
+                        _syncStatus.value = WeatherSyncStatus.Offline
+                    }
                     // No data to fall back on — surface a hard error.
                     else -> {
                         state = WeatherState.Error(err.message ?: "Unknown error")
@@ -248,6 +254,7 @@ class WeatherViewModel(
                 if (err is WeatherProviderCredentialFailure) _syncStatus.value = WeatherSyncStatus.CredentialFailed
                 if (err is WeatherProviderRateLimited) _syncStatus.value = WeatherSyncStatus.RateLimited
                 if (err is WeatherProviderUnconfigured) _syncStatus.value = WeatherSyncStatus.Unconfigured
+                if (err.isTransientNetworkFailure()) _syncStatus.value = WeatherSyncStatus.Offline
                 if (forecastCache[key] != null) return@fold
                 _forecast.value = if (err is WeatherProviderUnconfigured) ForecastState.Unconfigured else ForecastState.Failed
             },

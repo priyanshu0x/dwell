@@ -2,6 +2,8 @@ package com.droidslife.screensaver.weather
 
 import com.droidslife.screensaver.location.FALLBACK_CITY
 import com.droidslife.screensaver.location.LocationService
+import com.droidslife.screensaver.network.isTransientNetworkFailure
+import com.droidslife.screensaver.network.networkFailureSummary
 import com.droidslife.screensaver.settings.SecretStorage
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.weather.providers.CurrentWeather
@@ -101,7 +103,11 @@ class WeatherRepository(
         } catch (e: WeatherProviderCredentialFailure) {
             emit(WeatherState.Error(e.message ?: "Weather credentials failed"))
         } catch (e: Exception) {
-            emit(WeatherState.Error(e.message ?: "Unknown error"))
+            emit(
+                WeatherState.Error(
+                    if (e.isTransientNetworkFailure()) e.networkFailureSummary("Weather") else e.message ?: "Unknown error",
+                ),
+            )
         }
     }
 
