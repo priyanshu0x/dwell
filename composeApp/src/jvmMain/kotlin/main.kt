@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -30,6 +31,8 @@ import com.droidslife.screensaver.daemon.createIdleMonitor
 import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
+import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
+import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.ui.LinuxWindowManagerHints
@@ -228,102 +231,109 @@ private fun ApplicationScope.runDwellContent(
                 ?: WindowPosition(Alignment.Center)
         }
         var windowMinimized by remember { mutableStateOf(false) }
-        Window(
-            title = "Dwell",
-            icon = dwellWindowIcon,
-            state = rememberWindowState(
-                placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
-                position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
-                size = if (devMode) devWindowSize else DpSize.Unspecified,
-            ),
-            onCloseRequest = requestDashboardExit,
-            resizable = devMode,
-            alwaysOnTop = !windowMinimized,
-            undecorated = true,
-            transparent = true,
-            onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
-        ) {
-            DisposableEffect(window) {
-                LinuxWindowManagerHints.applyDwellWindowHints(window)
+        // Compose Desktop rejects transparent windows unless they are undecorated
+        // and also rejects changing transparency after the AWT window is shown.
+        val usesTransparentWindow =
+            settings.mode == Mode.Console &&
+                settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
+        key(usesTransparentWindow) {
+            Window(
+                title = "Dwell",
+                icon = dwellWindowIcon,
+                state = rememberWindowState(
+                    placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
+                    position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
+                    size = if (devMode) devWindowSize else DpSize.Unspecified,
+                ),
+                onCloseRequest = requestDashboardExit,
+                resizable = devMode,
+                alwaysOnTop = !windowMinimized,
+                undecorated = !devMode || usesTransparentWindow,
+                transparent = usesTransparentWindow,
+                onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
+            ) {
+                DisposableEffect(window) {
+                    LinuxWindowManagerHints.applyDwellWindowHints(window)
 
-                fun refreshMinimizedState() {
-                    windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
-                }
-
-                val listener = object : WindowAdapter() {
-                    override fun windowStateChanged(event: WindowEvent) {
-                        refreshMinimizedState()
+                    fun refreshMinimizedState() {
+                        windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
                     }
 
-                    override fun windowIconified(event: WindowEvent) {
-                        windowMinimized = true
-                    }
-
-                    override fun windowDeiconified(event: WindowEvent) {
-                        windowMinimized = false
-                    }
-                }
-
-                window.addWindowStateListener(listener)
-                window.addWindowListener(listener)
-                refreshMinimizedState()
-                onDispose {
-                    window.removeWindowStateListener(listener)
-                    window.removeWindowListener(listener)
-                }
-            }
-
-            DisposableEffect(window, devMode) {
-                if (!devMode) {
-                    onDispose {}
-                } else {
-                    val listener = object : ComponentAdapter() {
-                        override fun componentMoved(event: ComponentEvent) {
-                            saveDevWindowBounds(window)
+                    val listener = object : WindowAdapter() {
+                        override fun windowStateChanged(event: WindowEvent) {
+                            refreshMinimizedState()
                         }
 
-                        override fun componentResized(event: ComponentEvent) {
-                            saveDevWindowBounds(window)
+                        override fun windowIconified(event: WindowEvent) {
+                            windowMinimized = true
+                        }
+
+                        override fun windowDeiconified(event: WindowEvent) {
+                            windowMinimized = false
                         }
                     }
 
-                    window.addComponentListener(listener)
-                    saveDevWindowBounds(window)
+                    window.addWindowStateListener(listener)
+                    window.addWindowListener(listener)
+                    refreshMinimizedState()
                     onDispose {
-                        window.removeComponentListener(listener)
-                        saveDevWindowBounds(window)
+                        window.removeWindowStateListener(listener)
+                        window.removeWindowListener(listener)
                     }
                 }
-            }
 
-            LaunchedEffect(dashboardActivationRequest) {
-                if (dashboardActivationRequest > 0) {
-                    if ((window.extendedState and Frame.ICONIFIED) != 0) {
-                        window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
-                    }
-                    window.toFront()
-                    window.requestFocus()
-                }
-            }
-
-            ShortcutToast(toastState = windowEvents.toastState)
-
-            App(
-                onExitApplication = requestDashboardExit,
-                exitRequested = exitRequested,
-                onExited = {
-                    if (keepRunningInTray) {
-                        dashboardVisible = false
-                        exitRequested = false
+                DisposableEffect(window, devMode) {
+                    if (!devMode) {
+                        onDispose {}
                     } else {
-                        exitApplication()
+                        val listener = object : ComponentAdapter() {
+                            override fun componentMoved(event: ComponentEvent) {
+                                saveDevWindowBounds(window)
+                            }
+
+                            override fun componentResized(event: ComponentEvent) {
+                                saveDevWindowBounds(window)
+                            }
+                        }
+
+                        window.addComponentListener(listener)
+                        saveDevWindowBounds(window)
+                        onDispose {
+                            window.removeComponentListener(listener)
+                            saveDevWindowBounds(window)
+                        }
                     }
-                },
-                showHelpDialog = windowEvents.showHelpDialog,
-                onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
-                onShowHelpDialog = windowEvents.onShowHelpDialog,
-                modifier = windowEvents.mouseEventModifier
-            )
+                }
+
+                LaunchedEffect(dashboardActivationRequest) {
+                    if (dashboardActivationRequest > 0) {
+                        if ((window.extendedState and Frame.ICONIFIED) != 0) {
+                            window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
+                        }
+                        window.toFront()
+                        window.requestFocus()
+                    }
+                }
+
+                ShortcutToast(toastState = windowEvents.toastState)
+
+                App(
+                    onExitApplication = requestDashboardExit,
+                    exitRequested = exitRequested,
+                    onExited = {
+                        if (keepRunningInTray) {
+                            dashboardVisible = false
+                            exitRequested = false
+                        } else {
+                            exitApplication()
+                        }
+                    },
+                    showHelpDialog = windowEvents.showHelpDialog,
+                    onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
+                    onShowHelpDialog = windowEvents.onShowHelpDialog,
+                    modifier = windowEvents.mouseEventModifier
+                )
+            }
         }
     }
 }

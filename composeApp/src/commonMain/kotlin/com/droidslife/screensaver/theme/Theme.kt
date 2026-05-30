@@ -1,11 +1,13 @@
 package com.droidslife.screensaver.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
@@ -110,6 +112,7 @@ internal fun AppTheme(
             colorScheme = if (currentIsDark) DarkColorScheme else LightColorScheme,
             content = {
                 Surface(
+                    modifier = Modifier.fillMaxSize(),
                     color = if (transparentSurface) Color.Transparent else MaterialTheme.colorScheme.surface,
                     content = content,
                 )

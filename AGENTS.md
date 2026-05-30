@@ -23,6 +23,11 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 - Use `./scripts/dwell show` as the production-path smoke test from source. It must build and launch the current checkout, not ask an already-running daemon to show its existing window.
 - Do not add app-side IPC or daemon reuse to implement `dwell show`. If a registered daemon is running, the launcher owns the pause/restore lifecycle so the developer build does not race with the background daemon or show two dashboards.
 
+### Compose Desktop window transparency
+
+- `Window(transparent = true)` must be paired with `undecorated = true`; Compose Desktop enforces this in `ComposeWindowPanel.setWindowTransparent`.
+- Do not toggle `Window.transparent` on an already displayed window. Key/recreate the `Window` when changing between opaque and Liquid Glass modes, and keep normal dev windows decorated/opaque.
+
 ### Runtime requirements
 
 - Weather works out of the box through the default `wttr.in` provider. The optional WeatherAPI.com provider requires an API key stored through widget settings/secrets; if it is missing or invalid, the UI surfaces an unconfigured/error state instead of silently returning mock data.
