@@ -9,6 +9,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
@@ -120,6 +121,8 @@ private fun ApplicationScope.runDwellContent(
     var dashboardVisible by remember { mutableStateOf(devMode || launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
     var dashboardActivationRequest by remember { mutableIntStateOf(0) }
+    var activeTransparentWindow by remember { mutableStateOf<Boolean?>(null) }
+    var transparentWindowSwapPending by remember { mutableStateOf(false) }
     val requestDashboardExit = { exitRequested = true }
     val keepRunningInTray = !devMode && (launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show)
     // `dwell show` must leave an affordance after Esc even if the daemon tray
@@ -211,7 +214,43 @@ private fun ApplicationScope.runDwellContent(
         }
     }
 
-    if (dashboardVisible) {
+    val desiredTransparentWindow =
+        settingsViewModel.settingsLoaded &&
+            settings.mode == Mode.Console &&
+            settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
+    LaunchedEffect(dashboardVisible, settingsViewModel.settingsLoaded, desiredTransparentWindow) {
+        if (!dashboardVisible || !settingsViewModel.settingsLoaded) {
+            activeTransparentWindow = null
+            transparentWindowSwapPending = false
+            return@LaunchedEffect
+        }
+
+        val active = activeTransparentWindow
+        when {
+            active == null -> {
+                if (transparentWindowSwapPending) {
+                    withFrameNanos { }
+                    transparentWindowSwapPending = false
+                    dashboardActivationRequest += 1
+                }
+                activeTransparentWindow = desiredTransparentWindow
+            }
+            active != desiredTransparentWindow -> {
+                // Compose Desktop applies Window.transparent through a live
+                // ComposeWindow updater, so switching transparency must dispose
+                // the native window before creating the replacement.
+                transparentWindowSwapPending = true
+                activeTransparentWindow = null
+                withFrameNanos { }
+                transparentWindowSwapPending = false
+                activeTransparentWindow = desiredTransparentWindow
+                dashboardActivationRequest += 1
+            }
+        }
+    }
+
+    val windowTransparency = activeTransparentWindow
+    if (dashboardVisible && settingsViewModel.settingsLoaded && windowTransparency != null) {
         val windowEvents = rememberWindowEventHandlers(
             onExitApplication = requestDashboardExit,
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
@@ -233,9 +272,7 @@ private fun ApplicationScope.runDwellContent(
         var windowMinimized by remember { mutableStateOf(false) }
         // Compose Desktop rejects transparent windows unless they are undecorated
         // and also rejects changing transparency after the AWT window is shown.
-        val usesTransparentWindow =
-            settings.mode == Mode.Console &&
-                settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
+        val usesTransparentWindow = windowTransparency
         key(usesTransparentWindow) {
             Window(
                 title = "Dwell",

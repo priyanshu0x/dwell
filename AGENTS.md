@@ -26,7 +26,7 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 ### Compose Desktop window transparency
 
 - `Window(transparent = true)` must be paired with `undecorated = true`; Compose Desktop enforces this in `ComposeWindowPanel.setWindowTransparent`.
-- Do not toggle `Window.transparent` on an already displayed window. Key/recreate the `Window` when changing between opaque and Liquid Glass modes, and keep normal dev windows decorated/opaque.
+- Do not toggle `Window.transparent` on an already displayed window. When changing between opaque and Liquid Glass modes, first remove the dashboard `Window` from composition so Compose disposes the old AWT window, then create the replacement with the new transparency mode. A `key(...)` alone is not enough if the live `Window` receives an updated `transparent` value first.
 
 ### Runtime requirements
 
