@@ -8,7 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.AmbientVariant
 import com.droidslife.screensaver.settings.CinematicVariant
+import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
 import com.droidslife.screensaver.settings.ConsoleVariant
+import com.droidslife.screensaver.settings.ConsoleWidgetBorderStyle
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 
@@ -96,6 +98,46 @@ fun DisplaySection(settingsViewModel: SettingsViewModel) {
                         description = "Warm amber accent",
                     )
                 }
+            }
+        }
+
+        if (settings.mode == Mode.Console) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeader("Console background")
+                RadioRow(
+                    label = "Solid",
+                    selected = settings.consoleBackgroundStyle == ConsoleBackgroundStyle.Solid,
+                    onClick = { settingsViewModel.setConsoleBackgroundStyle(ConsoleBackgroundStyle.Solid) },
+                    description = "Current opaque console backdrop",
+                )
+                RadioRow(
+                    label = "Liquid glass",
+                    selected = settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass,
+                    onClick = { settingsViewModel.setConsoleBackgroundStyle(ConsoleBackgroundStyle.LiquidGlass) },
+                    description = "Translucent layered backdrop with soft highlights",
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeader("Widget border")
+                RadioRow(
+                    label = "Bordered",
+                    selected = settings.consoleWidgetBorderStyle == ConsoleWidgetBorderStyle.Bordered,
+                    onClick = { settingsViewModel.setConsoleWidgetBorderStyle(ConsoleWidgetBorderStyle.Bordered) },
+                    description = "Current one-pixel tile outline",
+                )
+                RadioRow(
+                    label = "Borderless",
+                    selected = settings.consoleWidgetBorderStyle == ConsoleWidgetBorderStyle.Borderless,
+                    onClick = { settingsViewModel.setConsoleWidgetBorderStyle(ConsoleWidgetBorderStyle.Borderless) },
+                    description = "Clean tile surfaces with no outline",
+                )
+                RadioRow(
+                    label = "Shadow",
+                    selected = settings.consoleWidgetBorderStyle == ConsoleWidgetBorderStyle.Shadow,
+                    onClick = { settingsViewModel.setConsoleWidgetBorderStyle(ConsoleWidgetBorderStyle.Shadow) },
+                    description = "Soft elevation around each tile",
+                )
             }
         }
 
