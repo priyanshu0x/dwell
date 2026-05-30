@@ -2,6 +2,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.bundling.Zip
+import org.jetbrains.compose.reload.gradle.ComposeHotRun
 
 val appVersion = "1.0.0"
 val appDisplayName = "Screen Saver App"
@@ -127,10 +128,15 @@ tasks.configureEach {
     }
 }
 
+tasks.named<ComposeHotRun>("hotRunJvm") {
+    mainClass.set("DevMainKt")
+    isAutoReloadEnabled.set(true)
+}
+
 tasks.register("runHot") {
     group = "compose hot reload"
     description = "Runs the Compose Hot Reload dev entry point."
-    dependsOn("hotDevJvm")
+    dependsOn("hotRunJvm")
 }
 
 // --- BuildInfo generation -----------------------------------------------------
