@@ -262,7 +262,7 @@ case "$cmd" in
         bootstrap_java; first_build_hint
         echo "Dwell — Compose Hot Reload dev mode."
         echo
-        exec ./gradlew :composeApp:runHot --console=plain
+        exec ./gradlew --no-configuration-cache :composeApp:runHot --console=plain
         ;;
     build)
         bootstrap_java; first_build_hint
