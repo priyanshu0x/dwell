@@ -54,10 +54,14 @@ val scrLauncherName = "$appDisplayName.scr"
 val composeCompilerReportsEnabled = providers.gradleProperty("composeCompilerReports")
     .map(String::toBoolean)
     .orElse(false)
-val dwellDesktopJvmArgs = listOf(
-    "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
-    "-Dsun.awt.X11.XWMClass=Dwell",
-)
+val isLinuxHost = System.getProperty("os.name").contains("Linux", ignoreCase = true)
+val dwellDesktopJvmArgs = buildList {
+    if (isLinuxHost) {
+        add("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
+        add("-Dsun.awt.X11.XWMClass=Dwell")
+        add("-Dskiko.renderApi=SOFTWARE_FAST")
+    }
+}
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -177,6 +181,8 @@ tasks.configureEach {
 }
 
 tasks.withType<JavaExec>().configureEach {
+    minHeapSize = "256m"
+    maxHeapSize = "2g"
     jvmArgs(dwellDesktopJvmArgs)
 }
 
