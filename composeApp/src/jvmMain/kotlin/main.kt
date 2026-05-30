@@ -32,6 +32,7 @@ import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
+import com.droidslife.screensaver.ui.LinuxWindowManagerHints
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -55,13 +56,19 @@ private const val DEV_WINDOW_PREFS_NODE = "/com/droidslife/screensaver/devWindow
 
 object Dwell {
     @JvmStatic
-    fun main(args: Array<String>) = application {
-        runDwell(args = args)
+    fun main(args: Array<String>) {
+        LinuxWindowManagerHints.configureDwellAppClassName()
+        application {
+            runDwell(args = args)
+        }
     }
 }
 
-fun main(args: Array<String>) = application {
-    runDwell(args = args)
+fun main(args: Array<String>) {
+    LinuxWindowManagerHints.configureDwellAppClassName()
+    application {
+        runDwell(args = args)
+    }
 }
 
 @Composable
@@ -238,6 +245,8 @@ private fun ApplicationScope.runDwellContent(
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
         ) {
             DisposableEffect(window) {
+                LinuxWindowManagerHints.applyDwellWindowHints(window)
+
                 fun refreshMinimizedState() {
                     windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
                 }
