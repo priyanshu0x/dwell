@@ -3,7 +3,7 @@
 # Auto-installs Temurin JDK 21 to ~/jdks/ if missing, then runs the requested mode.
 #
 # Usage:
-#   ./scripts/dwell show       # open dashboard and keep Dwell in the tray
+#   ./scripts/dwell show       # build current source, pause daemon, then open dashboard
 #   ./scripts/dwell daemon     # run as tray daemon (dashboard appears after idle)
 #   ./scripts/dwell config     # open dashboard with Settings pre-opened
 #   ./scripts/dwell dev        # hot-reload dev mode
@@ -110,10 +110,10 @@ Dwell — screensaver-with-widgets
 Usage: ./scripts/dwell <command>
 
 Commands:
-  show       Open the dashboard; Esc hides it to the tray.
+  show       Build current source, pause the registered daemon, then open the dashboard.
   daemon     Run as a tray daemon (dashboard appears after idle timeout).
   config     Open the dashboard with Settings pre-opened.
-  dev        Run with Compose Hot Reload (for development).
+  dev        Run with Compose Hot Reload; skips daemon/tray/idle plumbing.
   build      Compile (no launch) — handy for CI / verifying changes.
 
   install    Symlink this script into ~/.local/bin so you can type `dwell show` anywhere.
@@ -160,29 +160,103 @@ DESKTOP
     cp "$desktop_file" "$class_alias_file"
 }
 
+import_linux_session_environment() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+    command -v systemctl >/dev/null 2>&1 || return 0
+    systemctl --user import-environment \
+        DISPLAY WAYLAND_DISPLAY XAUTHORITY XDG_RUNTIME_DIR XDG_SESSION_TYPE \
+        XDG_CURRENT_DESKTOP DBUS_SESSION_BUS_ADDRESS 2>/dev/null || true
+    if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+        dbus-update-activation-environment --systemd \
+            DISPLAY WAYLAND_DISPLAY XAUTHORITY XDG_RUNTIME_DIR XDG_SESSION_TYPE \
+            XDG_CURRENT_DESKTOP DBUS_SESSION_BUS_ADDRESS 2>/dev/null || true
+    fi
+}
+
+stop_linux_dwell_daemon_apps() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+    command -v pkill >/dev/null 2>&1 || return 0
+    pkill -TERM -f ' Dwell --daemon$' 2>/dev/null || true
+}
+
+SHOW_RESTART_DAEMON=0
+
+pause_daemon_for_show() {
+    SHOW_RESTART_DAEMON=0
+    case "$(uname -s)" in
+        Linux)
+            if command -v systemctl >/dev/null 2>&1 && \
+               systemctl --user is-active --quiet dwell.service 2>/dev/null; then
+                SHOW_RESTART_DAEMON=1
+                systemctl --user stop dwell.service 2>/dev/null || true
+                echo "Dwell — temporarily stopped background daemon for this show session."
+            fi
+            stop_linux_dwell_daemon_apps
+            ;;
+        Darwin)
+            local plist="$HOME/Library/LaunchAgents/dev.dwell.daemon.plist"
+            if [ -f "$plist" ] && command -v launchctl >/dev/null 2>&1; then
+                if launchctl print gui/$(id -u)/dev.dwell.daemon >/dev/null 2>&1; then
+                    SHOW_RESTART_DAEMON=1
+                    launchctl unload "$plist" 2>/dev/null || true
+                    echo "Dwell — temporarily stopped background daemon for this show session."
+                fi
+            fi
+            ;;
+    esac
+}
+
+restore_paused_daemon() {
+    [ "${SHOW_RESTART_DAEMON:-0}" = "1" ] || return 0
+    SHOW_RESTART_DAEMON=0
+    case "$(uname -s)" in
+        Linux)
+            if command -v systemctl >/dev/null 2>&1; then
+                import_linux_session_environment
+                systemctl --user start dwell.service 2>/dev/null || true
+            fi
+            ;;
+        Darwin)
+            local plist="$HOME/Library/LaunchAgents/dev.dwell.daemon.plist"
+            if [ -f "$plist" ] && command -v launchctl >/dev/null 2>&1; then
+                launchctl load "$plist" 2>/dev/null || true
+            fi
+            ;;
+    esac
+}
+
 # --- Subcommand dispatch -----------------------------------------------------
 cmd="${1:-help}"
 
 case "$cmd" in
     show)
         bootstrap_java; ensure_linux_desktop_entry; first_build_hint
+        pause_daemon_for_show
+        trap restore_paused_daemon EXIT
         echo "Dwell — opening dashboard."
         cheatsheet; echo
-        exec ./gradlew :composeApp:run --args="--show" --console=plain
+        if ./gradlew --no-daemon :composeApp:run --args="--show" --console=plain; then
+            show_status=0
+        else
+            show_status=$?
+        fi
+        trap - EXIT
+        restore_paused_daemon
+        exit "$show_status"
         ;;
     daemon)
         bootstrap_java; ensure_linux_desktop_entry; first_build_hint
         echo "Dwell — starting tray daemon. Look for the icon in your system tray."
         echo "  Dashboard auto-opens after the idle timeout (Settings → Triggers)."
         echo
-        exec ./gradlew :composeApp:run --args="--daemon" --console=plain
+        exec ./gradlew --no-daemon :composeApp:run --args="--daemon" --console=plain
         ;;
     config)
         bootstrap_java; ensure_linux_desktop_entry; first_build_hint
         echo "Dwell — opening dashboard with Settings."
         echo "  Tip: add a WeatherAPI key to enable the weather widget."
         echo
-        exec ./gradlew :composeApp:run --args="/c" --console=plain
+        exec ./gradlew --no-daemon :composeApp:run --args="/c" --console=plain
         ;;
     dev)
         bootstrap_java; first_build_hint
@@ -194,6 +268,26 @@ case "$cmd" in
         bootstrap_java; first_build_hint
         echo "Dwell — compiling…"
         exec ./gradlew :composeApp:compileKotlinJvm :composeApp:compileTestKotlinJvm --console=plain
+        ;;
+    autostart)
+        case "$(uname -s)" in
+            Linux)
+                ensure_linux_desktop_entry
+                import_linux_session_environment
+                if command -v systemctl >/dev/null 2>&1 && [ -f "$HOME/.config/systemd/user/dwell.service" ]; then
+                    systemctl --user daemon-reload 2>/dev/null || true
+                    systemctl --user stop dwell.service 2>/dev/null || true
+                    stop_linux_dwell_daemon_apps
+                    if systemctl --user start dwell.service 2>/dev/null; then
+                        exit 0
+                    fi
+                fi
+                exec "$ROOT/scripts/dwell" daemon
+                ;;
+            *)
+                exec "$ROOT/scripts/dwell" daemon
+                ;;
+        esac
         ;;
     register)
         # Register Dwell to run as a tray daemon at login.
@@ -210,7 +304,7 @@ case "$cmd" in
 Type=Application
 Name=Dwell
 Comment=Idle-triggered screensaver dashboard
-Exec=$ROOT/scripts/dwell daemon
+Exec=$ROOT/scripts/dwell autostart
 Icon=dwell-real
 X-GNOME-Autostart-enabled=true
 StartupNotify=true
@@ -221,6 +315,7 @@ DESKTOP
 [Unit]
 Description=Dwell screensaver daemon
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 ExecStart=$ROOT/scripts/dwell daemon
@@ -228,17 +323,22 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 UNIT
                 echo "✓ Wrote $autostart/dwell.desktop"
                 echo "✓ Wrote $systemd_user/dwell.service"
                 if command -v systemctl >/dev/null 2>&1; then
+                    import_linux_session_environment
                     systemctl --user daemon-reload 2>/dev/null || true
-                    if systemctl --user enable --now dwell.service 2>/dev/null; then
+                    systemctl --user disable dwell.service 2>/dev/null || true
+                    systemctl --user stop dwell.service 2>/dev/null || true
+                    stop_linux_dwell_daemon_apps
+                    if systemctl --user enable dwell.service 2>/dev/null && \
+                       systemctl --user start dwell.service 2>/dev/null; then
                         echo "✓ Enabled + started dwell.service (systemd user)"
                     else
                         echo "  Could not start dwell.service automatically. Run manually:"
-                        echo "    systemctl --user enable --now dwell.service"
+                        echo "    systemctl --user enable dwell.service && systemctl --user start dwell.service"
                     fi
                 fi
                 ;;

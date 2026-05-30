@@ -21,10 +21,10 @@ The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` s
 
 | Command | What it does |
 |---|---|
-| `dwell show` | Open the dashboard and keep Dwell in the tray after dismiss. |
+| `dwell show` | Build current source, pause the registered daemon on Linux/macOS, then open the production dashboard. |
 | `dwell daemon` | Run as a tray daemon — dashboard appears after idle timeout. |
 | `dwell config` | Open the dashboard with Settings pre-opened. |
-| `dwell dev` | Compose Hot Reload dev mode (auto-recompiles on save). |
+| `dwell dev` | Compose Hot Reload dev mode; skips daemon/tray/idle plumbing. |
 | `dwell build` | Compile without launching (CI / verification). |
 | `dwell install` | Symlink the CLI into `~/.local/bin` so you can type `dwell …` from anywhere. |
 | `dwell uninstall` | Remove the symlink. |
@@ -32,6 +32,8 @@ The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` s
 
 > On Windows substitute `scripts\dwell.cmd` for `./scripts/dwell`. The install subcommand drops a `dwell.cmd` shim in `%USERPROFILE%\bin`.
 > Add `--debug` or set `DWELL_DEBUG=1` to show Gradle/Kotlin build output; normal launches keep it in the launcher log.
+
+Use `dwell dev` while iterating on UI. Use `dwell show` when you need the production entrypoint from source; it must build the current checkout and should not reuse an already-running daemon window.
 
 ## Three modes
 
@@ -141,7 +143,7 @@ If the tray icon doesn't appear on GNOME, install the *AppIndicator and KStatusN
 
 ```sh
 ./scripts/dwell build     # compile only
-./scripts/dwell show      # compile + launch
+./scripts/dwell show      # compile + launch production path, pausing the daemon first
 ```
 
 The build is driven by Gradle. Native installers are produced by:
