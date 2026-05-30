@@ -250,6 +250,15 @@ private fun ApplicationScope.runDwellContent(
     }
 
     val windowTransparency = activeTransparentWindow
+    if (dashboardVisible && (!settingsViewModel.settingsLoaded || windowTransparency == null)) {
+        Window(
+            title = "Dwell",
+            icon = dwellWindowIcon,
+            visible = false,
+            onCloseRequest = {},
+        ) {}
+    }
+
     if (dashboardVisible && settingsViewModel.settingsLoaded && windowTransparency != null) {
         val windowEvents = rememberWindowEventHandlers(
             onExitApplication = requestDashboardExit,
