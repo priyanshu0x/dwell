@@ -24,7 +24,7 @@ The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` s
 | `dwell show` | Build current source, pause the registered daemon on Linux/macOS, then open the production dashboard. |
 | `dwell daemon` | Run as a tray daemon — dashboard appears after idle timeout. |
 | `dwell config` | Open the dashboard with Settings pre-opened. |
-| `dwell dev` | Compose Hot Reload in a normal resizable window; skips daemon/tray/idle plumbing. |
+| `dwell dev` | Compose Hot Reload in a normal resizable always-on-top window; skips daemon/tray/idle plumbing. |
 | `dwell build` | Compile without launching (CI / verification). |
 | `dwell install` | Symlink the CLI into `~/.local/bin` so you can type `dwell …` from anywhere. |
 | `dwell uninstall` | Remove the symlink. |
@@ -33,7 +33,7 @@ The CLI auto-installs Temurin JDK 21 to `~/jdks/` on first run (no `JAVA_HOME` s
 > On Windows substitute `scripts\dwell.cmd` for `./scripts/dwell`. The install subcommand drops a `dwell.cmd` shim in `%USERPROFILE%\bin`.
 > Add `--debug` or set `DWELL_DEBUG=1` to show Gradle/Kotlin build output; normal launches keep it in the launcher log.
 
-Use `dwell dev` while iterating on UI. It should behave like a normal desktop window, not the fullscreen/transparent production overlay. Use `dwell show` when you need the production entrypoint from source; it must build the current checkout and should not reuse an already-running daemon window.
+Use `dwell dev` while iterating on UI. It should behave like a normal desktop window, not the fullscreen/transparent production overlay, and it only drops the always-on-top flag while minimized. Use `dwell show` when you need the production entrypoint from source; it must build the current checkout and should not reuse an already-running daemon window.
 
 ## Three modes
 

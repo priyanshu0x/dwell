@@ -38,6 +38,8 @@ import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Frame
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
 
 private const val IDLE_MONITOR_POLL_MS = 1_000L
 
@@ -194,6 +196,7 @@ private fun ApplicationScope.runDwellContent(
             onExitApplication = requestDashboardExit,
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
         )
+        var windowMinimized by remember { mutableStateOf(false) }
 
         Window(
             title = "Dwell",
@@ -205,11 +208,39 @@ private fun ApplicationScope.runDwellContent(
             ),
             onCloseRequest = requestDashboardExit,
             resizable = devMode,
-            alwaysOnTop = false,
+            alwaysOnTop = !windowMinimized,
             undecorated = !devMode,
             transparent = !devMode,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
         ) {
+            DisposableEffect(window) {
+                fun refreshMinimizedState() {
+                    windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
+                }
+
+                val listener = object : WindowAdapter() {
+                    override fun windowStateChanged(event: WindowEvent) {
+                        refreshMinimizedState()
+                    }
+
+                    override fun windowIconified(event: WindowEvent) {
+                        windowMinimized = true
+                    }
+
+                    override fun windowDeiconified(event: WindowEvent) {
+                        windowMinimized = false
+                    }
+                }
+
+                window.addWindowStateListener(listener)
+                window.addWindowListener(listener)
+                refreshMinimizedState()
+                onDispose {
+                    window.removeWindowStateListener(listener)
+                    window.removeWindowListener(listener)
+                }
+            }
+
             LaunchedEffect(dashboardActivationRequest) {
                 if (dashboardActivationRequest > 0) {
                     if ((window.extendedState and Frame.ICONIFIED) != 0) {
