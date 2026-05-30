@@ -5,6 +5,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Zip
@@ -169,6 +170,10 @@ tasks.configureEach {
             delete(layout.buildDirectory.dir("compose/binaries/main/app"))
         }
     }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs("-Dsun.awt.X11.XWMClass=Dwell")
 }
 
 tasks.named<ComposeHotRun>("hotRunJvm") {

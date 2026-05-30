@@ -89,6 +89,13 @@ bootstrap_java() {
     export PATH="$JAVA_HOME/bin:$PATH"
 }
 
+suppress_linux_ready_notifications() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+    # GNOME turns an inherited startup id into "<app> is ready" popups for JVM
+    # windows launched from terminals/IDEs. Dwell owns its own tray/window state.
+    unset DESKTOP_STARTUP_ID
+}
+
 first_build_hint() {
     [ -d "composeApp/build/libs" ] || echo "▶ First build — fetching dependencies (~1-2 min on a fast connection)."
 }
@@ -154,7 +161,7 @@ Exec=$ROOT/scripts/dwell show
 Icon=$icon_name
 Terminal=false
 Categories=Utility;
-StartupNotify=true
+StartupNotify=false
 StartupWMClass=Dwell
 DESKTOP
     cp "$desktop_file" "$class_alias_file"
@@ -227,6 +234,7 @@ restore_paused_daemon() {
 
 # --- Subcommand dispatch -----------------------------------------------------
 cmd="${1:-help}"
+suppress_linux_ready_notifications
 
 case "$cmd" in
     show)
@@ -307,7 +315,7 @@ Comment=Idle-triggered screensaver dashboard
 Exec=$ROOT/scripts/dwell autostart
 Icon=dwell-real
 X-GNOME-Autostart-enabled=true
-StartupNotify=true
+StartupNotify=false
 StartupWMClass=Dwell
 NoDisplay=false
 DESKTOP
