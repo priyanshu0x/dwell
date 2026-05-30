@@ -3,6 +3,7 @@ package com.droidslife.screensaver.modes.console
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -114,7 +115,10 @@ fun ConsoleMode(
             (placements - focused) + (focused to placements.getValue(focused))
         } else placements
     }
-    CompositionLocalProvider(LocalConsoleAccent provides accent) {
+    CompositionLocalProvider(
+        LocalConsoleAccent provides accent,
+        LocalConsoleWidgetBorderStyle provides widgetBorderStyle,
+    ) {
         BoxWithConstraints(
             modifier = modifier
                 .fillMaxSize()
@@ -330,6 +334,7 @@ private fun Modifier.consoleTileChrome(
         ConsoleWidgetBorderStyle.Bordered -> this
             .clip(shape)
             .background(backgroundColor)
+            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.88f), shape)
         ConsoleWidgetBorderStyle.Borderless -> this
             .clip(shape)
             .background(backgroundColor)
