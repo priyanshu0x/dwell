@@ -1,6 +1,8 @@
 package com.droidslife.screensaver.todos.providers
 
 import com.droidslife.screensaver.serialization.DwellJson
+import com.droidslife.screensaver.network.isTransientNetworkFailure
+import com.droidslife.screensaver.network.networkRetryMessage
 import com.droidslife.screensaver.widget.api.WidgetLogger
 import com.droidslife.screensaver.widget.api.WidgetStorage
 import io.ktor.client.HttpClient
@@ -222,7 +224,9 @@ class TodoistProvider(
             throw e
         } catch (e: Exception) {
             log.warn("Todoist poll failed; keeping previous snapshot", e)
-            sync.value = TodosSyncStatus.Offline("Can't reach Todoist — retrying")
+            sync.value = TodosSyncStatus.Offline(
+                if (e.isTransientNetworkFailure()) e.networkRetryMessage("Todoist") else "Todoist sync issue - retrying",
+            )
         }
     }
 

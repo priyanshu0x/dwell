@@ -1,6 +1,8 @@
 package com.droidslife.screensaver.widget.host
 
 import co.touchlab.kermit.Logger
+import com.droidslife.screensaver.network.isTransientNetworkFailure
+import com.droidslife.screensaver.network.networkFailureSummary
 import com.droidslife.screensaver.widget.api.WidgetLogger
 import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetStorage
@@ -23,10 +25,18 @@ private class PrintlnWidgetLogger(private val widgetId: String) : WidgetLogger {
     }
 
     override fun warn(msg: String, error: Throwable?) {
-        logger.w(error) { msg }
+        if (error?.isTransientNetworkFailure() == true) {
+            logger.w { "$msg - ${error.networkFailureSummary()}" }
+        } else {
+            logger.w(error) { msg }
+        }
     }
 
     override fun error(msg: String, error: Throwable?) {
-        logger.e(error) { msg }
+        if (error?.isTransientNetworkFailure() == true) {
+            logger.e { "$msg - ${error.networkFailureSummary()}" }
+        } else {
+            logger.e(error) { msg }
+        }
     }
 }

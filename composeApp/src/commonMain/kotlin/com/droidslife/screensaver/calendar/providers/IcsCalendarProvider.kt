@@ -1,6 +1,8 @@
 package com.droidslife.screensaver.calendar.providers
 
 import com.droidslife.screensaver.calendar.IcsParser
+import com.droidslife.screensaver.network.isTransientNetworkFailure
+import com.droidslife.screensaver.network.networkFailureSummary
 import com.droidslife.screensaver.widget.api.WidgetLogger
 import com.droidslife.screensaver.widget.api.WidgetStorage
 import io.ktor.client.HttpClient
@@ -105,8 +107,14 @@ class IcsCalendarProvider(
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
-            log.warn("ICS fetch failed for $target", t)
-            sync.value = CalendarSyncStatus.Offline("Calendar offline — last known events shown")
+            log.warn("ICS fetch failed; keeping cached events", t)
+            sync.value = CalendarSyncStatus.Offline(
+                if (t.isTransientNetworkFailure()) {
+                    "${t.networkFailureSummary("Calendar")} - last known events shown"
+                } else {
+                    "Calendar sync issue - last known events shown"
+                },
+            )
         }
     }
 
