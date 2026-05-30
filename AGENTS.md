@@ -6,7 +6,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 This is a Kotlin/Compose Multiplatform project with a single `:composeApp` module currently targeting JVM (desktop) only.
 
-- Run dashboard once: `./gradlew :composeApp:run --args="--show"` (Windows: `.\gradlew.bat :composeApp:run --args="--show"`)
+- Developer production smoke test: `./scripts/dwell show` (Windows: `scripts\dwell.cmd show`). On Linux/macOS this builds current source, temporarily stops the registered background daemon, opens the production dashboard, then restores the daemon when the show session exits.
+- Direct dashboard run without launcher daemon handling: `./gradlew :composeApp:run --args="--show"` (Windows: `.\gradlew.bat :composeApp:run --args="--show"`)
 - Run tray daemon: `./gradlew :composeApp:run` (Windows: `.\gradlew.bat :composeApp:run`)
 - Run with Compose hot-reload (uses `DevMainKt`): `./gradlew :composeApp:runHot`
 - Test (commonTest + jvmTest): `./gradlew :composeApp:jvmTest`
@@ -16,6 +17,12 @@ This is a Kotlin/Compose Multiplatform project with a single `:composeApp` modul
 
 The app uses Gradle configuration cache and parallel builds (see `gradle.properties`) — if you edit Gradle files and see stale-config errors, run with `--no-configuration-cache` once to debug.
 
+### Developer launcher semantics
+
+- Use `./scripts/dwell dev` for fast UI iteration. It runs `DevMainKt`, uses Compose hot reload, opens a normal decorated/resizable window, stays on top while visible, and intentionally skips daemon, tray, idle-monitor, and startup plumbing.
+- Use `./scripts/dwell show` as the production-path smoke test from source. It must build and launch the current checkout, not ask an already-running daemon to show its existing window.
+- Do not add app-side IPC or daemon reuse to implement `dwell show`. If a registered daemon is running, the launcher owns the pause/restore lifecycle so the developer build does not race with the background daemon or show two dashboards.
+
 ### Runtime requirements
 
 - Weather works out of the box through the default `wttr.in` provider. The optional WeatherAPI.com provider requires an API key stored through widget settings/secrets; if it is missing or invalid, the UI surfaces an unconfigured/error state instead of silently returning mock data.
@@ -24,7 +31,7 @@ The app uses Gradle configuration cache and parallel builds (see `gradle.propert
 
 ### Entry points
 - `composeApp/src/jvmMain/kotlin/main.kt` — production entry (`Dwell`). It owns the shared `ApplicationScope.runDwell(...)` implementation used by both normal and hot-reload launches.
-- `composeApp/src/jvmMain/kotlin/devMain.kt` — hot-reload entry (`DevMainKt`). It calls `runDwell(devMode = true)`, which uses a maximized window and skips daemon/tray/idle plumbing.
+- `composeApp/src/jvmMain/kotlin/devMain.kt` — hot-reload entry (`DevMainKt`). It calls `runDwell(devMode = true)`, which uses a decorated/resizable window and skips daemon/tray/idle plumbing.
 
 ### Composition flow
 `Dwell.main` / `DevMainKt.main` → `Window` → `App` (AppTheme + settings/widget sync) → `ModeHost` (Cinematic, Ambient, Console) plus `SettingsSidebar`, `WidgetConfigDialog`, and `ShortcutsHelpDialog` overlays.
