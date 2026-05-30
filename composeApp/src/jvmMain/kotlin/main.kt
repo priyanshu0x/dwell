@@ -5,7 +5,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -235,24 +234,21 @@ private fun ApplicationScope.runDwellContent(
             settings.mode == Mode.Console &&
                 settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
         val useTransparentWindow = !devMode || transparentConsoleWindow
-        val useUndecoratedWindow = useTransparentWindow
-
-        key(useTransparentWindow, useUndecoratedWindow) {
-            Window(
-                title = "Dwell",
-                icon = dwellWindowIcon,
-                state = rememberWindowState(
-                    placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
-                    position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
-                    size = if (devMode) devWindowSize else DpSize.Unspecified,
-                ),
-                onCloseRequest = requestDashboardExit,
-                resizable = devMode,
-                alwaysOnTop = !windowMinimized,
-                undecorated = useUndecoratedWindow,
-                transparent = useTransparentWindow,
-                onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
-            ) {
+        Window(
+            title = "Dwell",
+            icon = dwellWindowIcon,
+            state = rememberWindowState(
+                placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
+                position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
+                size = if (devMode) devWindowSize else DpSize.Unspecified,
+            ),
+            onCloseRequest = requestDashboardExit,
+            resizable = devMode,
+            alwaysOnTop = !windowMinimized,
+            undecorated = true,
+            transparent = useTransparentWindow,
+            onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
+        ) {
             DisposableEffect(window) {
                 LinuxWindowManagerHints.applyDwellWindowHints(window)
 
@@ -334,7 +330,6 @@ private fun ApplicationScope.runDwellContent(
                 onShowHelpDialog = windowEvents.onShowHelpDialog,
                 modifier = windowEvents.mouseEventModifier
             )
-            }
         }
     }
 }
