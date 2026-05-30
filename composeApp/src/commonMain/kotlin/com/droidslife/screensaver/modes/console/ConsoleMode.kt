@@ -3,7 +3,6 @@ package com.droidslife.screensaver.modes.console
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -85,6 +84,7 @@ fun ConsoleMode(
 
     val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
     val backgroundStyle = settingsViewModel.settings.consoleBackgroundStyle
+    val glassOpacity = settingsViewModel.settings.consoleLiquidGlassOpacityPercent.coerceIn(0, 100) / 100f
     val widgetBorderStyle = settingsViewModel.settings.consoleWidgetBorderStyle
     val locked = settingsViewModel.settings.dashboardLocked
     val editing = settingsViewModel.consoleEditMode
@@ -118,7 +118,7 @@ fun ConsoleMode(
         BoxWithConstraints(
             modifier = modifier
                 .fillMaxSize()
-                .consoleBackground(backgroundStyle, accent),
+                .consoleBackground(backgroundStyle, accent, glassOpacity),
         ) {
             // Grid geometry mirrored from ConsoleGrid so tile-drag pixel deltas
             // map to the same cells the grid lays out.
@@ -139,7 +139,7 @@ fun ConsoleMode(
                 val instance = instances[id] ?: return@ConsoleGrid
                 val rect = orderedPlacements.getValue(id)
                 val isHovered = hoveredTile == id
-                val tileBaseColor = consoleTileBaseColor(backgroundStyle)
+                val tileBaseColor = consoleTileBaseColor(backgroundStyle, glassOpacity)
                 val targetBg = if (isHovered) {
                     Color.White.copy(alpha = 0.04f).compositeOver(tileBaseColor)
                 } else tileBaseColor
@@ -165,8 +165,6 @@ fun ConsoleMode(
                         .consoleTileChrome(
                             backgroundColor = backgroundColor,
                             borderStyle = widgetBorderStyle,
-                            backgroundStyle = backgroundStyle,
-                            accent = accent,
                         )
                         .onPointerEvent(PointerEventType.Enter) { hoveredTile = id }
                         .onPointerEvent(PointerEventType.Exit) {
@@ -276,15 +274,17 @@ fun ConsoleMode(
 private fun Modifier.consoleBackground(
     style: ConsoleBackgroundStyle,
     accent: ConsoleAccent,
+    glassOpacity: Float,
 ): Modifier = when (style) {
     ConsoleBackgroundStyle.Solid -> background(DwellColors.Surface0)
-    ConsoleBackgroundStyle.LiquidGlass -> background(DwellColors.Surface0.copy(alpha = 0.62f))
+    ConsoleBackgroundStyle.LiquidGlass -> background(DwellColors.Surface0.copy(alpha = glassOpacity))
         .drawBehind {
+            if (glassOpacity <= 0f) return@drawBehind
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.08f),
-                        accent.primary.copy(alpha = 0.06f),
+                        Color.White.copy(alpha = 0.08f * glassOpacity),
+                        accent.primary.copy(alpha = 0.06f * glassOpacity),
                         Color.Transparent,
                     ),
                     start = Offset(0f, 0f),
@@ -295,7 +295,7 @@ private fun Modifier.consoleBackground(
                 brush = Brush.linearGradient(
                     colors = listOf(
                         Color.Transparent,
-                        Color.White.copy(alpha = 0.035f),
+                        Color.White.copy(alpha = 0.035f * glassOpacity),
                         Color.Transparent,
                     ),
                     start = Offset(0f, size.height * 0.12f),
@@ -305,39 +305,31 @@ private fun Modifier.consoleBackground(
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        DwellColors.Surface0.copy(alpha = 0.18f),
+                        DwellColors.Surface0.copy(alpha = 0.18f * glassOpacity),
                         Color.Transparent,
-                        accent.primary.copy(alpha = 0.05f),
+                        accent.primary.copy(alpha = 0.05f * glassOpacity),
                     ),
                     start = Offset(size.width, 0f),
                     end = Offset(0f, size.height),
                 ),
             )
-        }
+    }
 }
 
-private fun consoleTileBaseColor(style: ConsoleBackgroundStyle): Color = when (style) {
+private fun consoleTileBaseColor(style: ConsoleBackgroundStyle, glassOpacity: Float): Color = when (style) {
     ConsoleBackgroundStyle.Solid -> DwellColors.Surface1
-    ConsoleBackgroundStyle.LiquidGlass -> DwellColors.Surface1.copy(alpha = 0.58f)
+    ConsoleBackgroundStyle.LiquidGlass -> DwellColors.Surface1.copy(alpha = glassOpacity)
 }
 
 private fun Modifier.consoleTileChrome(
     backgroundColor: Color,
     borderStyle: ConsoleWidgetBorderStyle,
-    backgroundStyle: ConsoleBackgroundStyle,
-    accent: ConsoleAccent,
 ): Modifier {
     val shape = RoundedCornerShape(DwellRadius.m)
-    val borderColor = when (backgroundStyle) {
-        ConsoleBackgroundStyle.Solid -> DwellColors.Stroke.copy(alpha = 0.88f)
-        ConsoleBackgroundStyle.LiquidGlass -> Color.White.copy(alpha = 0.16f)
-            .compositeOver(accent.primary.copy(alpha = 0.08f))
-    }
     return when (borderStyle) {
         ConsoleWidgetBorderStyle.Bordered -> this
             .clip(shape)
             .background(backgroundColor)
-            .border(1.dp, borderColor, shape)
         ConsoleWidgetBorderStyle.Borderless -> this
             .clip(shape)
             .background(backgroundColor)

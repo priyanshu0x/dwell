@@ -89,6 +89,7 @@ data class SettingsModel(
     val ambientVariant: AmbientVariant = AmbientVariant.Lumen,
     val consoleVariant: ConsoleVariant = ConsoleVariant.Standard,
     val consoleBackgroundStyle: ConsoleBackgroundStyle = ConsoleBackgroundStyle.Solid,
+    val consoleLiquidGlassOpacityPercent: Int = 62,
     val consoleWidgetBorderStyle: ConsoleWidgetBorderStyle = ConsoleWidgetBorderStyle.Bordered,
     val quieterLumen: Boolean = false,
     val showSeconds: Boolean = false,

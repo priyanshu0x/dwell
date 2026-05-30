@@ -30,6 +30,8 @@ import com.droidslife.screensaver.daemon.createIdleMonitor
 import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
+import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
+import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.ui.LinuxWindowManagerHints
@@ -228,6 +230,9 @@ private fun ApplicationScope.runDwellContent(
                 ?: WindowPosition(Alignment.Center)
         }
         var windowMinimized by remember { mutableStateOf(false) }
+        val transparentConsoleWindow =
+            settings.mode == Mode.Console &&
+                settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
 
         Window(
             title = "Dwell",
@@ -241,7 +246,7 @@ private fun ApplicationScope.runDwellContent(
             resizable = devMode,
             alwaysOnTop = !windowMinimized,
             undecorated = !devMode,
-            transparent = !devMode,
+            transparent = !devMode || transparentConsoleWindow,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
         ) {
             DisposableEffect(window) {
