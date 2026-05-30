@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
@@ -197,15 +199,15 @@ private fun ApplicationScope.runDwellContent(
             title = "Dwell",
             icon = dwellWindowIcon,
             state = rememberWindowState(
-                placement = if (devMode) WindowPlacement.Maximized else WindowPlacement.Fullscreen,
+                placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
                 position = WindowPosition(Alignment.Center),
+                size = if (devMode) DpSize(1280.dp, 800.dp) else DpSize.Unspecified,
             ),
             onCloseRequest = requestDashboardExit,
-            resizable = false,
-            // Keep Dwell in the normal window stack so Alt-Tab behaves like a regular app.
-            alwaysOnTop = devMode,
-            undecorated = true,
-            transparent = true,
+            resizable = devMode,
+            alwaysOnTop = false,
+            undecorated = !devMode,
+            transparent = !devMode,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
         ) {
             LaunchedEffect(dashboardActivationRequest) {
