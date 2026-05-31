@@ -26,7 +26,6 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.host.WidgetInstance
@@ -35,8 +34,8 @@ import kotlin.math.roundToInt
 private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
-private val PADDING = 32.dp
-private val BOTTOM_PADDING = DashboardActionBarReservedHeight
+private val PADDING = 16.dp
+private val BOTTOM_PADDING = 32.dp
 
 /**
  * Renders a per-widget config gear floating at the top-right corner of each
@@ -45,9 +44,8 @@ private val BOTTOM_PADDING = DashboardActionBarReservedHeight
  * tile-level drag detector.
  *
  * The grid math is duplicated from [ConsoleGrid], [ConsoleEditOverlay], and
- * [ConsoleMode]
- * because Kotlin private consts don't cross file boundaries; these files need
- * to stay in sync.
+ * [ConsoleMode] because Kotlin private consts don't cross file boundaries;
+ * these files need to stay in sync.
  */
 @Composable
 fun TileGearsOverlay(
@@ -98,8 +96,9 @@ private fun Gear(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val tint: Color = if (hovered) DwellColors.TextHigh else DwellColors.TextFaint
-    val bg: Color = if (hovered) DwellColors.Surface1 else Color.Transparent
+    val accent = LocalConsoleAccent.current.primary
+    val tint: Color = if (hovered) accent else DwellColors.TextFaint
+    val bg: Color = if (hovered) accent.copy(alpha = 0.10f) else Color.Transparent
     Box(
         modifier = modifier
             .size(24.dp)

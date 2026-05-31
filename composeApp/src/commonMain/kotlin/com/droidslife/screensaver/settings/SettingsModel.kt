@@ -13,7 +13,7 @@ enum class CinematicVariant { Dusk, Noir }
 enum class AmbientVariant { Lumen, Borealis }
 
 @Serializable
-enum class ConsoleVariant { Standard, Amber }
+enum class ConsoleVariant { Standard, Amber, Dark }
 
 @Serializable
 enum class ConsoleWidgetBorderStyle { Bordered, Borderless, Shadow }

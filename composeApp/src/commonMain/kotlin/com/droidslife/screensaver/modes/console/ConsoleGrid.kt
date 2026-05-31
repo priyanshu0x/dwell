@@ -8,14 +8,13 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.widget.api.GridRect
 
 private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
-private val PADDING = 32.dp
-private val BOTTOM_PADDING = DashboardActionBarReservedHeight
+private val PADDING = 16.dp
+private val BOTTOM_PADDING = 32.dp
 
 /**
  * 12x6 grid layout engine for Console mode. Each placement is positioned and

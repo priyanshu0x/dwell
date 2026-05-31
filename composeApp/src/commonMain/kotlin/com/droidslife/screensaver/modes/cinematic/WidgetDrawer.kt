@@ -33,7 +33,6 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.SettingsViewModel
-import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.widget.api.WidgetRenderTarget
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import com.droidslife.screensaver.widgets.DefaultChipRender
@@ -84,12 +83,11 @@ fun BoxScope.WidgetDrawer(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .padding(horizontal = 60.dp)
-            .padding(bottom = DashboardActionBarReservedHeight)
             .fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp, 12.dp, 0.dp, 0.dp))
                 .background(Color(0xD9080812))
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

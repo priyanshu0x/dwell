@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.ConsoleWidgetBorderStyle
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DashboardActionBar
-import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellMotion
 import com.droidslife.screensaver.ui.DwellRadius
@@ -51,8 +50,8 @@ import kotlin.math.roundToInt
 private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
-private val PADDING = 32.dp
-private val BOTTOM_PADDING = DashboardActionBarReservedHeight
+private val PADDING = 16.dp
+private val BOTTOM_PADDING = 32.dp
 
 private val defaultLayouts: Map<String, GridRect> = mapOf(
     "com.droidslife.screensaver.clock"           to GridRect(0, 0, 12, 4),
@@ -142,7 +141,7 @@ fun ConsoleMode(
                 val isHovered = hoveredTile == id
                 val tileBaseColor = DwellColors.Surface1
                 val targetBg = if (isHovered) {
-                    Color.White.copy(alpha = 0.04f).compositeOver(tileBaseColor)
+                    accent.tileHoverOverlay.compositeOver(tileBaseColor)
                 } else tileBaseColor
                 // Key the LaunchedEffect on a stable Boolean, NOT the target
                 // Color. Color is a value class backed by ULong; passing it to
@@ -268,7 +267,7 @@ fun ConsoleMode(
             DashboardActionBar(
                 onSettings = onOpenSettings,
                 onHelp = onOpenHelp,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomEnd),
             )
         }
     }

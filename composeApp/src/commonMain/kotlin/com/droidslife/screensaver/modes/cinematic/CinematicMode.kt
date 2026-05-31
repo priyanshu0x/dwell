@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.settings.CinematicVariant
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DashboardActionBar
-import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.weather.WeatherState
@@ -61,7 +60,7 @@ fun CinematicMode(
         DashboardActionBar(
             onSettings = onOpenSettings,
             onHelp = onOpenHelp,
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.align(Alignment.BottomEnd),
         )
     }
 }
@@ -118,7 +117,7 @@ private fun BoxScope.CinematicForeground(
             fontSize = 9.sp,
             letterSpacing = 2.7.sp,
             color = DwellColors.TextHigh.copy(alpha = 0.32f),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = DashboardActionBarReservedHeight),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
         )
     }
     WidgetDrawer(settingsViewModel, registry)

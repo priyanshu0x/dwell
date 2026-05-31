@@ -33,8 +33,6 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
-internal val DashboardActionBarReservedHeight = 76.dp
-
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun DashboardActionBar(
@@ -52,15 +50,15 @@ fun DashboardActionBar(
 
     Row(
         modifier = modifier
-            .padding(bottom = 20.dp)
+            .padding(end = 20.dp, bottom = 4.dp)
             .alpha(alpha)
             .clip(shape)
             .background(DwellColors.Surface1.copy(alpha = 0.94f))
             .border(1.dp, DwellColors.Stroke.copy(alpha = 0.9f), shape)
             .onPointerEvent(PointerEventType.Enter) { hovered = true }
             .onPointerEvent(PointerEventType.Exit) { hovered = false }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ShortcutHint(shortcut = "S · Ctrl+,") {
             DashboardActionButton(Icons.Filled.Settings, "Settings", onSettings)
@@ -79,10 +77,10 @@ private fun DashboardActionButton(
 ) {
     Box(
         modifier = Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .size(24.dp)
+            .clip(RoundedCornerShape(6.dp))
             .background(DwellColors.Surface0.copy(alpha = 0.86f))
-            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.76f), RoundedCornerShape(7.dp))
+            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.76f), RoundedCornerShape(6.dp))
             .pointerHoverIcon(PointerIcon.Hand)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -91,7 +89,7 @@ private fun DashboardActionButton(
             imageVector = icon,
             contentDescription = label,
             tint = DwellColors.TextMid,
-            modifier = Modifier.size(15.dp),
+            modifier = Modifier.size(13.dp),
         )
     }
 }
