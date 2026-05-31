@@ -60,6 +60,9 @@ class SettingsViewModel(
     var savedSecretIds by mutableStateOf<Set<String>>(emptySet())
         private set
 
+    val profiles: List<ProfileModel>
+        get() = profileCatalogFor(settings)
+
     /**
      * Runtime-only flag for Console layout edit mode. Not persisted.
      */
@@ -147,6 +150,14 @@ class SettingsViewModel(
             current -= widgetId
         }
         updateSettings(settings.copy(enabledWidgetIds = current))
+    }
+
+    fun setActiveProfile(profileId: String) {
+        val profile = profileById(settings, profileId) ?: return
+        updateSettings(
+            profile.settings.applyTo(settings).copy(activeProfileId = profile.id),
+            preserveActiveProfile = true,
+        )
     }
 
     fun updateWidgetConfig(widgetId: String, config: JsonObject) {
@@ -293,7 +304,9 @@ class SettingsViewModel(
 
     /** Mark the first-run welcome toast as shown so it doesn't repeat. */
     fun markWelcomeShown() {
-        if (!settings.welcomeShown) updateSettings(settings.copy(welcomeShown = true))
+        if (!settings.welcomeShown) {
+            updateSettings(settings.copy(welcomeShown = true), preserveActiveProfile = true)
+        }
     }
 
     fun setWidgetLayout(widgetId: String, rect: com.droidslife.screensaver.widget.api.GridRect) {
@@ -339,12 +352,20 @@ class SettingsViewModel(
      * updates (for example a widget secret reference followed by its revision)
      * cannot be re-emitted out of order.
      */
-    private fun updateSettings(newSettings: SettingsModel) {
-        settings = newSettings
+    private fun updateSettings(
+        newSettings: SettingsModel,
+        preserveActiveProfile: Boolean = false,
+    ) {
+        val effectiveSettings = if (preserveActiveProfile) {
+            newSettings
+        } else {
+            newSettings.copy(activeProfileId = PROFILE_CURRENT_ID)
+        }
+        settings = effectiveSettings
         if (settingsDraftBase != null) return
         viewModelScope.launch {
             settingsWriteMutex.withLock {
-                preferencesRepository.updateSettings(newSettings)
+                preferencesRepository.updateSettings(effectiveSettings)
             }
         }
     }
