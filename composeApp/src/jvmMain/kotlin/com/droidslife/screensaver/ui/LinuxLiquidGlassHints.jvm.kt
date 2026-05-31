@@ -71,7 +71,19 @@ internal object LinuxLiquidGlassHints {
         }
     }
 
-    private fun isLinuxX11(): Boolean =
-        System.getProperty("os.name").contains("Linux", ignoreCase = true) &&
-            !System.getenv("DISPLAY").isNullOrBlank()
+    private fun isLinuxX11(): Boolean {
+        if (!System.getProperty("os.name").contains("Linux", ignoreCase = true)) return false
+        if (System.getenv("DISPLAY").isNullOrBlank()) return false
+        if (!System.getenv("WAYLAND_DISPLAY").isNullOrBlank()) return false
+
+        val sessionType = System.getenv("XDG_SESSION_TYPE").orEmpty().lowercase()
+        if (sessionType.isNotBlank() && sessionType != "x11") return false
+
+        val desktop = listOf(
+            System.getenv("XDG_CURRENT_DESKTOP"),
+            System.getenv("XDG_SESSION_DESKTOP"),
+            System.getenv("DESKTOP_SESSION"),
+        ).filterNotNull().joinToString(":").lowercase()
+        return desktop.contains("kde") || desktop.contains("plasma") || desktop.contains("kwin")
+    }
 }

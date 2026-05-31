@@ -28,8 +28,9 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 - `Window(transparent = true)` must be paired with `undecorated = true`; Compose Desktop enforces this in `ComposeWindowPanel.setWindowTransparent`.
 - Do not toggle `Window.transparent` on an already displayed window. When changing between opaque and Liquid Glass modes, first remove the dashboard `Window` from composition so Compose disposes the old AWT window, then create the replacement with the new transparency mode. A `key(...)` alone is not enough if the live `Window` receives an updated `transparent` value first.
 - Linux Liquid Glass runs with Skiko `SOFTWARE_FAST`; Skiko's default Linux `OPENGL` redrawer has crashed during transparent-window recreation.
-- Liquid Glass blur behind other apps is compositor-owned. On Linux/X11, Dwell requests KWin blur with `_KDE_NET_WM_BLUR_BEHIND_REGION`; on GNOME/Wayland it uses a captured, downsample-blurred desktop backdrop because Compose `Modifier.blur` only blurs Dwell's own rendered content.
-- Capture the Liquid Glass backdrop before the visible transparent `Window` is created. Recapturing while Dwell is visible captures Dwell itself and causes a recursive/empty glass effect.
+- Liquid Glass blur behind other apps is compositor-owned. Dwell may request native blur only where the compositor exposes a supported path; currently that is KWin on KDE/Plasma X11 via `_KDE_NET_WM_BLUR_BEHIND_REGION`.
+- Do not use AWT `Robot`, screenshots, or captured desktop bitmaps to fake Liquid Glass. That creates stale, recursive, monitor-position-dependent backgrounds and is not live compositor blur.
+- GNOME/Wayland currently has no robust Java/Compose/Swing path for live blur-behind. There, Liquid Glass must degrade to a transparent window with Dwell's own translucent material/tint.
 - Console `Bordered` must keep the original main-branch visual treatment: the tile host is clipped/background only, and the visible outline comes from `ConsoleEditOverlay` idle chrome. Do not add a second host border for `Bordered`.
 - Widgets rendered inside Console Liquid Glass should use the console nested-surface helpers instead of opaque `DwellColors.Surface1` cards, so inner cards do not erase the glass backdrop.
 

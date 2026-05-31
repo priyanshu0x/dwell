@@ -14,7 +14,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberToastState
 import com.droidslife.screensaver.modes.ModeHost
@@ -37,7 +36,6 @@ internal fun App(
     showHelpDialog: Boolean = false,
     onHelpDialogDismiss: () -> Unit = {},
     onShowHelpDialog: () -> Unit = {},
-    liquidGlassBackdrop: ImageBitmap? = null,
     modifier: Modifier = Modifier
 ) {
     val settingsViewModel = koinViewModel<SettingsViewModel>()
@@ -106,7 +104,6 @@ internal fun App(
                         registry = widgetRegistry,
                         onOpenSettings = { settingsViewModel.openSettingsDialog() },
                         onOpenHelp = onShowHelpDialog,
-                        liquidGlassBackdrop = liquidGlassBackdrop,
                     )
                     ShortcutToast(toastState = welcomeToast)
 
