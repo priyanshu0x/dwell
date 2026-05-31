@@ -130,7 +130,7 @@ class SettingsViewModel(
      */
     fun toggleClockFormat(): Boolean {
         val newSettings = settings.copy(is24HourFormat = !settings.is24HourFormat)
-        updateSettings(newSettings)
+        updateProfileControlledSettings(newSettings)
         return newSettings.is24HourFormat
     }
 
@@ -139,7 +139,7 @@ class SettingsViewModel(
      * @param is24Hour Whether to use 24-hour format.
      */
     fun setClockFormat(is24Hour: Boolean) {
-        updateSettings(settings.copy(is24HourFormat = is24Hour))
+        updateProfileControlledSettings(settings.copy(is24HourFormat = is24Hour))
     }
 
     fun setWidgetEnabled(widgetId: String, enabled: Boolean) {
@@ -149,15 +149,32 @@ class SettingsViewModel(
         } else {
             current -= widgetId
         }
-        updateSettings(settings.copy(enabledWidgetIds = current))
+        updateProfileControlledSettings(settings.copy(enabledWidgetIds = current))
     }
 
     fun setActiveProfile(profileId: String) {
-        val profile = profileById(settings, profileId) ?: return
-        updateSettings(
-            profile.settings.applyTo(settings).copy(activeProfileId = profile.id),
-            preserveActiveProfile = true,
-        )
+        if (profileById(settings, profileId) == null) return
+        updateSettings(settings.applyProfile(profileId))
+    }
+
+    fun createProfileFromCurrent(name: String) {
+        updateSettings(settings.createCustomProfileFromCurrent(name))
+    }
+
+    fun duplicateProfile(profileId: String) {
+        updateSettings(settings.duplicateProfile(profileId))
+    }
+
+    fun renameCustomProfile(profileId: String, name: String) {
+        updateSettings(settings.renameCustomProfile(profileId, name))
+    }
+
+    fun deleteCustomProfile(profileId: String) {
+        updateSettings(settings.deleteCustomProfile(profileId))
+    }
+
+    fun resetBuiltInProfile(profileId: String) {
+        updateSettings(settings.resetBuiltInProfile(profileId))
     }
 
     fun updateWidgetConfig(widgetId: String, config: JsonObject) {
@@ -215,7 +232,7 @@ class SettingsViewModel(
     }
 
     fun setIdleTimeoutSeconds(seconds: Int) {
-        updateSettings(settings.copy(idleTimeoutSeconds = seconds.coerceIn(30, 240 * 60)))
+        updateProfileControlledSettings(settings.copy(idleTimeoutSeconds = seconds.coerceIn(30, 240 * 60)))
     }
 
     fun setTrayIconEnabled(enabled: Boolean) {
@@ -258,63 +275,63 @@ class SettingsViewModel(
     }
 
     fun setMode(mode: Mode) {
-        updateSettings(settings.copy(mode = mode))
+        updateProfileControlledSettings(settings.copy(mode = mode))
     }
 
     fun setCinematicVariant(variant: CinematicVariant) {
-        updateSettings(settings.copy(cinematicVariant = variant))
+        updateProfileControlledSettings(settings.copy(cinematicVariant = variant))
     }
 
     fun setAmbientVariant(variant: AmbientVariant) {
-        updateSettings(settings.copy(ambientVariant = variant))
+        updateProfileControlledSettings(settings.copy(ambientVariant = variant))
     }
 
     fun setConsoleVariant(variant: ConsoleVariant) {
-        updateSettings(settings.copy(consoleVariant = variant))
+        updateProfileControlledSettings(settings.copy(consoleVariant = variant))
     }
 
     fun setConsoleWidgetBorderStyle(style: ConsoleWidgetBorderStyle) {
-        updateSettings(settings.copy(consoleWidgetBorderStyle = style))
+        updateProfileControlledSettings(settings.copy(consoleWidgetBorderStyle = style))
     }
 
     fun setQuieterLumen(enabled: Boolean) {
-        updateSettings(settings.copy(quieterLumen = enabled))
+        updateProfileControlledSettings(settings.copy(quieterLumen = enabled))
     }
 
     fun setShowSeconds(enabled: Boolean) {
-        updateSettings(settings.copy(showSeconds = enabled))
+        updateProfileControlledSettings(settings.copy(showSeconds = enabled))
     }
 
     fun setShowDate(enabled: Boolean) {
-        updateSettings(settings.copy(showDate = enabled))
+        updateProfileControlledSettings(settings.copy(showDate = enabled))
     }
 
     fun setExitOnKeypress(enabled: Boolean) {
-        updateSettings(settings.copy(exitOnKeypress = enabled))
+        updateProfileControlledSettings(settings.copy(exitOnKeypress = enabled))
     }
 
     fun setRightClickHidesDashboard(enabled: Boolean) {
-        updateSettings(settings.copy(rightClickHidesDashboard = enabled))
+        updateProfileControlledSettings(settings.copy(rightClickHidesDashboard = enabled))
     }
 
     fun setDashboardLocked(locked: Boolean) {
-        updateSettings(settings.copy(dashboardLocked = locked))
+        updateProfileControlledSettings(settings.copy(dashboardLocked = locked))
         if (!locked) consoleEditMode = false
     }
 
     /** Mark the first-run welcome toast as shown so it doesn't repeat. */
     fun markWelcomeShown() {
         if (!settings.welcomeShown) {
-            updateSettings(settings.copy(welcomeShown = true), preserveActiveProfile = true)
+            updateSettings(settings.copy(welcomeShown = true))
         }
     }
 
     fun setWidgetLayout(widgetId: String, rect: com.droidslife.screensaver.widget.api.GridRect) {
-        updateSettings(settings.copy(widgetLayouts = settings.widgetLayouts + (widgetId to rect)))
+        updateProfileControlledSettings(settings.copy(widgetLayouts = settings.widgetLayouts + (widgetId to rect)))
     }
 
     fun resetWidgetLayouts() {
-        updateSettings(settings.copy(widgetLayouts = emptyMap()))
+        updateProfileControlledSettings(settings.copy(widgetLayouts = emptyMap()))
     }
 
     fun cycleMode() {
@@ -341,7 +358,7 @@ class SettingsViewModel(
                 settings.copy(consoleVariant = next)
             }
         }
-        updateSettings(newSettings)
+        updateProfileControlledSettings(newSettings)
     }
 
     /**
@@ -352,15 +369,12 @@ class SettingsViewModel(
      * updates (for example a widget secret reference followed by its revision)
      * cannot be re-emitted out of order.
      */
-    private fun updateSettings(
-        newSettings: SettingsModel,
-        preserveActiveProfile: Boolean = false,
-    ) {
-        val effectiveSettings = if (preserveActiveProfile) {
-            newSettings
-        } else {
-            newSettings.copy(activeProfileId = PROFILE_CURRENT_ID)
-        }
+    private fun updateProfileControlledSettings(newSettings: SettingsModel) {
+        updateSettings(newSettings.syncActiveProfileSettings())
+    }
+
+    private fun updateSettings(newSettings: SettingsModel) {
+        val effectiveSettings = newSettings.withNormalizedProfiles()
         settings = effectiveSettings
         if (settingsDraftBase != null) return
         viewModelScope.launch {

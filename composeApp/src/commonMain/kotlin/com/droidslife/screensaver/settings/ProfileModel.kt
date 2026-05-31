@@ -9,6 +9,7 @@ const val PROFILE_FOCUS_ID = "focus"
 const val PROFILE_NIGHT_ID = "night"
 const val PROFILE_PRESENTATION_ID = "presentation"
 const val PROFILE_DESK_CLOCK_ID = "desk-clock"
+private const val CUSTOM_PROFILE_PREFIX = "custom-"
 
 @Serializable
 enum class ProfileKind { BuiltIn, Custom }
@@ -81,6 +82,17 @@ fun SettingsModel.toProfileSettings(): ProfileSettings = ProfileSettings(
     dashboardLocked = dashboardLocked,
 )
 
+fun SettingsModel.withNormalizedProfiles(): SettingsModel {
+    val records = normalizeProfileRecords(profiles)
+    val resolvedActiveProfileId = activeProfileId.takeIf { profileId ->
+        profileId == PROFILE_CURRENT_ID || records.any { it.id == profileId }
+    } ?: PROFILE_CURRENT_ID
+    return copy(
+        activeProfileId = resolvedActiveProfileId,
+        profiles = records,
+    )
+}
+
 fun profileCatalogFor(settings: SettingsModel): List<ProfileModel> {
     val currentProfile = ProfileModel(
         id = PROFILE_CURRENT_ID,
@@ -89,13 +101,155 @@ fun profileCatalogFor(settings: SettingsModel): List<ProfileModel> {
         kind = ProfileKind.Custom,
         settings = settings.toProfileSettings(),
     )
-    return listOf(currentProfile) + builtInProfiles
+    return listOf(currentProfile) + normalizeProfileRecords(settings.profiles)
 }
 
 fun profileById(settings: SettingsModel, profileId: String): ProfileModel? =
     profileCatalogFor(settings).firstOrNull { it.id == profileId }
 
-private val builtInProfiles: List<ProfileModel> = listOf(
+fun SettingsModel.applyProfile(profileId: String): SettingsModel {
+    val profile = profileById(this, profileId) ?: return this.withNormalizedProfiles()
+    return profile.settings
+        .applyTo(this)
+        .copy(activeProfileId = profile.id)
+        .withNormalizedProfiles()
+}
+
+fun SettingsModel.syncActiveProfileSettings(): SettingsModel {
+    val normalized = withNormalizedProfiles()
+    val activeProfileId = normalized.activeProfileId
+    if (activeProfileId == PROFILE_CURRENT_ID) return normalized
+
+    val records = normalized.profiles.map { profile ->
+        if (profile.id == activeProfileId) {
+            profile.copy(settings = normalized.toProfileSettings())
+        } else {
+            profile
+        }
+    }
+    return normalized.copy(profiles = records)
+}
+
+fun SettingsModel.createCustomProfileFromCurrent(name: String): SettingsModel {
+    val normalized = withNormalizedProfiles()
+    val profileName = normalizeProfileName(name)
+    val profile = ProfileModel(
+        id = customProfileId(profileName, normalized.profiles.map { it.id }.toSet()),
+        name = profileName,
+        description = "Custom profile",
+        kind = ProfileKind.Custom,
+        settings = normalized.toProfileSettings(),
+    )
+    return normalized.copy(
+        activeProfileId = profile.id,
+        profiles = normalized.profiles + profile,
+    )
+}
+
+fun SettingsModel.duplicateProfile(profileId: String): SettingsModel {
+    val normalized = withNormalizedProfiles()
+    val source = profileById(normalized, profileId) ?: return normalized
+    val profileName = normalizeProfileName("${source.name} Copy")
+    val profile = ProfileModel(
+        id = customProfileId(profileName, normalized.profiles.map { it.id }.toSet()),
+        name = profileName,
+        description = "Copy of ${source.name}",
+        kind = ProfileKind.Custom,
+        settings = source.settings,
+    )
+    return source.settings
+        .applyTo(normalized.copy(profiles = normalized.profiles + profile))
+        .copy(activeProfileId = profile.id)
+}
+
+fun SettingsModel.renameCustomProfile(profileId: String, name: String): SettingsModel {
+    val normalized = withNormalizedProfiles()
+    val profileName = normalizeProfileName(name)
+    return normalized.copy(
+        profiles = normalized.profiles.map { profile ->
+            if (profile.id == profileId && profile.kind == ProfileKind.Custom) {
+                profile.copy(name = profileName)
+            } else {
+                profile
+            }
+        },
+    )
+}
+
+fun SettingsModel.deleteCustomProfile(profileId: String): SettingsModel {
+    val normalized = withNormalizedProfiles()
+    val profile = normalized.profiles.firstOrNull { it.id == profileId } ?: return normalized
+    if (profile.kind != ProfileKind.Custom) return normalized
+
+    return normalized.copy(
+        activeProfileId = if (normalized.activeProfileId == profileId) PROFILE_CURRENT_ID else normalized.activeProfileId,
+        profiles = normalized.profiles.filterNot { it.id == profileId },
+    )
+}
+
+fun SettingsModel.resetBuiltInProfile(profileId: String): SettingsModel {
+    val normalized = withNormalizedProfiles()
+    val default = defaultBuiltInProfiles.firstOrNull { it.id == profileId } ?: return normalized
+    val records = normalized.profiles.map { profile ->
+        if (profile.id == profileId) default else profile
+    }
+    val reset = normalized.copy(profiles = records)
+    return if (normalized.activeProfileId == profileId) {
+        reset.applyProfile(profileId)
+    } else {
+        reset
+    }
+}
+
+fun normalizeProfileRecords(records: List<ProfileModel>): List<ProfileModel> {
+    val builtInDefaultsById = defaultBuiltInProfiles.associateBy { it.id }
+    val storedById = records
+        .filter { it.id != PROFILE_CURRENT_ID }
+        .distinctBy { it.id }
+        .associateBy { it.id }
+
+    val builtIns = defaultBuiltInProfiles.map { default ->
+        val stored = storedById[default.id]
+        if (stored?.kind == ProfileKind.BuiltIn) {
+            default.copy(settings = stored.settings)
+        } else {
+            default
+        }
+    }
+
+    val customProfiles = records
+        .filter { it.kind == ProfileKind.Custom }
+        .filter { it.id != PROFILE_CURRENT_ID }
+        .filter { it.id !in builtInDefaultsById }
+        .distinctBy { it.id }
+        .map { profile ->
+            profile.copy(name = normalizeProfileName(profile.name))
+        }
+
+    return builtIns + customProfiles
+}
+
+private fun normalizeProfileName(name: String): String =
+    name.trim().takeIf { it.isNotBlank() } ?: "Custom Profile"
+
+private fun customProfileId(name: String, existingIds: Set<String>): String {
+    val slug = name
+        .trim()
+        .lowercase()
+        .replace(Regex("[^a-z0-9]+"), "-")
+        .trim('-')
+        .ifBlank { "profile" }
+    val base = "$CUSTOM_PROFILE_PREFIX$slug"
+    var candidate = base
+    var suffix = 2
+    while (candidate in existingIds || candidate == PROFILE_CURRENT_ID) {
+        candidate = "$base-$suffix"
+        suffix += 1
+    }
+    return candidate
+}
+
+private val defaultBuiltInProfiles: List<ProfileModel> = listOf(
     ProfileModel(
         id = PROFILE_WORK_ID,
         name = "Work",

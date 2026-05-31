@@ -62,18 +62,18 @@ private class SettingsFileCodec(
     private val json: Json,
 ) : Codec<SettingsModel> {
     override suspend fun encode(value: SettingsModel?) {
-        val settings = value ?: SettingsModel()
+        val settings = (value ?: SettingsModel()).withNormalizedProfiles()
         settingsPath.parent?.createDirectories()
         settingsPath.writeText(json.encodeToString(settings))
     }
 
     override suspend fun decode(): SettingsModel? {
         return runCatching {
-            if (!settingsPath.exists()) return SettingsModel()
+            if (!settingsPath.exists()) return SettingsModel().withNormalizedProfiles()
             val raw = json.parseToJsonElement(settingsPath.readText())
             val migrated = migrateJson(raw)
-            json.decodeFromJsonElement<SettingsModel>(migrated)
-        }.getOrDefault(SettingsModel())
+            json.decodeFromJsonElement<SettingsModel>(migrated).withNormalizedProfiles()
+        }.getOrDefault(SettingsModel().withNormalizedProfiles())
     }
 }
 
