@@ -5,11 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
@@ -32,13 +30,9 @@ import com.droidslife.screensaver.daemon.createIdleMonitor
 import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
-import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
-import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
-import com.droidslife.screensaver.ui.LinuxLiquidGlassHints
 import com.droidslife.screensaver.ui.LinuxWindowManagerHints
-import com.droidslife.screensaver.ui.TransparentWindowSurface
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -46,7 +40,6 @@ import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Frame
-import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
@@ -124,8 +117,6 @@ private fun ApplicationScope.runDwellContent(
     var dashboardVisible by remember { mutableStateOf(devMode || launchArgs.mode != LaunchMode.Daemon) }
     var exitRequested by remember { mutableStateOf(false) }
     var dashboardActivationRequest by remember { mutableIntStateOf(0) }
-    var activeTransparentWindow by remember { mutableStateOf<Boolean?>(null) }
-    var transparentWindowSwapPending by remember { mutableStateOf(false) }
     val requestDashboardExit = { exitRequested = true }
     val keepRunningInTray = !devMode && (launchArgs.mode == LaunchMode.Daemon || launchArgs.mode == LaunchMode.Show)
     // `dwell show` must leave an affordance after Esc even if the daemon tray
@@ -217,43 +208,7 @@ private fun ApplicationScope.runDwellContent(
         }
     }
 
-    val desiredTransparentWindow =
-        settingsViewModel.settingsLoaded &&
-            settings.mode == Mode.Console &&
-            settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
-    LaunchedEffect(dashboardVisible, settingsViewModel.settingsLoaded, desiredTransparentWindow) {
-        if (!dashboardVisible || !settingsViewModel.settingsLoaded) {
-            activeTransparentWindow = null
-            transparentWindowSwapPending = false
-            return@LaunchedEffect
-        }
-
-        val active = activeTransparentWindow
-        when {
-            active == null -> {
-                if (transparentWindowSwapPending) {
-                    withFrameNanos { }
-                    transparentWindowSwapPending = false
-                    dashboardActivationRequest += 1
-                }
-                activeTransparentWindow = desiredTransparentWindow
-            }
-            active != desiredTransparentWindow -> {
-                // Compose Desktop applies Window.transparent through a live
-                // ComposeWindow updater, so switching transparency must dispose
-                // the native window before creating the replacement.
-                transparentWindowSwapPending = true
-                activeTransparentWindow = null
-                withFrameNanos { }
-                transparentWindowSwapPending = false
-                activeTransparentWindow = desiredTransparentWindow
-                dashboardActivationRequest += 1
-            }
-        }
-    }
-
-    val windowTransparency = activeTransparentWindow
-    if (dashboardVisible && (!settingsViewModel.settingsLoaded || windowTransparency == null)) {
+    if (dashboardVisible && !settingsViewModel.settingsLoaded) {
         Window(
             title = "Dwell",
             icon = dwellWindowIcon,
@@ -262,7 +217,7 @@ private fun ApplicationScope.runDwellContent(
         ) {}
     }
 
-    if (dashboardVisible && settingsViewModel.settingsLoaded && windowTransparency != null) {
+    if (dashboardVisible && settingsViewModel.settingsLoaded) {
         val windowEvents = rememberWindowEventHandlers(
             onExitApplication = requestDashboardExit,
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
@@ -271,138 +226,112 @@ private fun ApplicationScope.runDwellContent(
         val savedDevWindowBounds = remember(devMode) {
             if (devMode) loadDevWindowBounds() else null
         }
-        val transparentProductionBounds = remember(devMode, windowTransparency) {
-            if (!devMode && windowTransparency) loadPrimaryScreenBounds() else null
-        }
         val devWindowSize = with(density) {
             savedDevWindowBounds
                 ?.let { DpSize(it.width.toDp(), it.height.toDp()) }
                 ?: DpSize(DEV_WINDOW_DEFAULT_WIDTH_PX.toDp(), DEV_WINDOW_DEFAULT_HEIGHT_PX.toDp())
-        }
-        val productionWindowSize = with(density) {
-            transparentProductionBounds
-                ?.let { DpSize(it.width.toDp(), it.height.toDp()) }
-                ?: DpSize.Unspecified
         }
         val devWindowPosition = with(density) {
             savedDevWindowBounds
                 ?.let { WindowPosition(it.x.toDp(), it.y.toDp()) }
                 ?: WindowPosition(Alignment.Center)
         }
-        val productionWindowPosition = with(density) {
-            transparentProductionBounds
-                ?.let { WindowPosition(it.x.toDp(), it.y.toDp()) }
-                ?: WindowPosition(Alignment.Center)
-        }
         var windowMinimized by remember { mutableStateOf(false) }
-        // Compose Desktop rejects transparent windows unless they are undecorated
-        // and also rejects changing transparency after the AWT window is shown.
-        val usesTransparentWindow = windowTransparency
-        key(usesTransparentWindow) {
-            Window(
-                title = "Dwell",
-                icon = dwellWindowIcon,
-                state = rememberWindowState(
-                    placement = when {
-                        devMode -> WindowPlacement.Floating
-                        usesTransparentWindow -> WindowPlacement.Floating
-                        else -> WindowPlacement.Fullscreen
-                    },
-                    position = if (devMode) devWindowPosition else productionWindowPosition,
-                    size = if (devMode) devWindowSize else productionWindowSize,
-                ),
-                onCloseRequest = requestDashboardExit,
-                resizable = devMode,
-                alwaysOnTop = !windowMinimized,
-                undecorated = !devMode || usesTransparentWindow,
-                transparent = usesTransparentWindow,
-                onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
-            ) {
-                DisposableEffect(window) {
-                    TransparentWindowSurface.apply(window, enabled = usesTransparentWindow)
-                    LinuxWindowManagerHints.applyDwellWindowHints(window)
-                    LinuxLiquidGlassHints.applyBlurBehind(window, enabled = usesTransparentWindow)
+        Window(
+            title = "Dwell",
+            icon = dwellWindowIcon,
+            state = rememberWindowState(
+                placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
+                position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
+                size = if (devMode) devWindowSize else DpSize.Unspecified,
+            ),
+            onCloseRequest = requestDashboardExit,
+            resizable = devMode,
+            alwaysOnTop = !windowMinimized,
+            undecorated = !devMode,
+            onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
+        ) {
+            DisposableEffect(window) {
+                LinuxWindowManagerHints.applyDwellWindowHints(window)
 
-                    fun refreshMinimizedState() {
-                        windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
+                fun refreshMinimizedState() {
+                    windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
+                }
+
+                val listener = object : WindowAdapter() {
+                    override fun windowStateChanged(event: WindowEvent) {
+                        refreshMinimizedState()
                     }
 
-                    val listener = object : WindowAdapter() {
-                        override fun windowStateChanged(event: WindowEvent) {
-                            refreshMinimizedState()
-                        }
-
-                        override fun windowIconified(event: WindowEvent) {
-                            windowMinimized = true
-                        }
-
-                        override fun windowDeiconified(event: WindowEvent) {
-                            windowMinimized = false
-                        }
+                    override fun windowIconified(event: WindowEvent) {
+                        windowMinimized = true
                     }
 
-                    window.addWindowStateListener(listener)
-                    window.addWindowListener(listener)
-                    refreshMinimizedState()
-                    onDispose {
-                        window.removeWindowStateListener(listener)
-                        window.removeWindowListener(listener)
+                    override fun windowDeiconified(event: WindowEvent) {
+                        windowMinimized = false
                     }
                 }
 
-                DisposableEffect(window, devMode) {
-                    if (!devMode) {
-                        onDispose {}
-                    } else {
-                        val listener = object : ComponentAdapter() {
-                            override fun componentMoved(event: ComponentEvent) {
-                                saveDevWindowBounds(window)
-                            }
+                window.addWindowStateListener(listener)
+                window.addWindowListener(listener)
+                refreshMinimizedState()
+                onDispose {
+                    window.removeWindowStateListener(listener)
+                    window.removeWindowListener(listener)
+                }
+            }
 
-                            override fun componentResized(event: ComponentEvent) {
-                                saveDevWindowBounds(window)
-                                LinuxLiquidGlassHints.applyBlurBehind(window, enabled = usesTransparentWindow)
-                            }
+            DisposableEffect(window, devMode) {
+                if (!devMode) {
+                    onDispose {}
+                } else {
+                    val listener = object : ComponentAdapter() {
+                        override fun componentMoved(event: ComponentEvent) {
+                            saveDevWindowBounds(window)
                         }
 
-                        window.addComponentListener(listener)
-                        saveDevWindowBounds(window)
-                        onDispose {
-                            window.removeComponentListener(listener)
+                        override fun componentResized(event: ComponentEvent) {
                             saveDevWindowBounds(window)
                         }
                     }
-                }
 
-                LaunchedEffect(dashboardActivationRequest) {
-                    if (dashboardActivationRequest > 0) {
-                        if ((window.extendedState and Frame.ICONIFIED) != 0) {
-                            window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
-                        }
-                        window.toFront()
-                        window.requestFocus()
+                    window.addComponentListener(listener)
+                    saveDevWindowBounds(window)
+                    onDispose {
+                        window.removeComponentListener(listener)
+                        saveDevWindowBounds(window)
                     }
                 }
-
-                ShortcutToast(toastState = windowEvents.toastState)
-
-                App(
-                    onExitApplication = requestDashboardExit,
-                    exitRequested = exitRequested,
-                    onExited = {
-                        if (keepRunningInTray) {
-                            dashboardVisible = false
-                            exitRequested = false
-                        } else {
-                            exitApplication()
-                        }
-                    },
-                    showHelpDialog = windowEvents.showHelpDialog,
-                    onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
-                    onShowHelpDialog = windowEvents.onShowHelpDialog,
-                    modifier = windowEvents.mouseEventModifier
-                )
             }
+
+            LaunchedEffect(dashboardActivationRequest) {
+                if (dashboardActivationRequest > 0) {
+                    if ((window.extendedState and Frame.ICONIFIED) != 0) {
+                        window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
+                    }
+                    window.toFront()
+                    window.requestFocus()
+                }
+            }
+
+            ShortcutToast(toastState = windowEvents.toastState)
+
+            App(
+                onExitApplication = requestDashboardExit,
+                exitRequested = exitRequested,
+                onExited = {
+                    if (keepRunningInTray) {
+                        dashboardVisible = false
+                        exitRequested = false
+                    } else {
+                        exitApplication()
+                    }
+                },
+                showHelpDialog = windowEvents.showHelpDialog,
+                onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
+                onShowHelpDialog = windowEvents.onShowHelpDialog,
+                modifier = windowEvents.mouseEventModifier
+            )
         }
     }
 }
@@ -426,16 +355,6 @@ private fun loadDevWindowBounds(): DevWindowBounds? {
             width = width,
             height = height,
         )
-    }.getOrNull()
-}
-
-private fun loadPrimaryScreenBounds(): Rectangle? {
-    return runCatching {
-        GraphicsEnvironment
-            .getLocalGraphicsEnvironment()
-            .defaultScreenDevice
-            .defaultConfiguration
-            .bounds
     }.getOrNull()
 }
 

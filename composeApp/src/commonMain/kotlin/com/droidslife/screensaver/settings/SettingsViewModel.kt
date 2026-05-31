@@ -262,14 +262,6 @@ class SettingsViewModel(
         updateSettings(settings.copy(consoleVariant = variant))
     }
 
-    fun setConsoleBackgroundStyle(style: ConsoleBackgroundStyle) {
-        updateSettings(settings.copy(consoleBackgroundStyle = style))
-    }
-
-    fun setConsoleLiquidGlassOpacityPercent(percent: Int) {
-        updateSettings(settings.copy(consoleLiquidGlassOpacityPercent = percent.coerceIn(0, 100)))
-    }
-
     fun setConsoleWidgetBorderStyle(style: ConsoleWidgetBorderStyle) {
         updateSettings(settings.copy(consoleWidgetBorderStyle = style))
     }

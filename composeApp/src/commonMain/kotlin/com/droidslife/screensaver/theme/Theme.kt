@@ -8,7 +8,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
@@ -91,7 +90,6 @@ internal val LocalThemeIsDark = compositionLocalOf { mutableStateOf(true) }
 @Composable
 internal fun AppTheme(
     isDark: Boolean = isSystemInDarkTheme(),
-    transparentSurface: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val isDarkState = remember { mutableStateOf(isDark) }
@@ -113,7 +111,7 @@ internal fun AppTheme(
             content = {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = if (transparentSurface) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    color = MaterialTheme.colorScheme.surface,
                     content = content,
                 )
             }

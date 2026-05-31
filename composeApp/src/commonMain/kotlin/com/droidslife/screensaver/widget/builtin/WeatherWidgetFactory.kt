@@ -328,12 +328,12 @@ private fun ForecastDayCard(
 ) {
     val accent = LocalConsoleAccent.current.primary
     val bg = if (isToday) {
-        consoleNestedSurfaceColor(accent.copy(alpha = 0.10f), liquidAlpha = 0.14f)
+        consoleNestedSurfaceColor(accent.copy(alpha = 0.10f))
     } else {
-        consoleNestedSurfaceColor(DwellColors.Surface1.copy(alpha = 0.6f), liquidAlpha = 0.10f)
+        consoleNestedSurfaceColor(DwellColors.Surface1.copy(alpha = 0.6f))
     }
     val border = if (isToday) {
-        consoleNestedBorderColor(accent.copy(alpha = 0.45f), liquidAlpha = 0.32f)
+        consoleNestedBorderColor(accent.copy(alpha = 0.45f))
     } else {
         consoleNestedBorderColor()
     }

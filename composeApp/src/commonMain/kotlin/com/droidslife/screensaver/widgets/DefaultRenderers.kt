@@ -27,7 +27,7 @@ import com.droidslife.screensaver.widget.api.WidgetSummary
 fun DefaultTileRender(s: WidgetSummary, modifier: Modifier = Modifier) {
     val consoleBorderStyle = LocalConsoleWidgetBorderStyle.current
     val shape = RoundedCornerShape(DwellRadius.m)
-    val background = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+    val background = consoleNestedSurfaceColor(DwellColors.Surface1)
     Column(
         modifier = modifier
             .clip(shape)

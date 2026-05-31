@@ -19,22 +19,14 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 
 ### Developer launcher semantics
 
-- Use `./scripts/dwell dev` for fast UI iteration. It runs `DevMainKt` with Compose Hot Reload and `--no-configuration-cache`, opens a decorated/resizable window for normal modes, remembers its last size and position, stays on top while visible, and intentionally skips daemon, tray, idle-monitor, and startup plumbing. Liquid Glass is the exception: Compose requires that transparent window to be undecorated.
+- Use `./scripts/dwell dev` for fast UI iteration. It runs `DevMainKt` with Compose Hot Reload and `--no-configuration-cache`, opens a decorated/resizable window, remembers its last size and position, stays on top while visible, and intentionally skips daemon, tray, idle-monitor, and startup plumbing.
 - Use `./scripts/dwell show` as the production-path smoke test from source. It must build and launch the current checkout, not ask an already-running daemon to show its existing window.
 - Do not add app-side IPC or daemon reuse to implement `dwell show`. If a registered daemon is running, the launcher owns the pause/restore lifecycle so the developer build does not race with the background daemon or show two dashboards.
 
-### Compose Desktop window transparency
+### Desktop window notes
 
-- `Window(transparent = true)` must be paired with `undecorated = true`; Compose Desktop enforces this in `ComposeWindowPanel.setWindowTransparent`.
-- Do not toggle `Window.transparent` on an already displayed window. When changing between opaque and Liquid Glass modes, first remove the dashboard `Window` from composition so Compose disposes the old AWT window, then create the replacement with the new transparency mode. A `key(...)` alone is not enough if the live `Window` receives an updated `transparent` value first.
-- Do not force Linux Liquid Glass to Skiko `SOFTWARE_FAST`. Transparent fullscreen windows have failed there with `Failed to create Surface` / heap pressure; keep the default renderer unless a new fix is tested against `dwell show`.
-- Keep `-Dswing.bufferPerWindow=false` on Linux runs. Swing's per-window buffer strategy has failed on transparent dashboard windows with `OutOfMemoryError` while allocating AWT back buffers.
-- After creating a transparent `Window`, keep the AWT/Swing backing surfaces transparent too (`TransparentWindowSurface`) so Compose's translucent Console layer can reveal windows behind Dwell instead of an opaque Swing fill.
-- Liquid Glass blur behind other apps is compositor-owned. Dwell may request native blur only where the compositor exposes a supported path; currently that is KWin on KDE/Plasma X11 via `_KDE_NET_WM_BLUR_BEHIND_REGION`.
-- Do not use AWT `Robot`, screenshots, or captured desktop bitmaps to fake Liquid Glass. That creates stale, recursive, monitor-position-dependent backgrounds and is not live compositor blur.
-- GNOME/Wayland currently has no robust Java/Compose/Swing path for live blur-behind. There, Liquid Glass must degrade to a transparent window with Dwell's own translucent material/tint.
+- Keep `-Dswing.bufferPerWindow=false` on Linux runs unless a replacement is tested with `dwell show`; Swing's per-window buffer strategy previously hit AWT back-buffer heap pressure in dashboard smoke tests.
 - Console `Bordered` must keep the original main-branch visual treatment: the tile host is clipped/background only, and the visible outline comes from `ConsoleEditOverlay` idle chrome. Do not add a second host border for `Bordered`.
-- Widgets rendered inside Console Liquid Glass should use the console nested-surface helpers instead of opaque `DwellColors.Surface1` cards, so inner cards do not erase the glass backdrop.
 
 ### Runtime requirements
 

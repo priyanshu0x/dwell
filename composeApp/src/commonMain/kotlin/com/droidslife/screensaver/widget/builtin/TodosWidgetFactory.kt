@@ -987,7 +987,7 @@ private fun TodoRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val emptyCheckBackground = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.10f)
+    val emptyCheckBackground = consoleNestedSurfaceColor(DwellColors.Surface1)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1094,7 +1094,7 @@ private fun TodoRow(
 /** Small pill showing how many subtasks a task rolls up. */
 @Composable
 private fun SubtaskBadge(count: Int) {
-    val background = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+    val background = consoleNestedSurfaceColor(DwellColors.Surface1)
     val border = consoleNestedBorderColor()
     Box(
         modifier = Modifier
@@ -1277,7 +1277,7 @@ private fun TodoMatrix(
         }
         // Drag preview trailing the cursor (offset so it doesn't sit under it).
         dragging?.let { todo ->
-            val previewBg = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.28f)
+            val previewBg = consoleNestedSurfaceColor(DwellColors.Surface1)
             Box(
                 modifier = Modifier
                     .offset { IntOffset(dragPos.x.toInt() + 10, dragPos.y.toInt() + 10) }
@@ -1321,7 +1321,7 @@ private fun QuadrantCell(
     val cellBackground = if (highlighted) {
         Color.White.copy(alpha = 0.05f)
     } else {
-        consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+        consoleNestedSurfaceColor(DwellColors.Surface1)
     }
     val cellBorder = if (highlighted) accent else consoleNestedBorderColor()
     Column(
@@ -1407,8 +1407,8 @@ private fun MatrixChip(
     onToggle: () -> Unit,
 ) {
     var chipCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val chipBackground = consoleNestedSurfaceColor(DwellColors.Surface0, liquidAlpha = 0.08f)
-    val emptyCheckBackground = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.10f)
+    val chipBackground = consoleNestedSurfaceColor(DwellColors.Surface0)
+    val emptyCheckBackground = consoleNestedSurfaceColor(DwellColors.Surface1)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1722,7 +1722,7 @@ private fun TodoDetailOverlay(
                     DwellFormLabel("Subtasks (${subtasks.size})")
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         subtasks.forEach { sub ->
-                            val subtaskBg = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+                            val subtaskBg = consoleNestedSurfaceColor(DwellColors.Surface1)
                             val subtaskBorder = consoleNestedBorderColor()
                             Row(
                                 modifier = Modifier

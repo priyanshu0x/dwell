@@ -21,8 +21,6 @@ import com.droidslife.screensaver.settings.SettingsSidebar
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.settings.ShortcutsHelpDialog
 import com.droidslife.screensaver.settings.WidgetConfigDialog
-import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
-import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.theme.AppTheme
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import org.koin.compose.koinInject
@@ -81,13 +79,8 @@ internal fun App(
         }
     }
 
-    val transparentConsoleSurface =
-        settingsViewModel.settings.mode == Mode.Console &&
-            settingsViewModel.settings.consoleBackgroundStyle == ConsoleBackgroundStyle.LiquidGlass
-
     AppTheme(
         isDark = settingsViewModel.settings.isDarkTheme,
-        transparentSurface = transparentConsoleSurface,
     ) {
         AnimatedVisibility(
             visible = visible,

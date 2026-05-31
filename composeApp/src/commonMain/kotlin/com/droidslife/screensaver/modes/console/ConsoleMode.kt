@@ -27,8 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -36,7 +34,6 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
 import com.droidslife.screensaver.settings.ConsoleWidgetBorderStyle
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
@@ -83,8 +80,6 @@ fun ConsoleMode(
     }
 
     val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
-    val backgroundStyle = settingsViewModel.settings.consoleBackgroundStyle
-    val glassOpacity = settingsViewModel.settings.consoleLiquidGlassOpacityPercent.coerceIn(0, 100) / 100f
     val widgetBorderStyle = settingsViewModel.settings.consoleWidgetBorderStyle
     val locked = settingsViewModel.settings.dashboardLocked
     val editing = settingsViewModel.consoleEditMode
@@ -117,15 +112,11 @@ fun ConsoleMode(
     CompositionLocalProvider(
         LocalConsoleAccent provides accent,
         LocalConsoleWidgetBorderStyle provides widgetBorderStyle,
-        LocalConsoleSurfaceStyle provides ConsoleSurfaceStyle(
-            liquidGlass = backgroundStyle == ConsoleBackgroundStyle.LiquidGlass,
-            glassOpacity = glassOpacity,
-        ),
     ) {
         BoxWithConstraints(
             modifier = modifier
                 .fillMaxSize()
-                .consoleBackground(backgroundStyle, accent, glassOpacity),
+                .consoleBackground(accent),
         ) {
             // Grid geometry mirrored from ConsoleGrid so tile-drag pixel deltas
             // map to the same cells the grid lays out.
@@ -146,7 +137,7 @@ fun ConsoleMode(
                 val instance = instances[id] ?: return@ConsoleGrid
                 val rect = orderedPlacements.getValue(id)
                 val isHovered = hoveredTile == id
-                val tileBaseColor = consoleTileBaseColor(backgroundStyle, glassOpacity)
+                val tileBaseColor = DwellColors.Surface1
                 val targetBg = if (isHovered) {
                     Color.White.copy(alpha = 0.04f).compositeOver(tileBaseColor)
                 } else tileBaseColor
@@ -281,54 +272,11 @@ fun ConsoleMode(
 }
 
 private fun Modifier.consoleBackground(
-    style: ConsoleBackgroundStyle,
     accent: ConsoleAccent,
-    glassOpacity: Float,
-): Modifier = when (style) {
-    ConsoleBackgroundStyle.Solid -> background(DwellColors.Surface0)
-    ConsoleBackgroundStyle.LiquidGlass -> background(DwellColors.Surface0.copy(alpha = glassOpacity))
-        .drawBehind {
-            if (glassOpacity <= 0f) return@drawBehind
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.08f * glassOpacity),
-                        accent.primary.copy(alpha = 0.06f * glassOpacity),
-                        Color.Transparent,
-                    ),
-                    start = Offset(0f, 0f),
-                    end = Offset(size.width, size.height),
-                ),
-            )
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.White.copy(alpha = 0.035f * glassOpacity),
-                        Color.Transparent,
-                    ),
-                    start = Offset(0f, size.height * 0.12f),
-                    end = Offset(size.width, size.height * 0.68f),
-                ),
-            )
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        DwellColors.Surface0.copy(alpha = 0.18f * glassOpacity),
-                        Color.Transparent,
-                        accent.primary.copy(alpha = 0.05f * glassOpacity),
-                    ),
-                    start = Offset(size.width, 0f),
-                    end = Offset(0f, size.height),
-                ),
-            )
+): Modifier = background(DwellColors.Surface0)
+    .drawBehind {
+        drawRect(color = accent.primary.copy(alpha = 0.018f))
     }
-}
-
-private fun consoleTileBaseColor(style: ConsoleBackgroundStyle, glassOpacity: Float): Color = when (style) {
-    ConsoleBackgroundStyle.Solid -> DwellColors.Surface1
-    ConsoleBackgroundStyle.LiquidGlass -> DwellColors.Surface1.copy(alpha = glassOpacity)
-}
 
 private fun Modifier.consoleTileChrome(
     backgroundColor: Color,

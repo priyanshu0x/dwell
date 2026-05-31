@@ -448,9 +448,9 @@ private fun StripCell(
     modifier: Modifier = Modifier,
 ) {
     val bg = if (isToday) {
-        consoleNestedSurfaceColor(accent.copy(alpha = 0.16f), liquidAlpha = 0.16f)
+        consoleNestedSurfaceColor(accent.copy(alpha = 0.16f))
     } else {
-        consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.10f)
+        consoleNestedSurfaceColor(DwellColors.Surface1)
     }
     val clickable = firstEventUrl.isNotBlank()
     Column(
