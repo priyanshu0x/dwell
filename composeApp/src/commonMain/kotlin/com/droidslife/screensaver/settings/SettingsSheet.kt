@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.settings.sections.AboutSection
 import com.droidslife.screensaver.settings.sections.DisplaySection
+import com.droidslife.screensaver.settings.sections.ProfilesSection
 import com.droidslife.screensaver.settings.sections.SyncSection
 import com.droidslife.screensaver.settings.sections.TriggersSection
 import com.droidslife.screensaver.settings.sections.WidgetsSection
@@ -57,6 +58,7 @@ import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlin.math.min
 
 private enum class SettingsTab(val label: String) {
+    Profiles("Profiles"),
     Display("Display"),
     Widgets("Widgets"),
     Triggers("Triggers"),
@@ -166,7 +168,7 @@ private fun SidebarPanel(
             }
 
             // Sticky tab row
-            var selectedTab by remember { mutableStateOf(SettingsTab.Display) }
+            var selectedTab by remember { mutableStateOf(SettingsTab.Profiles) }
             TabPillRow(
                 tabs = SettingsTab.entries,
                 selected = selectedTab,
@@ -188,6 +190,7 @@ private fun SidebarPanel(
                         .padding(horizontal = 24.dp, vertical = 24.dp),
                 ) {
                     when (selectedTab) {
+                        SettingsTab.Profiles -> ProfilesSection(settingsViewModel)
                         SettingsTab.Display -> DisplaySection(settingsViewModel)
                         SettingsTab.Widgets -> WidgetsSection(settingsViewModel, widgetRegistry)
                         SettingsTab.Triggers -> TriggersSection(settingsViewModel)

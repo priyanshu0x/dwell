@@ -24,6 +24,13 @@ enum class ConsoleWidgetBorderStyle { Bordered, Borderless, Shadow }
 @Serializable
 data class SettingsModel(
     /**
+     * Selected manual profile. Profile application copies profile-controlled
+     * fields into this settings model; users who never switch profiles keep
+     * reading and writing the same top-level fields as before.
+     */
+    val activeProfileId: String = PROFILE_CURRENT_ID,
+
+    /**
      * Whether the app should use dark theme.
      */
     val isDarkTheme: Boolean = true,
