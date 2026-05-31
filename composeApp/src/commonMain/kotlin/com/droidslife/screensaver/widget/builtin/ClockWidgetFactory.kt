@@ -82,7 +82,6 @@ private const val VARIANT_WEATHER_ONLY = "weather"
 
 private val MockPanel = Color(0xFF101014)
 private val MockStroke = Color(0xFF315F74)
-private val MockBlue = Color(0xFF8AB4FF)
 private val MockMint = Color(0xFFA9DFAD)
 
 class ClockWidgetFactory(
@@ -372,7 +371,8 @@ private fun ConsoleVariant(
     sideBySide: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    MockFrame(modifier = modifier, accent = MockBlue, variant = MockVariant.Console) {
+    val accent = LocalConsoleAccent.current.primary
+    MockFrame(modifier = modifier, accent = accent, variant = MockVariant.Console) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
@@ -385,7 +385,7 @@ private fun ConsoleVariant(
                 Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(MockBlue.copy(alpha = 0.16f)),
+                    .background(accent.copy(alpha = 0.16f)),
             )
 
             // Inner console-screen takes all the slack between the header and the
@@ -397,7 +397,7 @@ private fun ConsoleVariant(
                     .weight(1f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.White.copy(alpha = 0.025f))
-                    .border(1.dp, DwellColors.TextLow.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+                    .border(1.dp, accent.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
                     .padding(if (compact) 12.dp else 18.dp),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
             ) {
@@ -448,7 +448,7 @@ private fun ConsoleVariant(
                 ForecastStrip(
                     days = forecastDays,
                     dense = compact,
-                    accent = MockBlue,
+                    accent = accent,
                     showIcon = false,
                     stackHighLow = compact,
                     modifier = Modifier.fillMaxWidth(),
@@ -698,10 +698,14 @@ private fun WeatherCard(
 }
 
 @Composable
-private fun WeatherTemperature(weather: WeatherSnapshot, fontSize: TextUnit) {
+private fun WeatherTemperature(
+    weather: WeatherSnapshot,
+    fontSize: TextUnit,
+    accent: Color = MockMint,
+) {
     Text(
         text = weather.temperature,
-        color = if (weather.isLive) MockMint else DwellColors.TextHigh,
+        color = if (weather.isLive) accent else DwellColors.TextHigh,
         fontFamily = DwellFonts.jetBrainsMono(),
         fontWeight = FontWeight.Light,
         fontSize = fontSize,
@@ -856,11 +860,9 @@ private fun ConsoleWeatherReadout(
     weather: WeatherSnapshot,
     modifier: Modifier = Modifier,
 ) {
+    val accent = LocalConsoleAccent.current.primary
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.024f))
-            .border(1.dp, DwellColors.TextLow.copy(alpha = 0.14f), RoundedCornerShape(12.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -879,8 +881,8 @@ private fun ConsoleWeatherReadout(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    WeatherTemperature(weather, fontSize = 46.sp)
-                    StatusPill(weather.condition, dotIsLive = weather.isLive)
+                    WeatherTemperature(weather, fontSize = 46.sp, accent = accent)
+                    StatusPill(weather.condition, dotIsLive = weather.isLive, accent = accent)
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -911,8 +913,8 @@ private fun ConsoleWeatherReadout(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        WeatherTemperature(weather, fontSize = 42.sp)
-                        StatusPill(weather.condition, dotIsLive = weather.isLive)
+                        WeatherTemperature(weather, fontSize = 42.sp, accent = accent)
+                        StatusPill(weather.condition, dotIsLive = weather.isLive, accent = accent)
                     }
                     Text(
                         text = weather.subtitleDetails,
@@ -951,12 +953,16 @@ private fun ConsoleLabel(text: String) {
 }
 
 @Composable
-private fun StatusPill(label: String, dotIsLive: Boolean = true) {
+private fun StatusPill(
+    label: String,
+    dotIsLive: Boolean = true,
+    accent: Color = MockMint,
+) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(MockMint.copy(alpha = 0.08f))
-            .border(1.dp, MockMint.copy(alpha = 0.26f), RoundedCornerShape(999.dp))
+            .background(accent.copy(alpha = 0.08f))
+            .border(1.dp, accent.copy(alpha = 0.26f), RoundedCornerShape(999.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -965,7 +971,7 @@ private fun StatusPill(label: String, dotIsLive: Boolean = true) {
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(if (dotIsLive) MockMint else DwellColors.TextLow),
+                .background(if (dotIsLive) accent else DwellColors.TextLow),
         )
         Text(
             text = label,
@@ -1004,8 +1010,8 @@ private fun ForecastStrip(
     }
 }
 
-// (ConsoleForecast removed — Console now uses ForecastStrip with
-// `accent = MockBlue, showIcon = false, stackHighLow = compact`.)
+// (ConsoleForecast removed — Console now uses ForecastStrip with the active
+// console accent, no weather icon, and stacked high/low values in compact tiles.)
 
 @Composable
 private fun ForecastDayCard(

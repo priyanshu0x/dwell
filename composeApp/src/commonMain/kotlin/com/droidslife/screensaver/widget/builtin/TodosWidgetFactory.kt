@@ -1290,7 +1290,7 @@ private fun TodoMatrix(
                 Text(
                     text = renderTaskMarkdown(todo.text, accent),
                     fontFamily = DwellFonts.interTight(),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = DwellColors.TextHigh,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1457,7 +1457,7 @@ private fun MatrixChip(
             text = renderTaskMarkdown(todo.text, DwellColors.TextMid),
             modifier = Modifier.weight(1f),
             fontFamily = DwellFonts.interTight(),
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             color = DwellColors.TextHigh,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

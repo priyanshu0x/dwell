@@ -241,4 +241,5 @@ private fun AmbientVariant.label(): String = when (this) {
 private fun ConsoleVariant.label(): String = when (this) {
     ConsoleVariant.Standard -> "Standard"
     ConsoleVariant.Amber -> "Amber"
+    ConsoleVariant.Dark -> "Dark"
 }

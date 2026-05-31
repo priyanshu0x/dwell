@@ -10,17 +10,21 @@ import com.droidslife.screensaver.ui.DwellColors
 /** Per-variant accent tokens for Console mode. */
 data class ConsoleAccent(
     val primary: Color,
-    val tileBorderTint: Color,
+    val tileHoverOverlay: Color,
 )
 
 fun consoleAccentFor(variant: ConsoleVariant): ConsoleAccent = when (variant) {
     ConsoleVariant.Standard -> ConsoleAccent(
         primary = DwellColors.ConsoleGreen,
-        tileBorderTint = Color.Transparent,
+        tileHoverOverlay = DwellColors.ConsoleGreen.copy(alpha = 0.035f),
     )
     ConsoleVariant.Amber -> ConsoleAccent(
         primary = DwellColors.ConsoleAmber,
-        tileBorderTint = DwellColors.ConsoleAmber.copy(alpha = 0.02f),
+        tileHoverOverlay = DwellColors.ConsoleAmber.copy(alpha = 0.04f),
+    )
+    ConsoleVariant.Dark -> ConsoleAccent(
+        primary = Color(0xFFB8BCC7),
+        tileHoverOverlay = Color.White.copy(alpha = 0.04f),
     )
 }
 
@@ -30,7 +34,10 @@ fun consoleAccentFor(variant: ConsoleVariant): ConsoleAccent = when (variant) {
  * to know about [ConsoleVariant] directly. Default falls back to Standard green.
  */
 val LocalConsoleAccent = compositionLocalOf<ConsoleAccent> {
-    ConsoleAccent(primary = DwellColors.ConsoleGreen, tileBorderTint = Color.Transparent)
+    ConsoleAccent(
+        primary = DwellColors.ConsoleGreen,
+        tileHoverOverlay = DwellColors.ConsoleGreen.copy(alpha = 0.035f),
+    )
 }
 
 val LocalConsoleWidgetBorderStyle = compositionLocalOf<ConsoleWidgetBorderStyle?> { null }

@@ -53,7 +53,8 @@ import kotlin.math.roundToInt
 private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
-private val PADDING = 32.dp
+private val PADDING = 16.dp
+private val BOTTOM_PADDING = 32.dp
 private val HANDLE_SIZE = 16.dp
 
 /**
@@ -80,11 +81,13 @@ fun ConsoleEditOverlay(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val accent = LocalConsoleAccent.current.primary
         val density = LocalDensity.current
         val paddingPx = with(density) { PADDING.toPx() }
+        val bottomPaddingPx = with(density) { BOTTOM_PADDING.toPx() }
         val gapPx = with(density) { GAP.toPx() }
         val innerW = (constraints.maxWidth - paddingPx * 2f).coerceAtLeast(0f)
-        val innerH = (constraints.maxHeight - paddingPx * 2f).coerceAtLeast(0f)
+        val innerH = (constraints.maxHeight - paddingPx - bottomPaddingPx).coerceAtLeast(0f)
         val cellW = ((innerW - gapPx * (COLS - 1)) / COLS).coerceAtLeast(0f)
         val cellH = ((innerH - gapPx * (ROWS - 1)) / ROWS).coerceAtLeast(0f)
         val stepX = cellW + gapPx
@@ -136,7 +139,7 @@ fun ConsoleEditOverlay(
                         val sw = 1.dp.toPx()
                         val r = 12.dp.toPx()
                         drawRoundRect(
-                            color = DwellColors.LumenCyan.copy(alpha = 0.35f),
+                            color = accent.copy(alpha = 0.35f),
                             topLeft = Offset(sw / 2, sw / 2),
                             size = Size(size.width - sw, size.height - sw),
                             cornerRadius = CornerRadius(r, r),
@@ -152,10 +155,10 @@ fun ConsoleEditOverlay(
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(DwellColors.LumenCyan.copy(alpha = 0.14f))
+                    .background(accent.copy(alpha = 0.14f))
                     .border(
                         width = 1.dp,
-                        color = DwellColors.LumenCyan.copy(alpha = 0.45f),
+                        color = accent.copy(alpha = 0.45f),
                         shape = RoundedCornerShape(999.dp),
                     )
                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -164,7 +167,7 @@ fun ConsoleEditOverlay(
                     text = "EDIT LAYOUT  ·  L to exit  ·  drag to move  ·  ⌥ drag to resize",
                     fontSize = 10.sp,
                     letterSpacing = 0.25.sp,
-                    color = DwellColors.LumenCyan,
+                    color = accent,
                     fontFamily = DwellFonts.jetBrainsMono(),
                     fontWeight = FontWeight.Medium,
                 )
@@ -197,6 +200,7 @@ private fun EditTile(
     onResize: (id: String, rect: GridRect) -> Unit,
 ) {
     val density = LocalDensity.current
+    val accent = LocalConsoleAccent.current.primary
 
     val tileW = rect.cols * cellW + (rect.cols - 1) * gapPx
     val tileH = rect.rows * cellH + (rect.rows - 1) * gapPx
@@ -231,9 +235,9 @@ private fun EditTile(
             label = "edit-border-alpha",
         )
         val borderColor = when {
-            isActive -> DwellColors.LumenCyan
+            isActive -> accent
             settledCollides -> DwellColors.StatusError
-            else -> DwellColors.LumenCyan.copy(alpha = idleAlpha)
+            else -> accent.copy(alpha = idleAlpha)
         }
         val showBorder = isActive || settledCollides || showIdleChrome
         val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
@@ -270,7 +274,7 @@ private fun EditTile(
                 Text(
                     text = "${activeRect.cols}×${activeRect.rows}",
                     fontSize = 9.sp,
-                    color = DwellColors.LumenCyan,
+                    color = accent,
                     fontFamily = DwellFonts.jetBrainsMono(),
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier
@@ -281,7 +285,7 @@ private fun EditTile(
         }
 
         // Bottom-right resize handle — L-bracket per mode-mockups-v2.html:
-        // 16×16, inset 4px from the tile edge, 2px LumenCyan strokes on the
+        // 16×16, inset 4px from the tile edge, 2px accent strokes on the
         // right + bottom edges only, joined by an 8px arc. 0.5 alpha at rest,
         // 1.0 while actively dragging.
         val showResizeHandle = interactionsEnabled && (isActive || isHovered || showIdleChrome)
@@ -296,7 +300,7 @@ private fun EditTile(
                     if (!showResizeHandle) return@drawBehind
                     val sw = 2.dp.toPx()
                     val r = 8.dp.toPx()
-                    val color = DwellColors.LumenCyan.copy(
+                    val color = accent.copy(
                         alpha = if (isActive) 1f else 0.5f,
                     )
                     handlePath.reset()

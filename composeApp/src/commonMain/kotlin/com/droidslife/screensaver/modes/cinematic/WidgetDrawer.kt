@@ -80,7 +80,10 @@ fun BoxScope.WidgetDrawer(
         visible = visible,
         enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it },
         exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it },
-        modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 60.dp).fillMaxWidth(),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 60.dp)
+            .fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier

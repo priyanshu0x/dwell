@@ -97,6 +97,12 @@ fun DisplaySection(settingsViewModel: SettingsViewModel) {
                         onClick = { settingsViewModel.setConsoleVariant(ConsoleVariant.Amber) },
                         description = "Warm amber accent",
                     )
+                    RadioRow(
+                        label = "Dark",
+                        selected = settings.consoleVariant == ConsoleVariant.Dark,
+                        onClick = { settingsViewModel.setConsoleVariant(ConsoleVariant.Dark) },
+                        description = "Neutral graphite with no colored accent",
+                    )
                 }
             }
         }
