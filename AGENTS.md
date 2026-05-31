@@ -51,6 +51,9 @@ Built-in widgets are registered in `di/AppModule.kt` through factory singletons 
 ### Settings persistence
 `PreferencesRepositoryImpl.jvm.kt` persists settings with `kstore` through `SettingsFileCodec`, writing JSON to `~/.screensaver/settings.json`. The codec migrates legacy `currentCity` and `idleTimeoutMinutes` fields before decoding with `ignoreUnknownKeys = true`.
 
+### Profiles
+Profiles are persisted in `SettingsModel.profiles`; `SettingsModel.activeProfileId` selects the active profile. Keep profile behavior centralized in `ProfileModel.kt` and `SettingsViewModel`: applying a profile copies profile-controlled fields to top-level settings, and editing profile-controlled fields while a built-in/custom profile is active updates that active profile snapshot. Do not duplicate widget/provider secrets into profile records. Theme, tray/startup, backend, weather key IDs, widget configs, secret versions, and first-run state remain global. See `docs/profiles.md` before changing profile precedence.
+
 ### Keyboard shortcuts
 Defined centrally in `components/KeyEventHandler.kt`, dispatched as `KeyEventAction` sealed-class instances handled by `rememberWindowEventHandlers(...)`:
 

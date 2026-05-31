@@ -22,6 +22,15 @@ class ProfileModelTest {
     }
 
     @Test
+    fun normalizationMigratesEmptyProfileListToBuiltInRecords() {
+        val settings = SettingsModel().withNormalizedProfiles()
+
+        assertTrue(settings.profiles.any { it.id == PROFILE_WORK_ID && it.kind == ProfileKind.BuiltIn })
+        assertTrue(settings.profiles.any { it.id == PROFILE_PRESENTATION_ID && it.kind == ProfileKind.BuiltIn })
+        assertFalse(settings.profiles.any { it.id == PROFILE_CURRENT_ID })
+    }
+
+    @Test
     fun currentProfileReflectsExistingManualSettings() {
         val settings = SettingsModel(
             mode = Mode.Console,
@@ -63,5 +72,63 @@ class ProfileModelTest {
         assertEquals("backend.custom", applied.backendApiKeySecretId)
         assertEquals(settings.widgetConfigs, applied.widgetConfigs)
         assertEquals(settings.widgetSecretVersions, applied.widgetSecretVersions)
+    }
+
+    @Test
+    fun customProfilesCanBeCreatedRenamedAndDeleted() {
+        val created = SettingsModel(
+            mode = Mode.Console,
+            consoleVariant = ConsoleVariant.Dark,
+            enabledWidgetIds = setOf("custom.widget"),
+        ).createCustomProfileFromCurrent("Client Work")
+
+        val custom = assertNotNull(profileCatalogFor(created).firstOrNull { it.name == "Client Work" })
+        assertEquals(custom.id, created.activeProfileId)
+        assertEquals(Mode.Console, custom.settings.mode)
+        assertEquals(setOf("custom.widget"), custom.settings.enabledWidgetIds)
+
+        val renamed = created.renameCustomProfile(custom.id, "Deep Work")
+        assertEquals("Deep Work", assertNotNull(profileById(renamed, custom.id)).name)
+
+        val deleted = renamed.deleteCustomProfile(custom.id)
+        assertEquals(PROFILE_CURRENT_ID, deleted.activeProfileId)
+        assertFalse(profileCatalogFor(deleted).any { it.id == custom.id })
+    }
+
+    @Test
+    fun duplicateProfileCreatesStableCustomCopyAndAppliesIt() {
+        val duplicated = SettingsModel().duplicateProfile(PROFILE_PRESENTATION_ID)
+        val copy = assertNotNull(profileCatalogFor(duplicated).firstOrNull { it.id.startsWith("custom-presentation-copy") })
+
+        assertEquals(copy.id, duplicated.activeProfileId)
+        assertEquals(PROFILE_PRESENTATION_ID.let { assertNotNull(profileById(SettingsModel(), it)).settings }, copy.settings)
+        assertFalse("com.droidslife.screensaver.todos" in duplicated.enabledWidgetIds)
+    }
+
+    @Test
+    fun activeProfileSettingsSyncWhenProfileControlledFieldsChange() {
+        val active = SettingsModel()
+            .applyProfile(PROFILE_FOCUS_ID)
+            .copy(showSeconds = true, widgetConfigs = mapOf("widget" to JsonObject(mapOf("apiKey" to JsonPrimitive("secret")))))
+            .syncActiveProfileSettings()
+
+        val focus = assertNotNull(profileById(active, PROFILE_FOCUS_ID))
+        assertTrue(focus.settings.showSeconds)
+        assertEquals(active.widgetConfigs, mapOf("widget" to JsonObject(mapOf("apiKey" to JsonPrimitive("secret")))))
+    }
+
+    @Test
+    fun resetBuiltInProfileRestoresDefaultSettings() {
+        val changed = SettingsModel()
+            .applyProfile(PROFILE_FOCUS_ID)
+            .copy(consoleWidgetBorderStyle = ConsoleWidgetBorderStyle.Shadow)
+            .syncActiveProfileSettings()
+
+        assertEquals(ConsoleWidgetBorderStyle.Shadow, assertNotNull(profileById(changed, PROFILE_FOCUS_ID)).settings.consoleWidgetBorderStyle)
+
+        val reset = changed.resetBuiltInProfile(PROFILE_FOCUS_ID)
+        val focus = assertNotNull(profileById(reset, PROFILE_FOCUS_ID))
+        assertEquals(ConsoleWidgetBorderStyle.Borderless, focus.settings.consoleWidgetBorderStyle)
+        assertEquals(ConsoleWidgetBorderStyle.Borderless, reset.consoleWidgetBorderStyle)
     }
 }

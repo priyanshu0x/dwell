@@ -99,6 +99,7 @@ Reload installed widgets via the tray menu, Settings → Widgets → Reload, or 
 
 Open with `Ctrl+,` (or the gear icon at the bottom-right of the dashboard). Tabs:
 
+- **Profiles** — switch Work, Focus, Night, Presentation, Desk Clock, or custom profile snapshots.
 - **Display** — Mode (Cinematic / Ambient / Console), variant picker (per mode), clock format (12/24h), show-seconds, show-date.
 - **Widgets** — enable/disable each widget, per-widget config, "Edit Console layout" entry point.
 - **Triggers** — idle timeout, start-with-system, mouse-movement dismiss, exit-on-keypress.
@@ -106,6 +107,8 @@ Open with `Ctrl+,` (or the gear icon at the bottom-right of the dashboard). Tabs
 - **About** — version, license, links.
 
 City selection lives inside the Weather widget itself (not in global Settings).
+
+See [`docs/profiles.md`](docs/profiles.md) for profile precedence, built-in defaults, and privacy behavior.
 
 ## Weather setup
 

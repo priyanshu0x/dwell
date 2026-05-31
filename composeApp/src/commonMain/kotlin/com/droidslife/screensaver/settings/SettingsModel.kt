@@ -31,6 +31,12 @@ data class SettingsModel(
     val activeProfileId: String = PROFILE_CURRENT_ID,
 
     /**
+     * Persisted profile records. Built-in records are kept here too once the
+     * model is normalized so user edits can be reset deterministically.
+     */
+    val profiles: List<ProfileModel> = emptyList(),
+
+    /**
      * Whether the app should use dark theme.
      */
     val isDarkTheme: Boolean = true,
