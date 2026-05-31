@@ -1,5 +1,9 @@
 import androidx.compose.ui.window.application
+import com.droidslife.screensaver.ui.LinuxWindowManagerHints
 
-fun main() = application {
-    runDwell(devMode = true)
+fun main() {
+    LinuxWindowManagerHints.configureDwellAppClassName()
+    application {
+        runDwell(devMode = true)
+    }
 }

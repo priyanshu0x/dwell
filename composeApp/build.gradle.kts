@@ -5,6 +5,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Zip
@@ -53,6 +54,10 @@ val scrLauncherName = "$appDisplayName.scr"
 val composeCompilerReportsEnabled = providers.gradleProperty("composeCompilerReports")
     .map(String::toBoolean)
     .orElse(false)
+val dwellDesktopJvmArgs = listOf(
+    "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+    "-Dsun.awt.X11.XWMClass=Dwell",
+)
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -138,7 +143,7 @@ compose.desktop {
 
             // JVM options
             modules("java.sql")
-            jvmArgs("-Xms256m", "-Xmx2g")
+            jvmArgs("-Xms256m", "-Xmx2g", *dwellDesktopJvmArgs.toTypedArray())
 
             linux {
                 iconFile.set(project.file("desktopAppIcons/LinuxIcon.png"))
@@ -169,6 +174,10 @@ tasks.configureEach {
             delete(layout.buildDirectory.dir("compose/binaries/main/app"))
         }
     }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs(dwellDesktopJvmArgs)
 }
 
 tasks.named<ComposeHotRun>("hotRunJvm") {

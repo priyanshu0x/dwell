@@ -64,7 +64,7 @@ private class JvmStartupRegistration : StartupRegistration {
             appendLine("Exec=${desktopExecCommand(appCommand(), "--daemon")}")
             appendLine("Icon=dwell-real")
             appendLine("StartupWMClass=Dwell")
-            appendLine("StartupNotify=true")
+            appendLine("StartupNotify=false")
             appendLine("X-GNOME-Autostart-enabled=true")
             appendLine("Terminal=false")
         })
