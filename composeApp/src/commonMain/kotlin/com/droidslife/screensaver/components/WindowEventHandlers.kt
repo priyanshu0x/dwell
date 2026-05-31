@@ -7,7 +7,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.widget.host.WidgetRegistry
@@ -123,13 +128,43 @@ fun rememberWindowEventHandlers(
     val keyEventHandler = rememberKeyEventHandler(
         onAction = onAction,
     )
+    val rightClickDismissActive = isRightClickDismissActive(
+        settingEnabled = settingsViewModel.settings.rightClickHidesDashboard,
+        settingsDialogOpen = settingsViewModel.isSettingsDialogOpen,
+        widgetConfigOpen = settingsViewModel.openWidgetConfigId != null,
+        helpDialogOpen = showHelpDialog,
+    )
 
     return WindowEventHandlers(
         keyEventHandler = keyEventHandler,
-        mouseEventModifier = Modifier,
+        mouseEventModifier = Modifier.rightClickDismiss(rightClickDismissActive) {
+            onAction(KeyEventAction.RequestExit)
+        },
         toastState = toastState,
         showHelpDialog = showHelpDialog,
         onHelpDialogDismiss = { showHelpDialog = false },
         onShowHelpDialog = { showHelpDialog = true },
     )
+}
+
+internal fun isRightClickDismissActive(
+    settingEnabled: Boolean,
+    settingsDialogOpen: Boolean,
+    widgetConfigOpen: Boolean,
+    helpDialogOpen: Boolean,
+): Boolean =
+    settingEnabled && !settingsDialogOpen && !widgetConfigOpen && !helpDialogOpen
+
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.rightClickDismiss(
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+): Modifier {
+    if (!enabled) return this
+    return onPointerEvent(PointerEventType.Press, pass = PointerEventPass.Final) { event ->
+        if (event.button == PointerButton.Secondary && event.changes.none { it.isConsumed }) {
+            event.changes.forEach { it.consume() }
+            onDismiss()
+        }
+    }
 }

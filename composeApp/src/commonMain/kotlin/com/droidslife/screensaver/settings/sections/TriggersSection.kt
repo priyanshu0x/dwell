@@ -59,6 +59,12 @@ fun TriggersSection(settingsViewModel: SettingsViewModel) {
                 description = "Any key (besides shortcuts) dismisses the dashboard",
             )
             ToggleRow(
+                label = "Right-click hides dashboard",
+                checked = settings.rightClickHidesDashboard,
+                onCheckedChange = settingsViewModel::setRightClickHidesDashboard,
+                description = "Secondary-click anywhere on the dashboard to dismiss it",
+            )
+            ToggleRow(
                 label = "Lock dashboard layout",
                 checked = settings.dashboardLocked,
                 onCheckedChange = settingsViewModel::setDashboardLocked,

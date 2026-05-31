@@ -89,7 +89,7 @@ internal fun App(
             exit = fadeOut(tween(400)),
         ) {
             if (settingsViewModel.settingsLoaded) {
-                Box(modifier = modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize().then(modifier)) {
                     ModeHost(
                         settingsViewModel = settingsViewModel,
                         registry = widgetRegistry,
