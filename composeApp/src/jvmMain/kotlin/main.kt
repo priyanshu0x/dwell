@@ -36,6 +36,7 @@ import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
 import com.droidslife.screensaver.settings.Mode
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
+import com.droidslife.screensaver.ui.LinuxLiquidGlassHints
 import com.droidslife.screensaver.ui.LinuxWindowManagerHints
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
@@ -300,6 +301,7 @@ private fun ApplicationScope.runDwellContent(
             ) {
                 DisposableEffect(window) {
                     LinuxWindowManagerHints.applyDwellWindowHints(window)
+                    LinuxLiquidGlassHints.applyBlurBehind(window, enabled = usesTransparentWindow)
 
                     fun refreshMinimizedState() {
                         windowMinimized = (window.extendedState and Frame.ICONIFIED) != 0
@@ -339,6 +341,7 @@ private fun ApplicationScope.runDwellContent(
 
                             override fun componentResized(event: ComponentEvent) {
                                 saveDevWindowBounds(window)
+                                LinuxLiquidGlassHints.applyBlurBehind(window, enabled = usesTransparentWindow)
                             }
                         }
 

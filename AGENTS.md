@@ -28,6 +28,7 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 - `Window(transparent = true)` must be paired with `undecorated = true`; Compose Desktop enforces this in `ComposeWindowPanel.setWindowTransparent`.
 - Do not toggle `Window.transparent` on an already displayed window. When changing between opaque and Liquid Glass modes, first remove the dashboard `Window` from composition so Compose disposes the old AWT window, then create the replacement with the new transparency mode. A `key(...)` alone is not enough if the live `Window` receives an updated `transparent` value first.
 - Linux Liquid Glass runs with Skiko `SOFTWARE_FAST`; Skiko's default Linux `OPENGL` redrawer has crashed during transparent-window recreation.
+- Liquid Glass blur behind other apps is compositor-owned. On Linux/X11, Dwell requests KWin blur with `_KDE_NET_WM_BLUR_BEHIND_REGION`; unsupported compositors will still show the app-side translucent tint without real background blur.
 
 ### Runtime requirements
 

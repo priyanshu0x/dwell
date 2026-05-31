@@ -252,6 +252,7 @@ fun ConsoleMode(
                     onHover = { id -> hoveredTile = id },
                     onFocus = { id -> lastFocused = id },
                     showBanner = showEditChrome,
+                    showIdleChrome = showEditChrome,
                     onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     modifier = Modifier.fillMaxSize(),

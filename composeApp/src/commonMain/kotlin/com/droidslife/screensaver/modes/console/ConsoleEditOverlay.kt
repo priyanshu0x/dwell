@@ -75,6 +75,7 @@ fun ConsoleEditOverlay(
     onHover: (String?) -> Unit = {},
     onFocus: (String) -> Unit = {},
     showBanner: Boolean = true,
+    showIdleChrome: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -109,6 +110,7 @@ fun ConsoleEditOverlay(
                     isHovered = hoveredTile == id,
                     onHover = onHover,
                     onFocus = onFocus,
+                    showIdleChrome = showIdleChrome,
                     onMove = onMove,
                     onResize = onResize,
                 )
@@ -187,6 +189,7 @@ private fun EditTile(
     isHovered: Boolean,
     onHover: (String?) -> Unit,
     onFocus: (String) -> Unit,
+    showIdleChrome: Boolean,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
 ) {
@@ -229,6 +232,7 @@ private fun EditTile(
             settledCollides -> DwellColors.StatusError
             else -> DwellColors.LumenCyan.copy(alpha = idleAlpha)
         }
+        val showBorder = isActive || settledCollides || showIdleChrome
         val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
         Box(
             modifier = Modifier
@@ -242,6 +246,7 @@ private fun EditTile(
                     else Modifier,
                 )
                 .drawBehind {
+                    if (!showBorder) return@drawBehind
                     val strokeWidth = 1.5.dp.toPx()
                     val r = 12.dp.toPx()
                     drawRoundRect(
@@ -276,6 +281,7 @@ private fun EditTile(
         // 16×16, inset 4px from the tile edge, 2px LumenCyan strokes on the
         // right + bottom edges only, joined by an 8px arc. 0.5 alpha at rest,
         // 1.0 while actively dragging.
+        val showResizeHandle = isActive || isHovered || showIdleChrome
         val handlePath = remember { Path() }
         Box(
             modifier = Modifier
@@ -284,6 +290,7 @@ private fun EditTile(
                 .size(HANDLE_SIZE)
                 .pointerHoverIcon(ResizeSEPointerIcon)
                 .drawBehind {
+                    if (!showResizeHandle) return@drawBehind
                     val sw = 2.dp.toPx()
                     val r = 8.dp.toPx()
                     val color = DwellColors.LumenCyan.copy(
