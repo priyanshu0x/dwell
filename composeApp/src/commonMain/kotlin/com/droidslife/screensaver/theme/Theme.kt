@@ -1,11 +1,13 @@
 package com.droidslife.screensaver.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
@@ -106,7 +108,13 @@ internal fun AppTheme(
         // rare user action and matches MaterialTheme's CompositionLocal model.
         MaterialTheme(
             colorScheme = if (currentIsDark) DarkColorScheme else LightColorScheme,
-            content = { Surface(content = content) }
+            content = {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surface,
+                    content = content,
+                )
+            }
         )
     }
 }

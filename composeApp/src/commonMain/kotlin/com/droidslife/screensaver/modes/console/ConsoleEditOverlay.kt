@@ -75,6 +75,8 @@ fun ConsoleEditOverlay(
     onHover: (String?) -> Unit = {},
     onFocus: (String) -> Unit = {},
     showBanner: Boolean = true,
+    showIdleChrome: Boolean = true,
+    interactionsEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -109,6 +111,8 @@ fun ConsoleEditOverlay(
                     isHovered = hoveredTile == id,
                     onHover = onHover,
                     onFocus = onFocus,
+                    showIdleChrome = showIdleChrome,
+                    interactionsEnabled = interactionsEnabled,
                     onMove = onMove,
                     onResize = onResize,
                 )
@@ -187,6 +191,8 @@ private fun EditTile(
     isHovered: Boolean,
     onHover: (String?) -> Unit,
     onFocus: (String) -> Unit,
+    showIdleChrome: Boolean,
+    interactionsEnabled: Boolean,
     onMove: (id: String, rect: GridRect) -> Unit,
     onResize: (id: String, rect: GridRect) -> Unit,
 ) {
@@ -229,6 +235,7 @@ private fun EditTile(
             settledCollides -> DwellColors.StatusError
             else -> DwellColors.LumenCyan.copy(alpha = idleAlpha)
         }
+        val showBorder = isActive || settledCollides || showIdleChrome
         val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
         Box(
             modifier = Modifier
@@ -238,10 +245,11 @@ private fun EditTile(
                 // is purely the visual border + grab cursor while a drag runs, and
                 // must NOT capture pointer events or it would swallow those taps.
                 .then(
-                    if (isActive) Modifier.pointerHoverIcon(GrabbingPointerIcon)
+                    if (interactionsEnabled && isActive) Modifier.pointerHoverIcon(GrabbingPointerIcon)
                     else Modifier,
                 )
                 .drawBehind {
+                    if (!showBorder) return@drawBehind
                     val strokeWidth = 1.5.dp.toPx()
                     val r = 12.dp.toPx()
                     drawRoundRect(
@@ -276,14 +284,16 @@ private fun EditTile(
         // 16×16, inset 4px from the tile edge, 2px LumenCyan strokes on the
         // right + bottom edges only, joined by an 8px arc. 0.5 alpha at rest,
         // 1.0 while actively dragging.
+        val showResizeHandle = interactionsEnabled && (isActive || isHovered || showIdleChrome)
         val handlePath = remember { Path() }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .offset(x = (-4).dp, y = (-4).dp)
                 .size(HANDLE_SIZE)
-                .pointerHoverIcon(ResizeSEPointerIcon)
+                .then(if (interactionsEnabled) Modifier.pointerHoverIcon(ResizeSEPointerIcon) else Modifier)
                 .drawBehind {
+                    if (!showResizeHandle) return@drawBehind
                     val sw = 2.dp.toPx()
                     val r = 8.dp.toPx()
                     val color = DwellColors.LumenCyan.copy(
@@ -310,54 +320,60 @@ private fun EditTile(
                         style = Stroke(width = sw, cap = StrokeCap.Round),
                     )
                 }
-                .pointerInput(id, rect, stepX, stepY, constraint) {
-                    detectDragGestures(
-                        onDragStart = {
-                            ghosts[id] = rect
-                            liveDrags[id] = TileLiveDrag.Zero
-                            onFocus(id)
-                        },
-                        onDrag = { change, drag ->
-                            change.consume()
-                            val prev = liveDrags[id] ?: TileLiveDrag.Zero
-                            val safeStepX = if (stepX > 0f) stepX else 1f
-                            val safeStepY = if (stepY > 0f) stepY else 1f
-                            val maxColsAtPos = COLS - rect.col
-                            val maxCols = minOf(constraint.maxCols, maxColsAtPos)
-                            val maxRowsAtPos = ROWS - rect.row
-                            val maxRows = minOf(constraint.maxRows, maxRowsAtPos)
-                            // Pixel size bounds derived from cols/rows limits.
-                            val minPxW = constraint.minCols * cellW + (constraint.minCols - 1) * gapPx - tileW
-                            val maxPxW = maxCols * cellW + (maxCols - 1) * gapPx - tileW
-                            val minPxH = constraint.minRows * cellH + (constraint.minRows - 1) * gapPx - tileH
-                            val maxPxH = maxRows * cellH + (maxRows - 1) * gapPx - tileH
-                            val newDw = (prev.dw + drag.x).coerceIn(minPxW, maxPxW)
-                            val newDh = (prev.dh + drag.y).coerceIn(minPxH, maxPxH)
-                            liveDrags[id] = prev.copy(dw = newDw, dh = newDh)
-                            val dCols = (newDw / safeStepX).roundToInt()
-                            val dRows = (newDh / safeStepY).roundToInt()
-                            val newRows = (rect.rows + dRows).coerceIn(constraint.minRows, maxRows)
-                            // Stricter minCols may apply at certain row counts
-                            // (e.g. Clock+Weather forbids 5×3 — needs ≥6 cols at 3 rows).
-                            val rowAwareMinCols = constraint.effectiveMinCols(newRows)
-                            val newCols = (rect.cols + dCols).coerceIn(rowAwareMinCols, maxCols)
-                            ghosts[id] = rect.copy(cols = newCols, rows = newRows)
-                        },
-                        onDragEnd = {
-                            val finalRect = ghosts.remove(id)
-                            liveDrags.remove(id)
-                            if (finalRect != null && finalRect != rect &&
-                                !totallyOverlapsAny(id, finalRect, placements)
-                            ) {
-                                onResize(id, finalRect)
-                            }
-                        },
-                        onDragCancel = {
-                            ghosts.remove(id)
-                            liveDrags.remove(id)
-                        },
-                    )
-                },
+                .then(
+                    if (interactionsEnabled) {
+                        Modifier.pointerInput(id, rect, stepX, stepY, constraint) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    ghosts[id] = rect
+                                    liveDrags[id] = TileLiveDrag.Zero
+                                    onFocus(id)
+                                },
+                                onDrag = { change, drag ->
+                                    change.consume()
+                                    val prev = liveDrags[id] ?: TileLiveDrag.Zero
+                                    val safeStepX = if (stepX > 0f) stepX else 1f
+                                    val safeStepY = if (stepY > 0f) stepY else 1f
+                                    val maxColsAtPos = COLS - rect.col
+                                    val maxCols = minOf(constraint.maxCols, maxColsAtPos)
+                                    val maxRowsAtPos = ROWS - rect.row
+                                    val maxRows = minOf(constraint.maxRows, maxRowsAtPos)
+                                    // Pixel size bounds derived from cols/rows limits.
+                                    val minPxW = constraint.minCols * cellW + (constraint.minCols - 1) * gapPx - tileW
+                                    val maxPxW = maxCols * cellW + (maxCols - 1) * gapPx - tileW
+                                    val minPxH = constraint.minRows * cellH + (constraint.minRows - 1) * gapPx - tileH
+                                    val maxPxH = maxRows * cellH + (maxRows - 1) * gapPx - tileH
+                                    val newDw = (prev.dw + drag.x).coerceIn(minPxW, maxPxW)
+                                    val newDh = (prev.dh + drag.y).coerceIn(minPxH, maxPxH)
+                                    liveDrags[id] = prev.copy(dw = newDw, dh = newDh)
+                                    val dCols = (newDw / safeStepX).roundToInt()
+                                    val dRows = (newDh / safeStepY).roundToInt()
+                                    val newRows = (rect.rows + dRows).coerceIn(constraint.minRows, maxRows)
+                                    // Stricter minCols may apply at certain row counts
+                                    // (e.g. Clock+Weather forbids 5×3 — needs ≥6 cols at 3 rows).
+                                    val rowAwareMinCols = constraint.effectiveMinCols(newRows)
+                                    val newCols = (rect.cols + dCols).coerceIn(rowAwareMinCols, maxCols)
+                                    ghosts[id] = rect.copy(cols = newCols, rows = newRows)
+                                },
+                                onDragEnd = {
+                                    val finalRect = ghosts.remove(id)
+                                    liveDrags.remove(id)
+                                    if (finalRect != null && finalRect != rect &&
+                                        !totallyOverlapsAny(id, finalRect, placements)
+                                    ) {
+                                        onResize(id, finalRect)
+                                    }
+                                },
+                                onDragCancel = {
+                                    ghosts.remove(id)
+                                    liveDrags.remove(id)
+                                },
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
         )
     }
 }

@@ -262,6 +262,10 @@ class SettingsViewModel(
         updateSettings(settings.copy(consoleVariant = variant))
     }
 
+    fun setConsoleWidgetBorderStyle(style: ConsoleWidgetBorderStyle) {
+        updateSettings(settings.copy(consoleWidgetBorderStyle = style))
+    }
+
     fun setQuieterLumen(enabled: Boolean) {
         updateSettings(settings.copy(quieterLumen = enabled))
     }

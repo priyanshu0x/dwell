@@ -15,6 +15,9 @@ enum class AmbientVariant { Lumen, Borealis }
 @Serializable
 enum class ConsoleVariant { Standard, Amber }
 
+@Serializable
+enum class ConsoleWidgetBorderStyle { Bordered, Borderless, Shadow }
+
 /**
  * Model class for application settings.
  */
@@ -82,6 +85,7 @@ data class SettingsModel(
     val cinematicVariant: CinematicVariant = CinematicVariant.Dusk,
     val ambientVariant: AmbientVariant = AmbientVariant.Lumen,
     val consoleVariant: ConsoleVariant = ConsoleVariant.Standard,
+    val consoleWidgetBorderStyle: ConsoleWidgetBorderStyle = ConsoleWidgetBorderStyle.Bordered,
     val quieterLumen: Boolean = false,
     val showSeconds: Boolean = false,
     val showDate: Boolean = true,

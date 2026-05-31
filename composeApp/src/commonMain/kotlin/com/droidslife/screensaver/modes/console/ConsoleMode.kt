@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -32,6 +34,7 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.droidslife.screensaver.settings.ConsoleWidgetBorderStyle
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.CornerButtons
 import com.droidslife.screensaver.ui.DwellColors
@@ -77,6 +80,7 @@ fun ConsoleMode(
     }
 
     val accent = consoleAccentFor(settingsViewModel.settings.consoleVariant)
+    val widgetBorderStyle = settingsViewModel.settings.consoleWidgetBorderStyle
     val locked = settingsViewModel.settings.dashboardLocked
     val editing = settingsViewModel.consoleEditMode
     // Tiles are editable when the dashboard is unlocked, OR when the user has
@@ -105,8 +109,15 @@ fun ConsoleMode(
             (placements - focused) + (focused to placements.getValue(focused))
         } else placements
     }
-    CompositionLocalProvider(LocalConsoleAccent provides accent) {
-        BoxWithConstraints(modifier = modifier.fillMaxSize().background(DwellColors.Surface0)) {
+    CompositionLocalProvider(
+        LocalConsoleAccent provides accent,
+        LocalConsoleWidgetBorderStyle provides widgetBorderStyle,
+    ) {
+        BoxWithConstraints(
+            modifier = modifier
+                .fillMaxSize()
+                .consoleBackground(accent),
+        ) {
             // Grid geometry mirrored from ConsoleGrid so tile-drag pixel deltas
             // map to the same cells the grid lays out.
             val density = LocalDensity.current
@@ -126,16 +137,17 @@ fun ConsoleMode(
                 val instance = instances[id] ?: return@ConsoleGrid
                 val rect = orderedPlacements.getValue(id)
                 val isHovered = hoveredTile == id
+                val tileBaseColor = DwellColors.Surface1
                 val targetBg = if (isHovered) {
-                    Color.White.copy(alpha = 0.04f).compositeOver(DwellColors.Surface1)
-                } else DwellColors.Surface1
+                    Color.White.copy(alpha = 0.04f).compositeOver(tileBaseColor)
+                } else tileBaseColor
                 // Key the LaunchedEffect on a stable Boolean, NOT the target
                 // Color. Color is a value class backed by ULong; passing it to
                 // LaunchedEffect boxes it into a fresh Object each composition,
                 // making the effect relaunch (and cancel the tween) every frame
                 // — which is exactly what made hover feel instant.
-                val bgAnim = remember(id) { Animatable(DwellColors.Surface1) }
-                LaunchedEffect(isHovered) {
+                val bgAnim = remember(id, tileBaseColor) { Animatable(tileBaseColor) }
+                LaunchedEffect(isHovered, tileBaseColor) {
                     bgAnim.animateTo(
                         targetValue = targetBg,
                         animationSpec = tween(DwellMotion.TileHover, easing = DwellMotion.Emphasized),
@@ -148,8 +160,10 @@ fun ConsoleMode(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(DwellRadius.m))
-                        .background(backgroundColor)
+                        .consoleTileChrome(
+                            backgroundColor = backgroundColor,
+                            borderStyle = widgetBorderStyle,
+                        )
                         .onPointerEvent(PointerEventType.Enter) { hoveredTile = id }
                         .onPointerEvent(PointerEventType.Exit) {
                             if (hoveredTile == id) hoveredTile = null
@@ -219,7 +233,7 @@ fun ConsoleMode(
                     }
                 }
             }
-            if (tilesEditable) {
+            if (tilesEditable || widgetBorderStyle == ConsoleWidgetBorderStyle.Bordered) {
                 val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
                     instances.mapValues { it.value.descriptor.factory.preferredSize }
                 }
@@ -232,6 +246,8 @@ fun ConsoleMode(
                     onHover = { id -> hoveredTile = id },
                     onFocus = { id -> lastFocused = id },
                     showBanner = showEditChrome,
+                    showIdleChrome = showEditChrome || widgetBorderStyle == ConsoleWidgetBorderStyle.Bordered,
+                    interactionsEnabled = tilesEditable,
                     onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     modifier = Modifier.fillMaxSize(),
@@ -255,3 +271,28 @@ fun ConsoleMode(
     }
 }
 
+private fun Modifier.consoleBackground(
+    accent: ConsoleAccent,
+): Modifier = background(DwellColors.Surface0)
+    .drawBehind {
+        drawRect(color = accent.primary.copy(alpha = 0.018f))
+    }
+
+private fun Modifier.consoleTileChrome(
+    backgroundColor: Color,
+    borderStyle: ConsoleWidgetBorderStyle,
+): Modifier {
+    val shape = RoundedCornerShape(DwellRadius.m)
+    return when (borderStyle) {
+        ConsoleWidgetBorderStyle.Bordered -> this
+            .clip(shape)
+            .background(backgroundColor)
+        ConsoleWidgetBorderStyle.Borderless -> this
+            .clip(shape)
+            .background(backgroundColor)
+        ConsoleWidgetBorderStyle.Shadow -> this
+            .shadow(elevation = 18.dp, shape = shape, clip = false)
+            .clip(shape)
+            .background(backgroundColor)
+    }
+}

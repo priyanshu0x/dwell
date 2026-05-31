@@ -208,7 +208,16 @@ private fun ApplicationScope.runDwellContent(
         }
     }
 
-    if (dashboardVisible) {
+    if (dashboardVisible && !settingsViewModel.settingsLoaded) {
+        Window(
+            title = "Dwell",
+            icon = dwellWindowIcon,
+            visible = false,
+            onCloseRequest = {},
+        ) {}
+    }
+
+    if (dashboardVisible && settingsViewModel.settingsLoaded) {
         val windowEvents = rememberWindowEventHandlers(
             onExitApplication = requestDashboardExit,
             openSettingsOnStart = launchArgs.mode == LaunchMode.Config,
@@ -228,7 +237,6 @@ private fun ApplicationScope.runDwellContent(
                 ?: WindowPosition(Alignment.Center)
         }
         var windowMinimized by remember { mutableStateOf(false) }
-
         Window(
             title = "Dwell",
             icon = dwellWindowIcon,
@@ -241,7 +249,6 @@ private fun ApplicationScope.runDwellContent(
             resizable = devMode,
             alwaysOnTop = !windowMinimized,
             undecorated = !devMode,
-            transparent = !devMode,
             onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
         ) {
             DisposableEffect(window) {

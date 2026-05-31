@@ -1,7 +1,9 @@
 package com.droidslife.screensaver.modes.console
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.droidslife.screensaver.settings.ConsoleWidgetBorderStyle
 import com.droidslife.screensaver.settings.ConsoleVariant
 import com.droidslife.screensaver.ui.DwellColors
 
@@ -30,3 +32,15 @@ fun consoleAccentFor(variant: ConsoleVariant): ConsoleAccent = when (variant) {
 val LocalConsoleAccent = compositionLocalOf<ConsoleAccent> {
     ConsoleAccent(primary = DwellColors.ConsoleGreen, tileBorderTint = Color.Transparent)
 }
+
+val LocalConsoleWidgetBorderStyle = compositionLocalOf<ConsoleWidgetBorderStyle?> { null }
+
+@Composable
+fun consoleNestedSurfaceColor(
+    solid: Color = DwellColors.Surface1,
+): Color = solid
+
+@Composable
+fun consoleNestedBorderColor(
+    solid: Color = DwellColors.Stroke,
+): Color = solid

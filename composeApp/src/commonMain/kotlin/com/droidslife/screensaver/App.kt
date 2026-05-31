@@ -79,7 +79,9 @@ internal fun App(
         }
     }
 
-    AppTheme(isDark = settingsViewModel.settings.isDarkTheme) {
+    AppTheme(
+        isDark = settingsViewModel.settings.isDarkTheme,
+    ) {
         AnimatedVisibility(
             visible = visible,
             enter = fadeIn(tween(800)) + scaleIn(
