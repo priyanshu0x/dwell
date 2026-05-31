@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.modes.console.LocalConsoleWidgetBorderStyle
+import com.droidslife.screensaver.modes.console.consoleNestedSurfaceColor
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.ui.DwellRadius
@@ -26,10 +27,11 @@ import com.droidslife.screensaver.widget.api.WidgetSummary
 fun DefaultTileRender(s: WidgetSummary, modifier: Modifier = Modifier) {
     val consoleBorderStyle = LocalConsoleWidgetBorderStyle.current
     val shape = RoundedCornerShape(DwellRadius.m)
+    val background = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
     Column(
         modifier = modifier
             .clip(shape)
-            .background(DwellColors.Surface1)
+            .background(background)
             .then(
                 if (consoleBorderStyle == null) {
                     Modifier.border(1.dp, DwellColors.Stroke, shape)

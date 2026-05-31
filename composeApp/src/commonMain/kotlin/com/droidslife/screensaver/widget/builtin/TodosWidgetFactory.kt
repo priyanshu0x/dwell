@@ -85,6 +85,8 @@ import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.components.ShortcutPause
 import com.droidslife.screensaver.components.pausesShortcutsWhileFocused
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
+import com.droidslife.screensaver.modes.console.consoleNestedBorderColor
+import com.droidslife.screensaver.modes.console.consoleNestedSurfaceColor
 import com.droidslife.screensaver.network.BackendGateway
 import com.droidslife.screensaver.todos.providers.LocalTodosProvider
 import com.droidslife.screensaver.todos.providers.Todo
@@ -1091,11 +1093,13 @@ private fun TodoRow(
 /** Small pill showing how many subtasks a task rolls up. */
 @Composable
 private fun SubtaskBadge(count: Int) {
+    val background = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+    val border = consoleNestedBorderColor()
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(DwellColors.Surface1)
-            .border(1.dp, DwellColors.Stroke, RoundedCornerShape(4.dp))
+            .background(background)
+            .border(1.dp, border, RoundedCornerShape(4.dp))
             .padding(horizontal = 5.dp, vertical = 1.dp),
     ) {
         Text(
@@ -1272,11 +1276,12 @@ private fun TodoMatrix(
         }
         // Drag preview trailing the cursor (offset so it doesn't sit under it).
         dragging?.let { todo ->
+            val previewBg = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.28f)
             Box(
                 modifier = Modifier
                     .offset { IntOffset(dragPos.x.toInt() + 10, dragPos.y.toInt() + 10) }
                     .clip(RoundedCornerShape(6.dp))
-                    .background(DwellColors.Surface1)
+                    .background(previewBg)
                     .border(1.dp, accent, RoundedCornerShape(6.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
                     .alpha(0.95f),
@@ -1312,12 +1317,18 @@ private fun QuadrantCell(
     modifier: Modifier = Modifier,
 ) {
     val label = quadrantColor(quadrant, accent)
+    val cellBackground = if (highlighted) {
+        Color.White.copy(alpha = 0.05f)
+    } else {
+        consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+    }
+    val cellBorder = if (highlighted) accent else consoleNestedBorderColor()
     Column(
         modifier = modifier
             .onGloballyPositioned(onCoords)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (highlighted) Color.White.copy(alpha = 0.05f) else DwellColors.Surface1)
-            .border(1.dp, if (highlighted) accent else DwellColors.Stroke, RoundedCornerShape(8.dp))
+            .background(cellBackground)
+            .border(1.dp, cellBorder, RoundedCornerShape(8.dp))
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -1708,12 +1719,14 @@ private fun TodoDetailOverlay(
                     DwellFormLabel("Subtasks (${subtasks.size})")
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         subtasks.forEach { sub ->
+                            val subtaskBg = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.12f)
+                            val subtaskBorder = consoleNestedBorderColor()
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(DwellColors.Surface1)
-                                    .border(1.dp, DwellColors.Stroke, RoundedCornerShape(10.dp))
+                                    .background(subtaskBg)
+                                    .border(1.dp, subtaskBorder, RoundedCornerShape(10.dp))
                                     .clickable { onToggleSubtask(sub) }
                                     .padding(horizontal = 10.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,

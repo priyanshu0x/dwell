@@ -4,7 +4,6 @@ import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -122,6 +121,10 @@ fun ConsoleMode(
     CompositionLocalProvider(
         LocalConsoleAccent provides accent,
         LocalConsoleWidgetBorderStyle provides widgetBorderStyle,
+        LocalConsoleSurfaceStyle provides ConsoleSurfaceStyle(
+            liquidGlass = backgroundStyle == ConsoleBackgroundStyle.LiquidGlass,
+            glassOpacity = glassOpacity,
+        ),
     ) {
         BoxWithConstraints(
             modifier = modifier.fillMaxSize(),
@@ -248,7 +251,7 @@ fun ConsoleMode(
                     }
                 }
             }
-            if (tilesEditable) {
+            if (tilesEditable || widgetBorderStyle == ConsoleWidgetBorderStyle.Bordered) {
                 val sizeConstraints: Map<String, WidgetSize> = remember(instances) {
                     instances.mapValues { it.value.descriptor.factory.preferredSize }
                 }
@@ -261,7 +264,8 @@ fun ConsoleMode(
                     onHover = { id -> hoveredTile = id },
                     onFocus = { id -> lastFocused = id },
                     showBanner = showEditChrome,
-                    showIdleChrome = showEditChrome,
+                    showIdleChrome = showEditChrome || widgetBorderStyle == ConsoleWidgetBorderStyle.Bordered,
+                    interactionsEnabled = tilesEditable,
                     onMove = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     onResize = { id, rect -> settingsViewModel.setWidgetLayout(id, rect) },
                     modifier = Modifier.fillMaxSize(),
@@ -369,7 +373,6 @@ private fun Modifier.consoleTileChrome(
         ConsoleWidgetBorderStyle.Bordered -> this
             .clip(shape)
             .background(backgroundColor)
-            .border(1.dp, DwellColors.LumenCyan.copy(alpha = 0.48f), shape)
         ConsoleWidgetBorderStyle.Borderless -> this
             .clip(shape)
             .background(backgroundColor)

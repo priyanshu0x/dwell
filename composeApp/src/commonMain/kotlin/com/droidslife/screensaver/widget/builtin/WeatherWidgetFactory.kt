@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.components.WidgetStatusLine
 import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
+import com.droidslife.screensaver.modes.console.consoleNestedBorderColor
+import com.droidslife.screensaver.modes.console.consoleNestedSurfaceColor
 import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
@@ -325,8 +327,16 @@ private fun ForecastDayCard(
     modifier: Modifier = Modifier,
 ) {
     val accent = LocalConsoleAccent.current.primary
-    val bg = if (isToday) accent.copy(alpha = 0.10f) else DwellColors.Surface1.copy(alpha = 0.6f)
-    val border = if (isToday) accent.copy(alpha = 0.45f) else DwellColors.Stroke
+    val bg = if (isToday) {
+        consoleNestedSurfaceColor(accent.copy(alpha = 0.10f), liquidAlpha = 0.14f)
+    } else {
+        consoleNestedSurfaceColor(DwellColors.Surface1.copy(alpha = 0.6f), liquidAlpha = 0.10f)
+    }
+    val border = if (isToday) {
+        consoleNestedBorderColor(accent.copy(alpha = 0.45f), liquidAlpha = 0.32f)
+    } else {
+        consoleNestedBorderColor()
+    }
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))

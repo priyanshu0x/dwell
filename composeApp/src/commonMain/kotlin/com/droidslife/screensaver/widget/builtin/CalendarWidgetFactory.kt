@@ -41,6 +41,7 @@ import com.droidslife.screensaver.calendar.providers.IcsCalendarProvider
 import com.droidslife.screensaver.components.WidgetStatusLine
 import com.droidslife.screensaver.components.WidgetStatusSeverity
 import com.droidslife.screensaver.modes.console.LocalConsoleAccent
+import com.droidslife.screensaver.modes.console.consoleNestedSurfaceColor
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.ui.openLink
@@ -446,7 +447,11 @@ private fun StripCell(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    val bg = if (isToday) accent.copy(alpha = 0.16f) else DwellColors.Surface1
+    val bg = if (isToday) {
+        consoleNestedSurfaceColor(accent.copy(alpha = 0.16f), liquidAlpha = 0.16f)
+    } else {
+        consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.10f)
+    }
     val clickable = firstEventUrl.isNotBlank()
     Column(
         modifier = modifier
