@@ -46,6 +46,7 @@ import java.awt.event.ComponentEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.util.prefs.Preferences
+import javax.swing.SwingUtilities
 
 private const val IDLE_MONITOR_POLL_MS = 1_000L
 private const val DEV_WINDOW_DEFAULT_WIDTH_PX = 1280
@@ -306,11 +307,7 @@ private fun ApplicationScope.runDwellContent(
 
             LaunchedEffect(dashboardActivationRequest) {
                 if (dashboardActivationRequest > 0) {
-                    if ((window.extendedState and Frame.ICONIFIED) != 0) {
-                        window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
-                    }
-                    window.toFront()
-                    window.requestFocus()
+                    activateDashboardWindow(window)
                 }
             }
 
@@ -334,6 +331,28 @@ private fun ApplicationScope.runDwellContent(
             )
         }
     }
+}
+
+private fun activateDashboardWindow(window: java.awt.Window) {
+    fun attemptActivation() {
+        if (!window.isDisplayable) return
+        (window as? Frame)?.let { frame ->
+            if ((frame.extendedState and Frame.ICONIFIED) != 0) {
+                frame.extendedState = frame.extendedState and Frame.ICONIFIED.inv()
+            }
+        }
+        window.setFocusableWindowState(true)
+        window.setAutoRequestFocus(true)
+        window.toFront()
+        window.requestFocus()
+        window.requestFocusInWindow()
+    }
+
+    attemptActivation()
+    // Idle-triggered windows can be shown from outside an input event; one AWT
+    // turn lets the native peer become focusable without repeatedly stealing
+    // focus after the user starts Alt+Tab or another window action.
+    SwingUtilities.invokeLater { attemptActivation() }
 }
 
 private data class DevWindowBounds(
