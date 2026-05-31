@@ -8,7 +8,7 @@ Notable user-facing changes. The project does not yet ship versioned releases; t
 
 - **`scripts/dwell` CLI** with one-line subcommands — `show`, `daemon`, `config`, `dev`, `build`, `install`, `uninstall`, `register`, `unregister`, `status`, `help`. Auto-installs Temurin JDK 21 to `~/jdks/` on first run; no `JAVA_HOME` setup required.
 - **`scripts/dwell.cmd`** — same CLI for Windows.
-- **`dwell register` / `unregister`** — autostart on login. Linux: writes `~/.config/autostart/dwell.desktop` + `~/.config/systemd/user/dwell.service`. macOS: `~/Library/LaunchAgents/dev.dwell.daemon.plist`. Windows: Startup-folder shortcut.
+- **`dwell register` / `unregister`** — autostart on login. Linux: writes `~/.config/autostart/dwell.desktop` + `~/.config/systemd/user/app-dwell.service`. macOS: `~/Library/LaunchAgents/dev.dwell.daemon.plist`. Windows: Startup-folder shortcut.
 - **Three modes** with two variants each:
   - **Cinematic** (default) — *Dusk* (peach/violet mesh) and *Noir* (warm-white drifting glow).
   - **Ambient** — *Lumen* (sci-fi HUD with orbital dial, perspective grid, telemetry) and *Borealis* (drifting aurora ribbons).

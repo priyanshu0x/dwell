@@ -31,6 +31,9 @@ HERE="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 
+LINUX_DWELL_SERVICE="app-dwell.service"
+LINUX_LEGACY_DWELL_SERVICE="dwell.service"
+
 # --- JDK 21 detection / auto-install -----------------------------------------
 detect_java21() {
     if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
@@ -186,17 +189,22 @@ stop_linux_dwell_daemon_apps() {
     pkill -TERM -f ' Dwell --daemon$' 2>/dev/null || true
 }
 
-SHOW_RESTART_DAEMON=0
+SHOW_RESTART_DAEMON_SERVICE=""
 
 pause_daemon_for_show() {
-    SHOW_RESTART_DAEMON=0
+    SHOW_RESTART_DAEMON_SERVICE=""
     case "$(uname -s)" in
         Linux)
-            if command -v systemctl >/dev/null 2>&1 && \
-               systemctl --user is-active --quiet dwell.service 2>/dev/null; then
-                SHOW_RESTART_DAEMON=1
-                systemctl --user stop dwell.service 2>/dev/null || true
-                echo "Dwell — temporarily stopped background daemon for this show session."
+            if command -v systemctl >/dev/null 2>&1; then
+                local service
+                for service in "$LINUX_DWELL_SERVICE" "$LINUX_LEGACY_DWELL_SERVICE"; do
+                    if systemctl --user is-active --quiet "$service" 2>/dev/null; then
+                        SHOW_RESTART_DAEMON_SERVICE="$service"
+                        systemctl --user stop "$service" 2>/dev/null || true
+                        echo "Dwell — temporarily stopped background daemon for this show session."
+                        break
+                    fi
+                done
             fi
             stop_linux_dwell_daemon_apps
             ;;
@@ -204,7 +212,7 @@ pause_daemon_for_show() {
             local plist="$HOME/Library/LaunchAgents/dev.dwell.daemon.plist"
             if [ -f "$plist" ] && command -v launchctl >/dev/null 2>&1; then
                 if launchctl print gui/$(id -u)/dev.dwell.daemon >/dev/null 2>&1; then
-                    SHOW_RESTART_DAEMON=1
+                    SHOW_RESTART_DAEMON_SERVICE="launchd"
                     launchctl unload "$plist" 2>/dev/null || true
                     echo "Dwell — temporarily stopped background daemon for this show session."
                 fi
@@ -214,13 +222,14 @@ pause_daemon_for_show() {
 }
 
 restore_paused_daemon() {
-    [ "${SHOW_RESTART_DAEMON:-0}" = "1" ] || return 0
-    SHOW_RESTART_DAEMON=0
+    [ -n "${SHOW_RESTART_DAEMON_SERVICE:-}" ] || return 0
+    local service="$SHOW_RESTART_DAEMON_SERVICE"
+    SHOW_RESTART_DAEMON_SERVICE=""
     case "$(uname -s)" in
         Linux)
             if command -v systemctl >/dev/null 2>&1; then
                 import_linux_session_environment
-                systemctl --user start dwell.service 2>/dev/null || true
+                [ "$service" = "launchd" ] || systemctl --user start "$service" 2>/dev/null || true
             fi
             ;;
         Darwin)
@@ -282,12 +291,21 @@ case "$cmd" in
             Linux)
                 ensure_linux_desktop_entry
                 import_linux_session_environment
-                if command -v systemctl >/dev/null 2>&1 && [ -f "$HOME/.config/systemd/user/dwell.service" ]; then
-                    systemctl --user daemon-reload 2>/dev/null || true
-                    systemctl --user stop dwell.service 2>/dev/null || true
-                    stop_linux_dwell_daemon_apps
-                    if systemctl --user start dwell.service 2>/dev/null; then
-                        exit 0
+                if command -v systemctl >/dev/null 2>&1; then
+                    local_service=""
+                    for service in "$LINUX_DWELL_SERVICE" "$LINUX_LEGACY_DWELL_SERVICE"; do
+                        if [ -f "$HOME/.config/systemd/user/$service" ]; then
+                            local_service="$service"
+                            break
+                        fi
+                    done
+                    if [ -n "$local_service" ]; then
+                        systemctl --user daemon-reload 2>/dev/null || true
+                        systemctl --user stop "$local_service" 2>/dev/null || true
+                        stop_linux_dwell_daemon_apps
+                        if systemctl --user start "$local_service" 2>/dev/null; then
+                            exit 0
+                        fi
                     fi
                 fi
                 exec "$ROOT/scripts/dwell" daemon
@@ -299,7 +317,7 @@ case "$cmd" in
         ;;
     register)
         # Register Dwell to run as a tray daemon at login.
-        # Linux: writes ~/.config/autostart/dwell.desktop + ~/.config/systemd/user/dwell.service.
+        # Linux: writes ~/.config/autostart/dwell.desktop + ~/.config/systemd/user/app-dwell.service.
         # macOS: writes ~/Library/LaunchAgents/dev.dwell.daemon.plist and loads it.
         case "$(uname -s)" in
             Linux)
@@ -319,7 +337,7 @@ StartupNotify=false
 StartupWMClass=Dwell
 NoDisplay=false
 DESKTOP
-                cat > "$systemd_user/dwell.service" <<UNIT
+                cat > "$systemd_user/$LINUX_DWELL_SERVICE" <<UNIT
 [Unit]
 Description=Dwell screensaver daemon
 After=graphical-session.target
@@ -334,19 +352,21 @@ RestartSec=5
 WantedBy=graphical-session.target
 UNIT
                 echo "✓ Wrote $autostart/dwell.desktop"
-                echo "✓ Wrote $systemd_user/dwell.service"
+                echo "✓ Wrote $systemd_user/$LINUX_DWELL_SERVICE"
                 if command -v systemctl >/dev/null 2>&1; then
                     import_linux_session_environment
+                    systemctl --user disable --now "$LINUX_LEGACY_DWELL_SERVICE" 2>/dev/null || true
+                    rm -f "$systemd_user/$LINUX_LEGACY_DWELL_SERVICE"
                     systemctl --user daemon-reload 2>/dev/null || true
-                    systemctl --user disable dwell.service 2>/dev/null || true
-                    systemctl --user stop dwell.service 2>/dev/null || true
+                    systemctl --user disable "$LINUX_DWELL_SERVICE" 2>/dev/null || true
+                    systemctl --user stop "$LINUX_DWELL_SERVICE" 2>/dev/null || true
                     stop_linux_dwell_daemon_apps
-                    if systemctl --user enable dwell.service 2>/dev/null && \
-                       systemctl --user start dwell.service 2>/dev/null; then
-                        echo "✓ Enabled + started dwell.service (systemd user)"
+                    if systemctl --user enable "$LINUX_DWELL_SERVICE" 2>/dev/null && \
+                       systemctl --user start "$LINUX_DWELL_SERVICE" 2>/dev/null; then
+                        echo "✓ Enabled + started $LINUX_DWELL_SERVICE (systemd user)"
                     else
-                        echo "  Could not start dwell.service automatically. Run manually:"
-                        echo "    systemctl --user enable dwell.service && systemctl --user start dwell.service"
+                        echo "  Could not start $LINUX_DWELL_SERVICE automatically. Run manually:"
+                        echo "    systemctl --user enable $LINUX_DWELL_SERVICE && systemctl --user start $LINUX_DWELL_SERVICE"
                     fi
                 fi
                 ;;
@@ -385,10 +405,12 @@ PLIST
         case "$(uname -s)" in
             Linux)
                 if command -v systemctl >/dev/null 2>&1; then
-                    systemctl --user disable --now dwell.service 2>/dev/null || true
+                    systemctl --user disable --now "$LINUX_DWELL_SERVICE" 2>/dev/null || true
+                    systemctl --user disable --now "$LINUX_LEGACY_DWELL_SERVICE" 2>/dev/null || true
                 fi
                 rm -f "$HOME/.config/autostart/dwell.desktop"
-                rm -f "$HOME/.config/systemd/user/dwell.service"
+                rm -f "$HOME/.config/systemd/user/$LINUX_DWELL_SERVICE"
+                rm -f "$HOME/.config/systemd/user/$LINUX_LEGACY_DWELL_SERVICE"
                 if command -v systemctl >/dev/null 2>&1; then
                     systemctl --user daemon-reload 2>/dev/null || true
                 fi

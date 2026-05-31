@@ -26,6 +26,7 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 ### Desktop window notes
 
 - Keep `-Dswing.bufferPerWindow=false` on Linux runs unless a replacement is tested with `dwell show`; Swing's per-window buffer strategy previously hit AWT back-buffer heap pressure in dashboard smoke tests.
+- GNOME Background Apps is portal-driven, not tray-driven. Keep the source launcher desktop ID as `dwell.desktop` with daemon unit `app-dwell.service`, and the packaged desktop ID as `screensaver-app.desktop` with daemon unit `app-screensaver-app.service`, so xdg-desktop-portal can infer app IDs from systemd cgroups. Do not use one-off `gdbus` subprocesses for `org.freedesktop.host.portal.Registry`; that registers the subprocess peer, not the JVM app.
 - Console `Bordered` must keep the original main-branch visual treatment: the tile host is clipped/background only, and the visible outline comes from `ConsoleEditOverlay` idle chrome. Do not add a second host border for `Bordered`.
 
 ### Runtime requirements
