@@ -4,3 +4,5 @@ Name=Screen Saver App
 Exec=screensaver-app --show
 Terminal=false
 Categories=Utility;
+StartupNotify=false
+StartupWMClass=Dwell

@@ -139,6 +139,8 @@ Idle detection backends Dwell can use, in preference order:
 
 If the tray icon doesn't appear on GNOME, install the *AppIndicator and KStatusNotifierItem Support* extension — GNOME removed legacy tray support in 3.26.
 
+On GNOME Wayland, `dwell register` also integrates with the xdg-desktop-portal Background Apps monitor. The registered user service is named `app-dwell.service` so portals can map the background process back to `dwell.desktop`; Dwell then requests background permission and publishes a short "Idle dashboard daemon" status through the background portal.
+
 ## Build from source
 
 ```sh

@@ -27,6 +27,7 @@ import com.droidslife.screensaver.components.rememberWindowEventHandlers
 import com.droidslife.screensaver.daemon.TrayDaemon
 import com.droidslife.screensaver.daemon.IdleState
 import com.droidslife.screensaver.daemon.createIdleMonitor
+import com.droidslife.screensaver.daemon.registerLinuxBackgroundApp
 import com.droidslife.screensaver.daemon.watch
 import com.droidslife.screensaver.di.appModule
 import com.droidslife.screensaver.di.initKoin
@@ -35,7 +36,9 @@ import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.ui.LinuxWindowManagerHints
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -175,6 +178,14 @@ private fun ApplicationScope.runDwellContent(
         val hotkey = WindowsTrayHotkey(onShowDashboard = onShow)
         if (keepRunningInTray) hotkey.start()
         onDispose { hotkey.close() }
+    }
+
+    LaunchedEffect(devMode, launchArgs.mode) {
+        if (!devMode && launchArgs.mode == LaunchMode.Daemon) {
+            withContext(Dispatchers.IO) {
+                registerLinuxBackgroundApp()
+            }
+        }
     }
 
     // Keep tray checkmarks in sync when settings change (from dashboard or another tray click).
