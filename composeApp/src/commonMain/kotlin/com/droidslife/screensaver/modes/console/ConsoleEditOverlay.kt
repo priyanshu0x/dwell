@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.ui.DwellMotion
@@ -54,6 +55,7 @@ private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
 private val PADDING = 32.dp
+private val BOTTOM_PADDING = DashboardActionBarReservedHeight
 private val HANDLE_SIZE = 16.dp
 
 /**
@@ -82,9 +84,10 @@ fun ConsoleEditOverlay(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val paddingPx = with(density) { PADDING.toPx() }
+        val bottomPaddingPx = with(density) { BOTTOM_PADDING.toPx() }
         val gapPx = with(density) { GAP.toPx() }
         val innerW = (constraints.maxWidth - paddingPx * 2f).coerceAtLeast(0f)
-        val innerH = (constraints.maxHeight - paddingPx * 2f).coerceAtLeast(0f)
+        val innerH = (constraints.maxHeight - paddingPx - bottomPaddingPx).coerceAtLeast(0f)
         val cellW = ((innerW - gapPx * (COLS - 1)) / COLS).coerceAtLeast(0f)
         val cellH = ((innerH - gapPx * (ROWS - 1)) / ROWS).coerceAtLeast(0f)
         val stepX = cellW + gapPx

@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.widget.api.GridRect
 import com.droidslife.screensaver.widget.host.WidgetInstance
@@ -35,6 +36,7 @@ private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
 private val PADDING = 32.dp
+private val BOTTOM_PADDING = DashboardActionBarReservedHeight
 
 /**
  * Renders a per-widget config gear floating at the top-right corner of each
@@ -42,9 +44,10 @@ private val PADDING = 32.dp
  * [ConsoleEditOverlay] in the parent Box so its clicks aren't eaten by the
  * tile-level drag detector.
  *
- * The grid math is duplicated from [ConsoleGrid] / [ConsoleEditOverlay]
- * because Kotlin private consts don't cross file boundaries; the three files
- * always need to stay in sync.
+ * The grid math is duplicated from [ConsoleGrid], [ConsoleEditOverlay], and
+ * [ConsoleMode]
+ * because Kotlin private consts don't cross file boundaries; these files need
+ * to stay in sync.
  */
 @Composable
 fun TileGearsOverlay(
@@ -56,9 +59,10 @@ fun TileGearsOverlay(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val paddingPx = with(density) { PADDING.toPx() }
+        val bottomPaddingPx = with(density) { BOTTOM_PADDING.toPx() }
         val gapPx = with(density) { GAP.toPx() }
         val innerW = (constraints.maxWidth - paddingPx * 2).coerceAtLeast(0f)
-        val innerH = (constraints.maxHeight - paddingPx * 2).coerceAtLeast(0f)
+        val innerH = (constraints.maxHeight - paddingPx - bottomPaddingPx).coerceAtLeast(0f)
         val cellW = ((innerW - gapPx * (COLS - 1)) / COLS).coerceAtLeast(0f)
         val cellH = ((innerH - gapPx * (ROWS - 1)) / ROWS).coerceAtLeast(0f)
         val stepX = cellW + gapPx

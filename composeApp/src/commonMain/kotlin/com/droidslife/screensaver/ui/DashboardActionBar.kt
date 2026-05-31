@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Settings
@@ -33,52 +33,56 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
+internal val DashboardActionBarReservedHeight = 76.dp
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun CornerButtons(
+fun DashboardActionBar(
     onSettings: () -> Unit,
     onHelp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var hovered by remember { mutableStateOf(false) }
     val alpha by animateFloatAsState(
-        targetValue = if (hovered) 0.95f else 0.32f,
+        targetValue = if (hovered) 0.96f else 0.72f,
         animationSpec = tween(DwellMotion.CornerHover, easing = DwellMotion.Standard),
-        label = "corner-alpha",
+        label = "dashboard-actions-alpha",
     )
+    val shape = RoundedCornerShape(8.dp)
 
     Row(
         modifier = modifier
-            .padding(20.dp)
+            .padding(bottom = 20.dp)
             .alpha(alpha)
+            .clip(shape)
+            .background(DwellColors.Surface1.copy(alpha = 0.94f))
+            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.9f), shape)
             .onPointerEvent(PointerEventType.Enter) { hovered = true }
-            .onPointerEvent(PointerEventType.Exit) { hovered = false },
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .onPointerEvent(PointerEventType.Exit) { hovered = false }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ShortcutHint(shortcut = "S · Ctrl+,") {
-            CornerIconButton(Icons.Filled.Settings, "Settings", onSettings)
+            DashboardActionButton(Icons.Filled.Settings, "Settings", onSettings)
         }
         ShortcutHint(shortcut = "F1 · ?") {
-            CornerIconButton(Icons.AutoMirrored.Filled.HelpOutline, "Help", onHelp)
+            DashboardActionButton(Icons.AutoMirrored.Filled.HelpOutline, "Help", onHelp)
         }
     }
 }
 
 @Composable
-private fun CornerIconButton(
+private fun DashboardActionButton(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
 ) {
-    // Hand-rolled Box-button (not Material 3 IconButton) so we own the exact
-    // 28dp footprint — IconButton forces a 40dp touch target which previously
-    // produced a "tail" of empty space below the visible circle.
     Box(
         modifier = Modifier
-            .size(28.dp)
-            .clip(CircleShape)
-            .background(DwellColors.Surface1)
-            .border(1.dp, DwellColors.Stroke, CircleShape)
+            .size(32.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(DwellColors.Surface0.copy(alpha = 0.86f))
+            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.76f), RoundedCornerShape(7.dp))
             .pointerHoverIcon(PointerIcon.Hand)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -87,7 +91,7 @@ private fun CornerIconButton(
             imageVector = icon,
             contentDescription = label,
             tint = DwellColors.TextMid,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(15.dp),
         )
     }
 }

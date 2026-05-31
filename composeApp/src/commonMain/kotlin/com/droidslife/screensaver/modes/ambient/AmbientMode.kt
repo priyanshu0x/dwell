@@ -14,7 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.AmbientVariant
 import com.droidslife.screensaver.settings.SettingsViewModel
-import com.droidslife.screensaver.ui.CornerButtons
+import com.droidslife.screensaver.ui.DashboardActionBar
+import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.widget.api.WidgetRenderTarget
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 
@@ -39,7 +40,7 @@ fun AmbientMode(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 56.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = DashboardActionBarReservedHeight),
             ) {
                 minimal.forEach { instance ->
                     key(instance.scope) {
@@ -49,10 +50,10 @@ fun AmbientMode(
             }
         }
 
-        CornerButtons(
+        DashboardActionBar(
             onSettings = onOpenSettings,
             onHelp = onOpenHelp,
-            modifier = Modifier.align(Alignment.BottomEnd),
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }

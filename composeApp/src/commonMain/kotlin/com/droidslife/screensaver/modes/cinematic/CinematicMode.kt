@@ -30,7 +30,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.settings.CinematicVariant
 import com.droidslife.screensaver.settings.SettingsViewModel
-import com.droidslife.screensaver.ui.CornerButtons
+import com.droidslife.screensaver.ui.DashboardActionBar
+import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.ui.DwellColors
 import com.droidslife.screensaver.ui.DwellFonts
 import com.droidslife.screensaver.weather.WeatherState
@@ -57,10 +58,10 @@ fun CinematicMode(
             CinematicVariant.Noir -> NoirBackdrop(Modifier.fillMaxSize())
         }
         CinematicForeground(settingsViewModel, registry)
-        CornerButtons(
+        DashboardActionBar(
             onSettings = onOpenSettings,
             onHelp = onOpenHelp,
-            modifier = Modifier.align(Alignment.BottomEnd),
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
@@ -108,7 +109,6 @@ private fun BoxScope.CinematicForeground(
             }
         }
     }
-    WidgetDrawer(settingsViewModel, registry)
     val instances by registry.instances.collectAsState()
     if (instances.isNotEmpty()) {
         Text(
@@ -118,9 +118,10 @@ private fun BoxScope.CinematicForeground(
             fontSize = 9.sp,
             letterSpacing = 2.7.sp,
             color = DwellColors.TextHigh.copy(alpha = 0.32f),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = DashboardActionBarReservedHeight),
         )
     }
+    WidgetDrawer(settingsViewModel, registry)
 }
 
 // Row with explicit · spans so we can apply the mockup's 12 dp padding +

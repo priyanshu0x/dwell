@@ -8,12 +8,14 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import com.droidslife.screensaver.ui.DashboardActionBarReservedHeight
 import com.droidslife.screensaver.widget.api.GridRect
 
 private const val COLS = 12
 private const val ROWS = 6
 private val GAP = 12.dp
 private val PADDING = 32.dp
+private val BOTTOM_PADDING = DashboardActionBarReservedHeight
 
 /**
  * 12x6 grid layout engine for Console mode. Each placement is positioned and
@@ -52,9 +54,10 @@ fun ConsoleGrid(
         },
     ) { measurables, constraints ->
         val padding = PADDING.roundToPx()
+        val bottomPadding = BOTTOM_PADDING.roundToPx()
         val gap = GAP.roundToPx()
         val innerW = (constraints.maxWidth - padding * 2).coerceAtLeast(0)
-        val innerH = (constraints.maxHeight - padding * 2).coerceAtLeast(0)
+        val innerH = (constraints.maxHeight - padding - bottomPadding).coerceAtLeast(0)
         val cellW = ((innerW - gap * (COLS - 1)) / COLS).coerceAtLeast(0)
         val cellH = ((innerH - gap * (ROWS - 1)) / ROWS).coerceAtLeast(0)
 
