@@ -2,6 +2,7 @@ package com.droidslife.screensaver.modes.console
 
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,10 +32,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.droidslife.screensaver.settings.ConsoleBackgroundStyle
@@ -73,6 +76,7 @@ fun ConsoleMode(
     registry: WidgetRegistry,
     onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
+    liquidGlassBackdrop: ImageBitmap? = null,
     modifier: Modifier = Modifier,
 ) {
     val instances by registry.instances.collectAsState()
@@ -120,10 +124,15 @@ fun ConsoleMode(
         LocalConsoleWidgetBorderStyle provides widgetBorderStyle,
     ) {
         BoxWithConstraints(
-            modifier = modifier
-                .fillMaxSize()
-                .consoleBackground(backgroundStyle, accent, glassOpacity),
+            modifier = modifier.fillMaxSize(),
         ) {
+            ConsoleBackgroundLayer(
+                style = backgroundStyle,
+                accent = accent,
+                glassOpacity = glassOpacity,
+                backdrop = liquidGlassBackdrop,
+                modifier = Modifier.matchParentSize(),
+            )
             // Grid geometry mirrored from ConsoleGrid so tile-drag pixel deltas
             // map to the same cells the grid lays out.
             val density = LocalDensity.current
@@ -276,6 +285,31 @@ fun ConsoleMode(
     }
 }
 
+@Composable
+private fun ConsoleBackgroundLayer(
+    style: ConsoleBackgroundStyle,
+    accent: ConsoleAccent,
+    glassOpacity: Float,
+    backdrop: ImageBitmap?,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        if (style == ConsoleBackgroundStyle.LiquidGlass && backdrop != null) {
+            Image(
+                bitmap = backdrop,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .consoleBackground(style, accent, glassOpacity),
+        )
+    }
+}
+
 private fun Modifier.consoleBackground(
     style: ConsoleBackgroundStyle,
     accent: ConsoleAccent,
@@ -335,7 +369,7 @@ private fun Modifier.consoleTileChrome(
         ConsoleWidgetBorderStyle.Bordered -> this
             .clip(shape)
             .background(backgroundColor)
-            .border(1.dp, DwellColors.Stroke.copy(alpha = 0.88f), shape)
+            .border(1.dp, DwellColors.LumenCyan.copy(alpha = 0.48f), shape)
         ConsoleWidgetBorderStyle.Borderless -> this
             .clip(shape)
             .background(backgroundColor)

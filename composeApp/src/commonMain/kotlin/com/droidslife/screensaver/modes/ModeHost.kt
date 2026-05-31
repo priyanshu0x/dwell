@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import com.droidslife.screensaver.modes.ambient.AmbientMode
 import com.droidslife.screensaver.modes.cinematic.CinematicMode
 import com.droidslife.screensaver.modes.console.ConsoleMode
@@ -19,6 +20,7 @@ fun ModeHost(
     registry: WidgetRegistry,
     onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
+    liquidGlassBackdrop: ImageBitmap? = null,
     modifier: Modifier = Modifier,
 ) {
     // Crossfade manages the transition state internally so we don't get the
@@ -34,7 +36,7 @@ fun ModeHost(
         modifier = modifier.fillMaxSize(),
         label = "mode-crossfade",
     ) { mode ->
-        renderMode(mode, settingsViewModel, registry, onOpenSettings, onOpenHelp)
+        renderMode(mode, settingsViewModel, registry, onOpenSettings, onOpenHelp, liquidGlassBackdrop)
     }
 }
 
@@ -45,6 +47,7 @@ private fun renderMode(
     registry: WidgetRegistry,
     onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
+    liquidGlassBackdrop: ImageBitmap?,
 ) {
     when (mode) {
         Mode.Cinematic -> CinematicMode(
@@ -64,6 +67,7 @@ private fun renderMode(
             registry = registry,
             onOpenSettings = onOpenSettings,
             onOpenHelp = onOpenHelp,
+            liquidGlassBackdrop = liquidGlassBackdrop,
         )
     }
 }

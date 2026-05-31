@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -45,11 +46,14 @@ import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Frame
+import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
+import java.awt.RenderingHints
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.awt.image.BufferedImage
 import java.util.prefs.Preferences
 
 private const val IDLE_MONITOR_POLL_MS = 1_000L
@@ -283,6 +287,12 @@ private fun ApplicationScope.runDwellContent(
         // Compose Desktop rejects transparent windows unless they are undecorated
         // and also rejects changing transparency after the AWT window is shown.
         val usesTransparentWindow = windowTransparency
+        val initialWindowBounds = remember(devMode, savedDevWindowBounds) {
+            initialDashboardBounds(devMode, savedDevWindowBounds)
+        }
+        val liquidGlassBackdrop = remember(usesTransparentWindow, dashboardActivationRequest, initialWindowBounds) {
+            if (usesTransparentWindow) captureLiquidGlassBackdrop(initialWindowBounds) else null
+        }
         key(usesTransparentWindow) {
             Window(
                 title = "Dwell",
@@ -380,6 +390,7 @@ private fun ApplicationScope.runDwellContent(
                     showHelpDialog = windowEvents.showHelpDialog,
                     onHelpDialogDismiss = windowEvents.onHelpDialogDismiss,
                     onShowHelpDialog = windowEvents.onShowHelpDialog,
+                    liquidGlassBackdrop = liquidGlassBackdrop,
                     modifier = windowEvents.mouseEventModifier
                 )
             }
@@ -429,6 +440,65 @@ private fun saveDevWindowBounds(bounds: Rectangle) {
 
 private fun devWindowPrefs(): Preferences =
     Preferences.userRoot().node(DEV_WINDOW_PREFS_NODE)
+
+private fun initialDashboardBounds(
+    devMode: Boolean,
+    savedDevWindowBounds: DevWindowBounds?,
+): Rectangle {
+    val screenBounds = defaultScreenBounds()
+    if (!devMode) return Rectangle(screenBounds)
+
+    val width = savedDevWindowBounds?.width ?: DEV_WINDOW_DEFAULT_WIDTH_PX
+    val height = savedDevWindowBounds?.height ?: DEV_WINDOW_DEFAULT_HEIGHT_PX
+    val x = savedDevWindowBounds?.x ?: screenBounds.x + (screenBounds.width - width) / 2
+    val y = savedDevWindowBounds?.y ?: screenBounds.y + (screenBounds.height - height) / 2
+    return Rectangle(x, y, width, height)
+}
+
+private fun captureLiquidGlassBackdrop(bounds: Rectangle): ImageBitmap? {
+    return runCatching {
+        if (GraphicsEnvironment.isHeadless()) return@runCatching null
+        val captureBounds = bounds.intersection(desktopBounds())
+        if (captureBounds.width <= 0 || captureBounds.height <= 0) return@runCatching null
+
+        val screenshot = java.awt.Robot().createScreenCapture(captureBounds)
+        blurByDownsampling(screenshot).toComposeImageBitmap()
+    }.getOrNull()
+}
+
+private fun blurByDownsampling(source: BufferedImage): BufferedImage {
+    val scale = 18
+    val smallWidth = (source.width / scale).coerceAtLeast(1)
+    val smallHeight = (source.height / scale).coerceAtLeast(1)
+    val small = BufferedImage(smallWidth, smallHeight, BufferedImage.TYPE_INT_RGB)
+    small.createGraphics().apply {
+        setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+        drawImage(source, 0, 0, smallWidth, smallHeight, null)
+        dispose()
+    }
+
+    return BufferedImage(source.width, source.height, BufferedImage.TYPE_INT_ARGB).also { output ->
+        output.createGraphics().apply {
+            setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+            drawImage(small, 0, 0, source.width, source.height, null)
+            dispose()
+        }
+    }
+}
+
+private fun defaultScreenBounds(): Rectangle {
+    val environment = GraphicsEnvironment.getLocalGraphicsEnvironment()
+    return Rectangle(environment.defaultScreenDevice.defaultConfiguration.bounds)
+}
+
+private fun desktopBounds(): Rectangle {
+    val environment = GraphicsEnvironment.getLocalGraphicsEnvironment()
+    var bounds = defaultScreenBounds()
+    environment.screenDevices.forEach { device ->
+        bounds = bounds.union(device.defaultConfiguration.bounds)
+    }
+    return bounds
+}
 
 private class DwellViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore = ViewModelStore()
