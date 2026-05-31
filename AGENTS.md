@@ -27,7 +27,9 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 
 - `Window(transparent = true)` must be paired with `undecorated = true`; Compose Desktop enforces this in `ComposeWindowPanel.setWindowTransparent`.
 - Do not toggle `Window.transparent` on an already displayed window. When changing between opaque and Liquid Glass modes, first remove the dashboard `Window` from composition so Compose disposes the old AWT window, then create the replacement with the new transparency mode. A `key(...)` alone is not enough if the live `Window` receives an updated `transparent` value first.
-- Linux Liquid Glass runs with Skiko `SOFTWARE_FAST`; Skiko's default Linux `OPENGL` redrawer has crashed during transparent-window recreation.
+- Do not force Linux Liquid Glass to Skiko `SOFTWARE_FAST`. Transparent fullscreen windows have failed there with `Failed to create Surface` / heap pressure; keep the default renderer unless a new fix is tested against `dwell show`.
+- Keep `-Dswing.bufferPerWindow=false` on Linux runs. Swing's per-window buffer strategy has failed on transparent dashboard windows with `OutOfMemoryError` while allocating AWT back buffers.
+- After creating a transparent `Window`, keep the AWT/Swing backing surfaces transparent too (`TransparentWindowSurface`) so Compose's translucent Console layer can reveal windows behind Dwell instead of an opaque Swing fill.
 - Liquid Glass blur behind other apps is compositor-owned. Dwell may request native blur only where the compositor exposes a supported path; currently that is KWin on KDE/Plasma X11 via `_KDE_NET_WM_BLUR_BEHIND_REGION`.
 - Do not use AWT `Robot`, screenshots, or captured desktop bitmaps to fake Liquid Glass. That creates stale, recursive, monitor-position-dependent backgrounds and is not live compositor blur.
 - GNOME/Wayland currently has no robust Java/Compose/Swing path for live blur-behind. There, Liquid Glass must degrade to a transparent window with Dwell's own translucent material/tint.

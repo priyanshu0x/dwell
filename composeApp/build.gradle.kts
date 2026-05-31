@@ -59,7 +59,7 @@ val dwellDesktopJvmArgs = buildList {
     if (isLinuxHost) {
         add("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
         add("-Dsun.awt.X11.XWMClass=Dwell")
-        add("-Dskiko.renderApi=SOFTWARE_FAST")
+        add("-Dswing.bufferPerWindow=false")
     }
 }
 

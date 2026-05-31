@@ -38,6 +38,7 @@ import com.droidslife.screensaver.settings.SettingsViewModel
 import com.droidslife.screensaver.ui.DwellIconLoader
 import com.droidslife.screensaver.ui.LinuxLiquidGlassHints
 import com.droidslife.screensaver.ui.LinuxWindowManagerHints
+import com.droidslife.screensaver.ui.TransparentWindowSurface
 import com.droidslife.screensaver.widget.host.WidgetRegistry
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -45,6 +46,7 @@ import org.koin.core.context.stopKoin
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Frame
+import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
@@ -269,13 +271,26 @@ private fun ApplicationScope.runDwellContent(
         val savedDevWindowBounds = remember(devMode) {
             if (devMode) loadDevWindowBounds() else null
         }
+        val transparentProductionBounds = remember(devMode, windowTransparency) {
+            if (!devMode && windowTransparency) loadPrimaryScreenBounds() else null
+        }
         val devWindowSize = with(density) {
             savedDevWindowBounds
                 ?.let { DpSize(it.width.toDp(), it.height.toDp()) }
                 ?: DpSize(DEV_WINDOW_DEFAULT_WIDTH_PX.toDp(), DEV_WINDOW_DEFAULT_HEIGHT_PX.toDp())
         }
+        val productionWindowSize = with(density) {
+            transparentProductionBounds
+                ?.let { DpSize(it.width.toDp(), it.height.toDp()) }
+                ?: DpSize.Unspecified
+        }
         val devWindowPosition = with(density) {
             savedDevWindowBounds
+                ?.let { WindowPosition(it.x.toDp(), it.y.toDp()) }
+                ?: WindowPosition(Alignment.Center)
+        }
+        val productionWindowPosition = with(density) {
+            transparentProductionBounds
                 ?.let { WindowPosition(it.x.toDp(), it.y.toDp()) }
                 ?: WindowPosition(Alignment.Center)
         }
@@ -288,9 +303,13 @@ private fun ApplicationScope.runDwellContent(
                 title = "Dwell",
                 icon = dwellWindowIcon,
                 state = rememberWindowState(
-                    placement = if (devMode) WindowPlacement.Floating else WindowPlacement.Fullscreen,
-                    position = if (devMode) devWindowPosition else WindowPosition(Alignment.Center),
-                    size = if (devMode) devWindowSize else DpSize.Unspecified,
+                    placement = when {
+                        devMode -> WindowPlacement.Floating
+                        usesTransparentWindow -> WindowPlacement.Floating
+                        else -> WindowPlacement.Fullscreen
+                    },
+                    position = if (devMode) devWindowPosition else productionWindowPosition,
+                    size = if (devMode) devWindowSize else productionWindowSize,
                 ),
                 onCloseRequest = requestDashboardExit,
                 resizable = devMode,
@@ -300,6 +319,7 @@ private fun ApplicationScope.runDwellContent(
                 onKeyEvent = { event -> windowEvents.keyEventHandler.handleWindowKeyEvent(event) }
             ) {
                 DisposableEffect(window) {
+                    TransparentWindowSurface.apply(window, enabled = usesTransparentWindow)
                     LinuxWindowManagerHints.applyDwellWindowHints(window)
                     LinuxLiquidGlassHints.applyBlurBehind(window, enabled = usesTransparentWindow)
 
@@ -406,6 +426,16 @@ private fun loadDevWindowBounds(): DevWindowBounds? {
             width = width,
             height = height,
         )
+    }.getOrNull()
+}
+
+private fun loadPrimaryScreenBounds(): Rectangle? {
+    return runCatching {
+        GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .defaultScreenDevice
+            .defaultConfiguration
+            .bounds
     }.getOrNull()
 }
 
