@@ -987,6 +987,7 @@ private fun TodoRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val emptyCheckBackground = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.10f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1012,7 +1013,7 @@ private fun TodoRow(
             modifier = Modifier
                 .size(18.dp)
                 .clip(CircleShape)
-                .background(if (todo.done) DwellColors.StatusOk else DwellColors.Surface1)
+                .background(if (todo.done) DwellColors.StatusOk else emptyCheckBackground)
                 .then(
                     if (todo.done) {
                         Modifier
@@ -1406,12 +1407,14 @@ private fun MatrixChip(
     onToggle: () -> Unit,
 ) {
     var chipCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val chipBackground = consoleNestedSurfaceColor(DwellColors.Surface0, liquidAlpha = 0.08f)
+    val emptyCheckBackground = consoleNestedSurfaceColor(DwellColors.Surface1, liquidAlpha = 0.10f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .onGloballyPositioned { chipCoords = it }
             .clip(RoundedCornerShape(5.dp))
-            .background(DwellColors.Surface0)
+            .background(chipBackground)
             .padding(horizontal = 6.dp, vertical = 4.dp)
             .alpha(if (beingDragged) 0.4f else 1f)
             // Tap opens the detail view; a drag (past touch slop) reclassifies.
@@ -1438,7 +1441,7 @@ private fun MatrixChip(
             modifier = Modifier
                 .size(14.dp)
                 .clip(CircleShape)
-                .background(DwellColors.Surface1)
+                .background(emptyCheckBackground)
                 .border(1.dp, DwellColors.TextMid, CircleShape)
                 .clickable(onClick = onToggle),
             contentAlignment = Alignment.Center,
