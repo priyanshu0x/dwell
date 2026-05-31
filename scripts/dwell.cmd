@@ -86,7 +86,7 @@ if /I "%CMD%"=="dev" (
     call :first_build_hint
     echo Dwell - Compose Hot Reload dev mode.
     echo.
-    call :run_gradle :composeApp:runHot
+    call :run_gradle --no-configuration-cache :composeApp:runHot
     goto :end
 )
 echo Unknown command: %CMD%

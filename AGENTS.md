@@ -9,17 +9,17 @@ This is a Kotlin/Compose Multiplatform project with a single `:composeApp` modul
 - Developer production smoke test: `./scripts/dwell show` (Windows: `scripts\dwell.cmd show`). On Linux/macOS this builds current source, temporarily stops the registered background daemon, opens the production dashboard, then restores the daemon when the show session exits.
 - Direct dashboard run without launcher daemon handling: `./gradlew :composeApp:run --args="--show"` (Windows: `.\gradlew.bat :composeApp:run --args="--show"`)
 - Run tray daemon: `./gradlew :composeApp:run` (Windows: `.\gradlew.bat :composeApp:run`)
-- Run with Compose hot-reload (uses `DevMainKt`): `./gradlew :composeApp:runHot`
+- Run with Compose hot-reload (uses `DevMainKt`): `./gradlew --no-configuration-cache :composeApp:runHot`
 - Test (commonTest + jvmTest): `./gradlew :composeApp:jvmTest`
 - Single test class: `./gradlew :composeApp:jvmTest --tests "com.droidslife.screensaver.ArgsTest"`
 - Generate Compose compiler reports: `./gradlew :composeApp:compileKotlinJvm -PcomposeCompilerReports=true` (inspect `composeApp/build/compose_compiler/jvm/main/composeApp-module.json`)
 - Package native installer: `./gradlew :composeApp:packageDistributionForCurrentOS` (formats: Dmg, Msi, Deb, Exe — see `composeApp/build.gradle.kts`)
 
-The app uses Gradle configuration cache and parallel builds (see `gradle.properties`) — if you edit Gradle files and see stale-config errors, run with `--no-configuration-cache` once to debug.
+The app uses Gradle configuration cache and parallel builds for normal builds (see `gradle.properties`). Keep Compose Hot Reload runs on `--no-configuration-cache`; its long-lived recompiler can otherwise reuse stale task state and leave the dev window on old classes.
 
 ### Developer launcher semantics
 
-- Use `./scripts/dwell dev` for fast UI iteration. It runs `DevMainKt`, uses Compose hot reload, opens a normal decorated/resizable window, remembers its last size and position, stays on top while visible, and intentionally skips daemon, tray, idle-monitor, and startup plumbing.
+- Use `./scripts/dwell dev` for fast UI iteration. It runs `DevMainKt` with Compose Hot Reload and `--no-configuration-cache`, opens a normal decorated/resizable window, remembers its last size and position, stays on top while visible, and intentionally skips daemon, tray, idle-monitor, and startup plumbing.
 - Use `./scripts/dwell show` as the production-path smoke test from source. It must build and launch the current checkout, not ask an already-running daemon to show its existing window.
 - Do not add app-side IPC or daemon reuse to implement `dwell show`. If a registered daemon is running, the launcher owns the pause/restore lifecycle so the developer build does not race with the background daemon or show two dashboards.
 
