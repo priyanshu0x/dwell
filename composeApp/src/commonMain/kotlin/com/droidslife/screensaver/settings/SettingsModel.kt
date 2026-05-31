@@ -88,6 +88,7 @@ data class SettingsModel(
     val widgetLayouts: Map<String, com.droidslife.screensaver.widget.api.GridRect> = emptyMap(),
     val widgetOrder: List<String> = emptyList(),
     val exitOnKeypress: Boolean = true,
+    val rightClickHidesDashboard: Boolean = true,
 
     /**
      * When true, Console tiles ignore drag / resize gestures until the user

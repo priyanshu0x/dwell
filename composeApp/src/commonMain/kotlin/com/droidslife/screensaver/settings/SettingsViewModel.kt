@@ -278,6 +278,10 @@ class SettingsViewModel(
         updateSettings(settings.copy(exitOnKeypress = enabled))
     }
 
+    fun setRightClickHidesDashboard(enabled: Boolean) {
+        updateSettings(settings.copy(rightClickHidesDashboard = enabled))
+    }
+
     fun setDashboardLocked(locked: Boolean) {
         updateSettings(settings.copy(dashboardLocked = locked))
         if (!locked) consoleEditMode = false
