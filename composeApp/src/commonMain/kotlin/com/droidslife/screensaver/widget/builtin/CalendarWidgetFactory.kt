@@ -66,7 +66,9 @@ import com.droidslife.screensaver.widget.api.WidgetFactory
 import com.droidslife.screensaver.widget.api.WidgetScope
 import com.droidslife.screensaver.widget.api.WidgetSize
 import com.droidslife.screensaver.widget.api.WidgetSummary
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -197,8 +199,12 @@ private class CalendarWidget(
     override fun Content(modifier: Modifier) {
         val today = todayLocal()
         val nowDt = nowLocalDateTime()
-        val rawEvents by (provider?.watch() ?: emptyEvents()).collectAsState(initial = remember { summaryCache.value })
-        val sync by (provider?.syncStatus() ?: emptyStatus()).collectAsState(initial = statusFlow.value)
+        // Build the flows once per provider instead of allocating a fresh
+        // flowOf on every recomposition.
+        val eventsFlow = remember(provider) { provider?.watch() ?: emptyEventsFlow }
+        val statusFlowToCollect = remember(provider) { provider?.syncStatus() ?: statusFlow }
+        val rawEvents by eventsFlow.collectAsState(initial = remember { summaryCache.value })
+        val sync by statusFlowToCollect.collectAsState(initial = statusFlow.value)
 
         // Single sort boundary — providers don't promise ordering per the
         // contract, so we normalize once here and feed sorted events to every
@@ -292,8 +298,9 @@ private class CalendarWidget(
         }
     }
 
-    private fun emptyEvents() = kotlinx.coroutines.flow.flowOf<List<CalendarEvent>>(emptyList())
-    private fun emptyStatus() = statusFlow
+    // Shared empty-events flow for the no-provider case; avoids allocating a
+    // new flow on each recomposition.
+    private val emptyEventsFlow: Flow<List<CalendarEvent>> = flowOf(emptyList())
 }
 
 private enum class CalendarLayout { MONTH_GRID, WEEK_STRIP, TODAY_TIMELINE }
@@ -363,6 +370,9 @@ private fun MonthGrid(
     val daysInMonth = daysInMonth(today.year, today.month)
     val totalCells = leadingBlanks + daysInMonth
     val rows = (totalCells + 6) / 7
+    // NOTE: Sunday-first, English-only header. The grid itself is also fixed
+    // Sunday-first (see sundayFirstLeadingBlanks). Both need revisiting for
+    // locales that start the week on Monday and for non-English labels.
     val weekdayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
