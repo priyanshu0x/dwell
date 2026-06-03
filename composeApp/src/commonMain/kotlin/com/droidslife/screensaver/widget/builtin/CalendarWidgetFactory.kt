@@ -24,6 +24,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -235,6 +239,9 @@ private class CalendarWidget(
         val upcoming = events.filter { it.isUpcomingFrom(nowDt) }
             .sortedBy { it.start ?: it.startDate.atTime(0, 0) }
 
+        // Only offer manual refresh when there's a remote provider to re-fetch.
+        val onRefresh: (() -> Unit)? = provider?.let { p -> { p.refresh() } }
+
         BoxWithConstraints(modifier = modifier.fillMaxSize()) {
             val w = maxWidth
             val h = maxHeight
@@ -253,6 +260,7 @@ private class CalendarWidget(
                     events = events,
                     countsByDay = countsByDay,
                     accent = accent,
+                    onRefresh = onRefresh,
                     statusMessage = statusMessage,
                     statusSeverity = statusSeverity,
                 )
@@ -264,6 +272,7 @@ private class CalendarWidget(
                     // disappears at 9:16 and the day reads emptier than it was.
                     events = events,
                     accent = accent,
+                    onRefresh = onRefresh,
                     statusMessage = statusMessage,
                     statusSeverity = statusSeverity,
                 )
@@ -275,6 +284,7 @@ private class CalendarWidget(
                     heatByDay = heatByDay,
                     firstUrlByDay = firstUrlByDay,
                     accent = accent,
+                    onRefresh = onRefresh,
                     statusMessage = statusMessage,
                     statusSeverity = statusSeverity,
                 )
@@ -288,6 +298,28 @@ private class CalendarWidget(
 
 private enum class CalendarLayout { MONTH_GRID, WEEK_STRIP, TODAY_TIMELINE }
 
+/**
+ * Shared widget header for every calendar layout. Renders [label] and, when
+ * [onRefresh] is non-null (a remote provider is configured), a small refresh
+ * button so the user doesn't have to wait out the poll interval after fixing
+ * something upstream.
+ */
+@Composable
+private fun CalendarHeader(label: String, onRefresh: (() -> Unit)?) {
+    WidgetHeader(label = label, settingsId = WIDGET_ID) {
+        if (onRefresh != null) {
+            IconButton(onClick = onRefresh, modifier = Modifier.size(18.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = "Refresh calendar",
+                    tint = DwellColors.TextLow,
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+        }
+    }
+}
+
 // region — Month grid (default)
 
 @Composable
@@ -299,6 +331,7 @@ private fun MonthGridContent(
     heatByDay: Map<LocalDate, Int>,
     firstUrlByDay: Map<LocalDate, String>,
     accent: Color,
+    onRefresh: (() -> Unit)?,
     statusMessage: String?,
     statusSeverity: WidgetStatusSeverity,
 ) {
@@ -306,10 +339,7 @@ private fun MonthGridContent(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        WidgetHeader(
-            label = "${monthShortName(today.month).uppercase()} ${today.year}",
-            settingsId = WIDGET_ID,
-        )
+        CalendarHeader(label = "${monthShortName(today.month).uppercase()} ${today.year}", onRefresh = onRefresh)
         Spacer(Modifier.height(4.dp))
         MonthGrid(today = today, countsByDay = countsByDay, heatByDay = heatByDay, firstUrlByDay = firstUrlByDay, accent = accent)
         if (upcoming.isNotEmpty()) {
@@ -448,6 +478,7 @@ private fun WeekStripContent(
     events: List<CalendarEvent>,
     countsByDay: Map<LocalDate, Int>,
     accent: Color,
+    onRefresh: (() -> Unit)?,
     statusMessage: String?,
     statusSeverity: WidgetStatusSeverity,
 ) {
@@ -465,10 +496,7 @@ private fun WeekStripContent(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        WidgetHeader(
-            label = "NEXT 7 DAYS",
-            settingsId = WIDGET_ID,
-        )
+        CalendarHeader(label = "NEXT 7 DAYS", onRefresh = onRefresh)
         Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             days.forEach { d ->
                 // events here are already widget-sorted by start, so first() is
@@ -571,6 +599,7 @@ private fun TodayTimelineContent(
     nowDt: LocalDateTime,
     events: List<CalendarEvent>,
     accent: Color,
+    onRefresh: (() -> Unit)?,
     statusMessage: String?,
     statusSeverity: WidgetStatusSeverity,
 ) {
@@ -585,9 +614,9 @@ private fun TodayTimelineContent(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        WidgetHeader(
+        CalendarHeader(
             label = "TODAY · ${monthShortName(today.month).uppercase()} ${today.day}",
-            settingsId = WIDGET_ID,
+            onRefresh = onRefresh,
         )
         if (todays.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {

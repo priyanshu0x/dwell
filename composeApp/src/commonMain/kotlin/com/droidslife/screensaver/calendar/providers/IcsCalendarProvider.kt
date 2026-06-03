@@ -11,12 +11,13 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -54,6 +55,10 @@ class IcsCalendarProvider(
     private val sync = MutableStateFlow<CalendarSyncStatus>(CalendarSyncStatus.Healthy)
     private var pollJob: Job? = null
 
+    // Conflated so repeated taps collapse into a single pending refresh; the
+    // poll loop waits on this OR the interval, whichever comes first.
+    private val refreshSignal = Channel<Unit>(Channel.CONFLATED)
+
     override fun watch(): Flow<List<CalendarEvent>> {
         if (url.isBlank()) {
             sync.value = CalendarSyncStatus.Unconfigured("Paste an ICS URL in widget settings")
@@ -71,7 +76,12 @@ class IcsCalendarProvider(
                 loadCache()
                 while (isActive) {
                     refreshSafely()
-                    delay(refreshIntervalMs.coerceAtLeast(MIN_REFRESH_MS))
+                    // Sleep until the interval elapses or a manual refresh is
+                    // requested, whichever is first. withTimeoutOrNull returns
+                    // null on timeout (normal tick) or Unit on an early signal.
+                    withTimeoutOrNull(refreshIntervalMs.coerceAtLeast(MIN_REFRESH_MS)) {
+                        refreshSignal.receive()
+                    }
                 }
             }
         }
@@ -79,6 +89,12 @@ class IcsCalendarProvider(
     }
 
     override fun syncStatus(): Flow<CalendarSyncStatus> = sync.asStateFlow()
+
+    override fun refresh() {
+        // No-op until watch() has started the loop; trySend never blocks and
+        // the conflated channel coalesces bursts into one pending wake-up.
+        refreshSignal.trySend(Unit)
+    }
 
     private suspend fun loadCache() {
         // Only trust the cached body if it was fetched from the URL we're
