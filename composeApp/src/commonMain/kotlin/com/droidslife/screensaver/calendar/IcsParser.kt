@@ -47,9 +47,12 @@ object IcsParser {
 
         var inEvent = false
         var props = mutableMapOf<String, Pair<Map<String, String>, String>>()
+        // Incremented per VEVENT; mixed into the synthesized UID so two events
+        // with the same SUMMARY + DTSTART and no UID don't collapse into one.
+        var veventSeq = 0
 
         for (line in lines) {
-            val upper = line.uppercase()
+            val upper = if (line.length <= MAX_DELIMITER_LINE) line.uppercase() else line
             when {
                 upper == "BEGIN:VEVENT" -> {
                     inEvent = true
@@ -57,9 +60,10 @@ object IcsParser {
                 }
                 upper == "END:VEVENT" -> {
                     if (inEvent) {
-                        val expanded = runCatching { buildEvents(props, windowStart, windowEnd) }
+                        val expanded = runCatching { buildEvents(props, veventSeq, windowStart, windowEnd) }
                             .getOrDefault(emptyList())
                         events.addAll(expanded)
+                        veventSeq++
                     }
                     inEvent = false
                 }
@@ -73,6 +77,14 @@ object IcsParser {
 
         return events.sortedBy { it.start ?: it.startDate.atTime(0, 0) }
     }
+
+    /**
+     * Longest content line we'll ever uppercase whole — only delimiter lines
+     * (BEGIN:VEVENT / END:VEVENT) need that, and they're under 16 chars.
+     * Long data lines (DESCRIPTION, ATTENDEE) get processed without the
+     * uppercase, which on a 50k-line corporate feed is real wall-clock.
+     */
+    private const val MAX_DELIMITER_LINE = 16
 
     /**
      * RFC 5545 §3.1 line unfolding: a continuation line begins with a single
@@ -114,6 +126,7 @@ object IcsParser {
 
     private fun buildEvents(
         props: Map<String, Pair<Map<String, String>, String>>,
+        veventSeq: Int,
         windowStart: LocalDate,
         windowEnd: LocalDate,
     ): List<CalendarEvent> {
@@ -124,7 +137,9 @@ object IcsParser {
         // URL is stored raw — calendar feeds emit full https links here; we
         // don't escape-decode because RFC 5545 §3.8.4.6 says it's already a URI.
         val url = props["URL"]?.second.orEmpty()
-        val uid = props["UID"]?.second ?: "ics-${summary.hashCode()}-$dtStartValue"
+        // Mix veventSeq into the synthesized UID so two UID-less events with
+        // identical SUMMARY + DTSTART don't collapse into the same id.
+        val uid = props["UID"]?.second ?: "ics-synth-$veventSeq-${summary.hashCode()}-$dtStartValue"
 
         val start = parseDateOrDateTime(dtStartValue, dtStartParams) ?: return emptyList()
         val end = dtEndPair?.let { parseDateOrDateTime(it.second, it.first) }
@@ -133,8 +148,11 @@ object IcsParser {
         // Duration is preserved when expanding recurrences so a 30-minute slot
         // stays 30 minutes on every occurrence — not a property of the rule.
         val durationDays = if (start.allDay && end != null && end.allDay) {
-            // ICS all-day DTEND is exclusive — subtract 1 to get inclusive last day.
-            (end.date.toEpochDays() - start.date.toEpochDays()).toInt().coerceAtLeast(0) - 1
+            // ICS all-day DTEND is exclusive — subtract 1 to get inclusive last
+            // day. Coerce the result, not the input: a same-day DTSTART/DTEND
+            // (degenerate but seen in the wild) used to yield -1 here.
+            val span = (end.date.toEpochDays() - start.date.toEpochDays()).toInt()
+            (span - 1).coerceAtLeast(0)
         } else 0
 
         val starts: List<DateOrDateTime> = if (rrule != null) {

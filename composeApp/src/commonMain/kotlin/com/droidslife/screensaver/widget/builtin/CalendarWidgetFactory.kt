@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -227,7 +228,10 @@ private class CalendarWidget(
                 CalendarLayout.TODAY_TIMELINE -> TodayTimelineContent(
                     today = today,
                     nowDt = nowDt,
-                    events = upcoming,
+                    // Pass the full event list so past-today events still show
+                    // up in the timeline (dimmed) — otherwise a 9 a.m. standup
+                    // disappears at 9:16 and the day reads emptier than it was.
+                    events = events,
                     accent = accent,
                     statusMessage = statusMessage,
                     statusSeverity = statusSeverity,
@@ -504,7 +508,13 @@ private fun TodayTimelineContent(
     statusMessage: String?,
     statusSeverity: WidgetStatusSeverity,
 ) {
-    val todays = events.filter { it.startDate == today }
+    // Anchoring on startDate == today (not on isUpcomingFrom) keeps already-
+    // ended meetings in the timeline so the user can scroll up and see the
+    // full shape of the day. They render dimmed so attention stays on what's
+    // current/next.
+    val todays = events
+        .filter { it.startDate == today }
+        .sortedBy { it.start ?: it.startDate.atTime(0, 0) }
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -545,7 +555,24 @@ private fun TimelineRow(event: CalendarEvent, nowDt: LocalDateTime, accent: Colo
     }
     val isLive = event.start != null && event.end != null &&
         nowDt in event.start..event.end
+    // "Past" = an event whose end (or start, if no end) is before now today.
+    // All-day events never go "past" while the day is still today.
+    val isPast = !event.allDay && !isLive && run {
+        val end = event.end ?: event.start
+        end != null && end < nowDt
+    }
     val clickable = event.url.isNotBlank()
+    val barColor = when {
+        isLive -> accent
+        isPast -> DwellColors.TextFaint
+        else -> accent.copy(alpha = 0.5f)
+    }
+    val timeColor = when {
+        isLive -> accent
+        isPast -> DwellColors.TextFaint
+        else -> DwellColors.TextMid
+    }
+    val titleColor = if (isPast) DwellColors.TextLow else DwellColors.TextHigh
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -561,20 +588,21 @@ private fun TimelineRow(event: CalendarEvent, nowDt: LocalDateTime, accent: Colo
                 .width(2.dp)
                 .height(18.dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(if (isLive) accent else accent.copy(alpha = 0.5f)),
+                .background(barColor),
         )
         Text(
             text = timeLabel,
             fontFamily = DwellFonts.jetBrainsMono(),
             fontSize = 10.sp,
-            color = if (isLive) accent else DwellColors.TextMid,
+            color = timeColor,
             modifier = Modifier.width(46.dp),
         )
         Text(
             text = event.title.ifBlank { "(no title)" },
             fontFamily = DwellFonts.interTight(),
             fontSize = 12.sp,
-            color = DwellColors.TextHigh,
+            color = titleColor,
+            textDecoration = if (isPast) TextDecoration.LineThrough else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
