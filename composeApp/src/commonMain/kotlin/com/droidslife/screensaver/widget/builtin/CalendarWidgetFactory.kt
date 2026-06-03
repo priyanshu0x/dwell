@@ -1,6 +1,10 @@
 package com.droidslife.screensaver.widget.builtin
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,9 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droidslife.screensaver.calendar.CalendarMath
@@ -214,6 +222,16 @@ private class CalendarWidget(
         val heatByDay: Map<LocalDate, Int> = remember(events, monthNumber, today.year, heatmapEnabled) {
             if (heatmapEnabled) CalendarMath.busyMinutesByDay(events, today.year, monthNumber) else emptyMap()
         }
+        // First-event URL per day so a click on a day cell opens that day's
+        // earliest event in the source calendar. Days with no event aren't
+        // clickable — we don't know what generic "open the calendar" link to
+        // use without knowing the source provider.
+        val firstUrlByDay: Map<LocalDate, String> = remember(events) {
+            events
+                .filter { it.url.isNotBlank() }
+                .groupBy { it.startDate }
+                .mapValues { (_, list) -> list.first().url }
+        }
         val upcoming = events.filter { it.isUpcomingFrom(nowDt) }
             .sortedBy { it.start ?: it.startDate.atTime(0, 0) }
 
@@ -255,6 +273,7 @@ private class CalendarWidget(
                     upcoming = upcoming,
                     countsByDay = countsByDay,
                     heatByDay = heatByDay,
+                    firstUrlByDay = firstUrlByDay,
                     accent = accent,
                     statusMessage = statusMessage,
                     statusSeverity = statusSeverity,
@@ -278,6 +297,7 @@ private fun MonthGridContent(
     upcoming: List<CalendarEvent>,
     countsByDay: Map<LocalDate, Int>,
     heatByDay: Map<LocalDate, Int>,
+    firstUrlByDay: Map<LocalDate, String>,
     accent: Color,
     statusMessage: String?,
     statusSeverity: WidgetStatusSeverity,
@@ -291,7 +311,7 @@ private fun MonthGridContent(
             settingsId = WIDGET_ID,
         )
         Spacer(Modifier.height(4.dp))
-        MonthGrid(today = today, countsByDay = countsByDay, heatByDay = heatByDay, accent = accent)
+        MonthGrid(today = today, countsByDay = countsByDay, heatByDay = heatByDay, firstUrlByDay = firstUrlByDay, accent = accent)
         if (upcoming.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             UpcomingList(events = upcoming, today = today, nowDt = nowDt, accent = accent, max = 3)
@@ -305,6 +325,7 @@ private fun MonthGrid(
     today: LocalDate,
     countsByDay: Map<LocalDate, Int>,
     heatByDay: Map<LocalDate, Int>,
+    firstUrlByDay: Map<LocalDate, String>,
     accent: Color,
 ) {
     val firstOfMonth = LocalDate(today.year, today.month, 1)
@@ -340,6 +361,7 @@ private fun MonthGrid(
                             isToday = dayNumber == today.day,
                             eventCount = countsByDay[date] ?: 0,
                             heatAlpha = CalendarMath.heatAlpha(heatByDay[date] ?: 0),
+                            openUrl = firstUrlByDay[date].orEmpty(),
                             accent = accent,
                         )
                     } else {
@@ -354,7 +376,14 @@ private fun MonthGrid(
 }
 
 @Composable
-private fun DayCell(day: Int, isToday: Boolean, eventCount: Int, heatAlpha: Float, accent: Color) {
+private fun DayCell(
+    day: Int,
+    isToday: Boolean,
+    eventCount: Int,
+    heatAlpha: Float,
+    openUrl: String,
+    accent: Color,
+) {
     // Today wins the visual emphasis: a stronger tint than the heatmap would
     // otherwise apply to that single cell, so it stays anchored.
     val bg = when {
@@ -368,6 +397,7 @@ private fun DayCell(day: Int, isToday: Boolean, eventCount: Int, heatAlpha: Floa
             .padding(horizontal = 2.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(bg)
+            .openLinkOnClick(openUrl)
             .padding(horizontal = 6.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(1.dp),
@@ -424,10 +454,12 @@ private fun WeekStripContent(
     // Show today plus the next 6 days. Anchoring at today (instead of the
     // start of the week) keeps the most actionable cells leftmost.
     val days = (0 until 7).map { today.plus(it, DateTimeUnit.DAY) }
-    val firstEventByDay = events
-        .filter { it.isUpcomingFrom(nowDt) }
+    // For each day: the earliest upcoming event (used for the title + click-
+    // through), and the total count of upcoming events so the cell can show a
+    // "+N" overflow hint when the day has more than one.
+    val byDay = events
+        .filter { it.isUpcomingFrom(nowDt) && it.startDate in days.first()..days.last() }
         .groupBy { it.startDate }
-        .mapValues { (_, list) -> list.minByOrNull { it.start ?: it.startDate.atTime(0, 0) } }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -439,12 +471,18 @@ private fun WeekStripContent(
         )
         Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             days.forEach { d ->
+                // events here are already widget-sorted by start, so first() is
+                // the earliest of the day for the click-through target.
+                val dayEvents = byDay[d].orEmpty()
+                val first = dayEvents.firstOrNull()
                 StripCell(
                     date = d,
                     isToday = d == today,
                     eventCount = countsByDay[d] ?: 0,
-                    firstEventTitle = firstEventByDay[d]?.title,
-                    firstEventUrl = firstEventByDay[d]?.url.orEmpty(),
+                    firstEvent = first,
+                    firstEventTitle = first?.title,
+                    firstEventUrl = first?.url.orEmpty(),
+                    extraUpcoming = (dayEvents.size - 1).coerceAtLeast(0),
                     accent = accent,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
@@ -459,8 +497,10 @@ private fun StripCell(
     date: LocalDate,
     isToday: Boolean,
     eventCount: Int,
+    firstEvent: CalendarEvent?,
     firstEventTitle: String?,
     firstEventUrl: String,
+    extraUpcoming: Int,
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
@@ -469,12 +509,11 @@ private fun StripCell(
     } else {
         consoleNestedSurfaceColor(DwellColors.Surface1)
     }
-    val clickable = firstEventUrl.isNotBlank()
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
             .background(bg)
-            .then(if (clickable) Modifier.clickable { openLink(firstEventUrl) } else Modifier)
+            .openLinkOnClick(firstEventUrl)
             .padding(horizontal = 4.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -496,13 +535,27 @@ private fun StripCell(
         )
         EventDots(count = eventCount, accent = accent)
         if (!firstEventTitle.isNullOrBlank()) {
+            val titleText: @Composable () -> Unit = {
+                Text(
+                    text = firstEventTitle,
+                    fontFamily = DwellFonts.interTight(),
+                    fontSize = 9.sp,
+                    color = DwellColors.TextLow,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (firstEvent != null) EventTooltip(event = firstEvent) { titleText() } else titleText()
+        }
+        // Lets a 5-meetings-Monday read differently from a 1-meeting-Monday
+        // even after the dots cap kicks in at 3.
+        if (extraUpcoming > 0) {
             Text(
-                text = firstEventTitle,
+                text = "+$extraUpcoming more",
                 fontFamily = DwellFonts.interTight(),
-                fontSize = 9.sp,
-                color = DwellColors.TextLow,
+                fontSize = 8.sp,
+                color = DwellColors.TextFaint,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -574,7 +627,6 @@ private fun TimelineRow(event: CalendarEvent, nowDt: LocalDateTime, accent: Colo
         val end = event.end ?: event.start
         end != null && end < nowDt
     }
-    val clickable = event.url.isNotBlank()
     val barColor = when {
         isLive -> accent
         isPast -> DwellColors.TextFaint
@@ -591,7 +643,7 @@ private fun TimelineRow(event: CalendarEvent, nowDt: LocalDateTime, accent: Colo
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
             .background(if (isLive) accent.copy(alpha = 0.10f) else Color.Transparent)
-            .then(if (clickable) Modifier.clickable { openLink(event.url) } else Modifier)
+            .openLinkOnClick(event.url)
             .padding(horizontal = 4.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -610,16 +662,18 @@ private fun TimelineRow(event: CalendarEvent, nowDt: LocalDateTime, accent: Colo
             color = timeColor,
             modifier = Modifier.width(46.dp),
         )
-        Text(
-            text = event.title.ifBlank { "(no title)" },
-            fontFamily = DwellFonts.interTight(),
-            fontSize = 12.sp,
-            color = titleColor,
-            textDecoration = if (isPast) TextDecoration.LineThrough else null,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        EventTooltip(event = event, modifier = Modifier.weight(1f)) {
+            Text(
+                text = event.title.ifBlank { "(no title)" },
+                fontFamily = DwellFonts.interTight(),
+                fontSize = 12.sp,
+                color = titleColor,
+                textDecoration = if (isPast) TextDecoration.LineThrough else null,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -637,11 +691,10 @@ private fun UpcomingList(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         events.take(max).forEach { e ->
-            val clickable = e.url.isNotBlank()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (clickable) Modifier.clickable { openLink(e.url) } else Modifier),
+                    .openLinkOnClick(e.url),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -659,15 +712,17 @@ private fun UpcomingList(
                     modifier = Modifier.width(58.dp),
                     maxLines = 1,
                 )
-                Text(
-                    text = e.title.ifBlank { "(no title)" },
-                    fontFamily = DwellFonts.interTight(),
-                    fontSize = 11.sp,
-                    color = DwellColors.TextHigh,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                EventTooltip(event = e, modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = e.title.ifBlank { "(no title)" },
+                        fontFamily = DwellFonts.interTight(),
+                        fontSize = 11.sp,
+                        color = DwellColors.TextHigh,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
@@ -770,6 +825,89 @@ private fun minutesBetween(a: LocalDateTime, b: LocalDateTime): Int {
     val secA = a.time.toSecondOfDay()
     val secB = b.time.toSecondOfDay()
     return (days * 24 * 60) + (secB - secA) / 60
+}
+
+/**
+ * Adds a click handler that opens [url] and switches the hover cursor to a
+ * hand on platforms that support pointer icons, so a calendar row reads as
+ * actionable instead of decorative. No-op when [url] is blank.
+ */
+private fun Modifier.openLinkOnClick(url: String): Modifier {
+    if (url.isBlank()) return this
+    return this
+        .pointerHoverIcon(PointerIcon.Hand)
+        .clickable { openLink(url) }
+}
+
+/**
+ * Wraps [content] in a hover tooltip showing the event's full detail —
+ * needed because every list/strip/timeline title is single-line ellipsized,
+ * so a long "Quarterly business review with the leadership team" otherwise
+ * reads as "Quarterly busine…". The card surfaces the full title plus a
+ * time/location line on hover.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun EventTooltip(
+    event: CalendarEvent,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    TooltipArea(
+        tooltip = { EventHoverCard(event) },
+        delayMillis = 450,
+        tooltipPlacement = TooltipPlacement.ComponentRect(
+            anchor = Alignment.TopStart,
+            alignment = Alignment.BottomStart,
+            offset = DpOffset(0.dp, (-6).dp),
+        ),
+        modifier = modifier,
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun EventHoverCard(event: CalendarEvent) {
+    val timeLine = buildString {
+        if (event.allDay) {
+            append("All day")
+        } else if (event.start != null) {
+            append("${event.start.time.hour.toString().padStart(2, '0')}:${event.start.time.minute.toString().padStart(2, '0')}")
+            event.end?.let {
+                append("–${it.time.hour.toString().padStart(2, '0')}:${it.time.minute.toString().padStart(2, '0')}")
+            }
+        }
+        if (event.location.isNotBlank()) {
+            if (isNotEmpty()) append("  ·  ")
+            append(event.location)
+        }
+    }
+    Column(
+        modifier = Modifier
+            .widthIn(max = 280.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(DwellColors.Surface0.copy(alpha = 0.97f))
+            .border(1.dp, DwellColors.Stroke, RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = event.title.ifBlank { "(no title)" },
+            color = DwellColors.TextHigh,
+            fontFamily = DwellFonts.interTight(),
+            fontWeight = FontWeight.Medium,
+            fontSize = 12.sp,
+        )
+        if (timeLine.isNotBlank()) {
+            Text(
+                text = timeLine,
+                color = DwellColors.TextLow,
+                fontFamily = DwellFonts.jetBrainsMono(),
+                fontSize = 10.sp,
+            )
+        }
+    }
 }
 
 // endregion
