@@ -12,16 +12,20 @@ import kotlinx.datetime.plus
 
 /**
  * Minimal RFC 5545 parser, scoped to what a dashboard tile actually needs:
- * VEVENT only, `DTSTART` / `DTEND` / `SUMMARY` / `LOCATION`, plus a small
- * RRULE expander for `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY` with `INTERVAL`,
- * `UNTIL`, `COUNT`, and (for WEEKLY) `BYDAY`.
+ * VEVENT only, `DTSTART` / `DTEND` / `SUMMARY` / `LOCATION` / `URL`, plus a
+ * small RRULE expander for `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY` with
+ * `INTERVAL`, `UNTIL`, `COUNT`, and (for WEEKLY) `BYDAY`.
  *
  * Out of scope on purpose:
- *  - VTIMEZONE — we read TZID as a hint but render every time as wall-clock
- *    in the user's current zone. Cross-zone meetings drift by the TZ offset
- *    rather than being shifted; documented limitation, fine for "what's next?"
- *  - EXDATE / RDATE — exceptions are ignored; expanded occurrences may include
- *    a date the source marked as cancelled.
+ *  - VTIMEZONE and `TZID=` parameters. We don't read them and we don't
+ *    convert. Every parsed timestamp is treated as **wall-clock in the
+ *    user's current zone**, regardless of source TZ. A trailing `Z`
+ *    (UTC) on a DATETIME is also stripped without conversion. Practical
+ *    consequence: cross-zone meetings drift by the offset between the
+ *    feed's zone and the user's zone. Fine for "what's next?" on a feed
+ *    that lives in one zone; wrong if you mix zones.
+ *  - EXDATE / RDATE — exceptions are ignored; expanded occurrences may
+ *    include a date the source marked as cancelled.
  *  - Complex BY* expansions (BYMONTHDAY etc.) — not supported.
  *
  * The parser is deliberately tolerant: malformed lines are skipped, an
@@ -75,7 +79,9 @@ object IcsParser {
             }
         }
 
-        return events.sortedBy { it.start ?: it.startDate.atTime(0, 0) }
+        // No sort here. Consumers (the widget) sort once at the boundary —
+        // see CalendarProvider.watch() docs.
+        return events
     }
 
     /**

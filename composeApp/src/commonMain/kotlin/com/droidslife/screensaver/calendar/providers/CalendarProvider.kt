@@ -60,8 +60,13 @@ interface CalendarProvider {
 
     /**
      * Live snapshot of every known event, across recent history through the
-     * provider's forward window. Sorted by start; recurring series are pre-
-     * expanded to one entry per occurrence.
+     * provider's forward window. Recurring series are pre-expanded to one
+     * entry per occurrence.
+     *
+     * Ordering is not part of the contract — the consumer (the widget)
+     * sorts before rendering. Providers may emit in any order, which keeps
+     * adapters for new sources (Google Cal OAuth, manual lists, …) from
+     * having to remember an undocumented sort step.
      */
     fun watch(): Flow<List<CalendarEvent>>
 

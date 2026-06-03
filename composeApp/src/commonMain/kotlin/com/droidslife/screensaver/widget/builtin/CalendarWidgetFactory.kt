@@ -153,7 +153,13 @@ private class CalendarWidget(
 
     private val heatmapEnabled: Boolean = config.bool("heatmap", default = true)
 
-    /** Cache of the latest snapshot so [summary] (called outside composition) stays cheap. */
+    /**
+     * Cache of the latest snapshot, **sorted by start**, so [summary] (called
+     * outside composition by chip / minimal renderers) can grab the next
+     * event with a single `firstOrNull` without re-sorting on every call.
+     * Sort is applied once at the LaunchedEffect boundary because
+     * [CalendarProvider.watch] explicitly disclaims ordering.
+     */
     private val summaryCache = MutableStateFlow<List<CalendarEvent>>(emptyList())
 
     override fun summary(): WidgetSummary {
@@ -179,8 +185,15 @@ private class CalendarWidget(
     override fun Content(modifier: Modifier) {
         val today = todayLocal()
         val nowDt = nowLocalDateTime()
-        val events by (provider?.watch() ?: emptyEvents()).collectAsState(initial = remember { summaryCache.value })
+        val rawEvents by (provider?.watch() ?: emptyEvents()).collectAsState(initial = remember { summaryCache.value })
         val sync by (provider?.syncStatus() ?: emptyStatus()).collectAsState(initial = statusFlow.value)
+
+        // Single sort boundary — providers don't promise ordering per the
+        // contract, so we normalize once here and feed sorted events to every
+        // downstream composable AND the off-composition summary cache.
+        val events = remember(rawEvents) {
+            rawEvents.sortedBy { it.start ?: it.startDate.atTime(0, 0) }
+        }
 
         LaunchedEffect(events) { summaryCache.value = events }
 
