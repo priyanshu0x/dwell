@@ -51,8 +51,13 @@ object CalendarMath {
 
     /**
      * Sum busy-minutes per day. Timed events contribute their wall-clock
-     * duration; all-day events contribute [ALL_DAY_BASELINE_MINUTES] per day
-     * they cover. A timed event with no DTEND contributes 30 minutes.
+     * duration; all-day events contribute [ALL_DAY_BASELINE_MINUTES] per
+     * day they cover. A timed event with no DTEND contributes 30 minutes.
+     *
+     * Overlapping meetings are **unioned** before summing — a 9:00-10:00
+     * stacked on a 9:30-10:30 contributes 90 minutes, not 120. Multi-day
+     * timed events (a conference Fri 5pm → Sun 11am) are sliced into
+     * per-day chunks so each touched day gets its real busy minutes.
      */
     fun busyMinutesByDay(
         events: List<CalendarEvent>,
@@ -60,37 +65,104 @@ object CalendarMath {
         monthNumber: Int,
     ): Map<LocalDate, Int> {
         if (events.isEmpty()) return emptyMap()
-        val out = mutableMapOf<LocalDate, Int>()
         val month = Month.entries[(monthNumber - 1).coerceIn(0, 11)]
         val monthStart = LocalDate(year, month, 1)
         val monthEnd = monthStart.plus(1, DateTimeUnit.MONTH)
+        val monthLast = monthEnd.plus(-1, DateTimeUnit.DAY)
+
+        // Collected separately so all-day baselines stack atop a fully-merged
+        // timed total — birthdays + meetings on the same day each contribute.
+        val intervalsByDay = mutableMapOf<LocalDate, MutableList<IntInterval>>()
+        val allDayMinutesByDay = mutableMapOf<LocalDate, Int>()
 
         for (e in events) {
             if (e.endDate < monthStart || e.startDate >= monthEnd) continue
             if (e.allDay) {
                 var d = if (e.startDate < monthStart) monthStart else e.startDate
-                val last = if (e.endDate >= monthEnd) monthEnd.plus(-1, DateTimeUnit.DAY) else e.endDate
+                val last = if (e.endDate > monthLast) monthLast else e.endDate
                 while (d <= last) {
-                    out[d] = (out[d] ?: 0) + ALL_DAY_BASELINE_MINUTES
+                    allDayMinutesByDay[d] = (allDayMinutesByDay[d] ?: 0) + ALL_DAY_BASELINE_MINUTES
                     d = d.plus(1, DateTimeUnit.DAY)
                 }
             } else {
-                val start = e.start ?: continue
-                val day = start.date
-                if (day < monthStart || day >= monthEnd) continue
-                val mins = e.end?.let {
-                    // Wall-clock minutes within the same day. Multi-day timed
-                    // events are rare in practice; for v1 we attribute the
-                    // span to the start day only.
-                    val s = start.time.toSecondOfDay()
-                    val en = it.time.toSecondOfDay()
-                    if (it.date == start.date) ((en - s) / 60).coerceAtLeast(0) else 60
-                } ?: 30
-                out[day] = (out[day] ?: 0) + mins
+                for (slice in sliceTimed(e)) {
+                    if (slice.date < monthStart || slice.date >= monthEnd) continue
+                    intervalsByDay.getOrPut(slice.date) { mutableListOf() } += IntInterval(slice.startMin, slice.endMin)
+                }
             }
+        }
+
+        val out = mutableMapOf<LocalDate, Int>()
+        for ((day, raw) in intervalsByDay) {
+            out[day] = unionMinutes(raw)
+        }
+        for ((day, baseline) in allDayMinutesByDay) {
+            out[day] = (out[day] ?: 0) + baseline
         }
         return out
     }
+
+    /**
+     * Slice a timed event into one (date, startMinute, endMinute) entry per
+     * day it touches. Single-day timed events return a single slice; cross-
+     * midnight events fan out into a first-day-tail, full middle days, and
+     * a last-day-head. A timed event with no DTEND is treated as a 60-min
+     * block starting at DTSTART.
+     */
+    private fun sliceTimed(event: CalendarEvent): List<TimedSlice> {
+        val start = event.start ?: return emptyList()
+        val end = event.end
+        val startMin = start.time.toSecondOfDay() / 60
+        if (end == null) {
+            return listOf(TimedSlice(start.date, startMin, (startMin + 60).coerceAtMost(MINUTES_PER_DAY)))
+        }
+        if (end.date == start.date) {
+            val endMin = end.time.toSecondOfDay() / 60
+            return if (endMin > startMin) listOf(TimedSlice(start.date, startMin, endMin)) else emptyList()
+        }
+        val out = mutableListOf<TimedSlice>()
+        out += TimedSlice(start.date, startMin, MINUTES_PER_DAY)
+        var d = start.date.plus(1, DateTimeUnit.DAY)
+        while (d < end.date) {
+            out += TimedSlice(d, 0, MINUTES_PER_DAY)
+            d = d.plus(1, DateTimeUnit.DAY)
+        }
+        val tail = end.time.toSecondOfDay() / 60
+        if (tail > 0) out += TimedSlice(end.date, 0, tail)
+        return out
+    }
+
+    /**
+     * Sweep-merge a list of half-open intervals [start, end) and return the
+     * total covered minutes. Inputs are unsorted; the function sorts in place.
+     */
+    private fun unionMinutes(intervals: MutableList<IntInterval>): Int {
+        if (intervals.isEmpty()) return 0
+        intervals.sortBy { it.start }
+        var covered = 0
+        var curStart = intervals[0].start
+        var curEnd = intervals[0].end
+        for (i in 1 until intervals.size) {
+            val iv = intervals[i]
+            if (iv.start > curEnd) {
+                covered += (curEnd - curStart)
+                curStart = iv.start
+                curEnd = iv.end
+            } else if (iv.end > curEnd) {
+                curEnd = iv.end
+            }
+        }
+        covered += (curEnd - curStart)
+        return covered
+    }
+
+    private const val MINUTES_PER_DAY = 24 * 60
+
+    /** Tiny per-day interval. [start] / [end] are minutes-of-day, half-open. */
+    private data class IntInterval(val start: Int, val end: Int)
+
+    /** One (date, start-of-day, end-of-day) entry produced by [sliceTimed]. */
+    private data class TimedSlice(val date: LocalDate, val startMin: Int, val endMin: Int)
 
     /**
      * Maps a busy-minutes count to an 8-bit heat intensity (0..255) for use
