@@ -190,4 +190,99 @@ class IcsParserTest {
         assertEquals(1, events.size)
         assertEquals("In range", events.single().title)
     }
+
+    @Test
+    fun unfoldsTabContinuationLines() {
+        // RFC 5545 allows a tab (not just space) as the fold marker. The
+        // leading tab is dropped and the remainder concatenated verbatim.
+        val ics = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART:20260601T090000\nSUMMARY:Part1\n\tPart2\nEND:VEVENT\nEND:VCALENDAR"
+        val events = IcsParser.parse(ics, windowStart, windowEnd)
+        assertEquals("Part1Part2", events.single().title)
+    }
+
+    @Test
+    fun clampsEndBeforeStartToStartDay() {
+        // A malformed feed with DTEND before DTSTART must not produce an event
+        // whose endDate precedes startDate — the parser clamps endDate to start.
+        val ics = """
+            BEGIN:VCALENDAR
+            BEGIN:VEVENT
+            UID:backwards@example.com
+            DTSTART:20260615T140000
+            DTEND:20260615T130000
+            SUMMARY:Backwards
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val e = IcsParser.parse(ics, windowStart, windowEnd).single()
+        assertTrue(e.endDate >= e.startDate, "endDate must not precede startDate")
+        assertEquals(LocalDate(2026, 6, 15), e.startDate)
+    }
+
+    @Test
+    fun rruleWithoutFreqYieldsSingleOccurrence() {
+        // A degenerate RRULE missing FREQ shouldn't expand — we fall back to
+        // the seed event alone rather than looping or dropping it.
+        val ics = """
+            BEGIN:VCALENDAR
+            BEGIN:VEVENT
+            UID:nofreq@example.com
+            DTSTART;VALUE=DATE:20260601
+            SUMMARY:No freq
+            RRULE:INTERVAL=2;COUNT=5
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val events = IcsParser.parse(ics, windowStart, windowEnd)
+        assertEquals(1, events.size)
+        assertEquals(LocalDate(2026, 6, 1), events.single().startDate)
+    }
+
+    @Test
+    fun synthesizesDistinctIdsForUidlessDuplicates() {
+        // Two events with identical SUMMARY + DTSTART and no UID must not
+        // collapse into one — the per-VEVENT sequence keeps their ids distinct.
+        val ics = """
+            BEGIN:VCALENDAR
+            BEGIN:VEVENT
+            DTSTART:20260601T090000
+            SUMMARY:Dup
+            END:VEVENT
+            BEGIN:VEVENT
+            DTSTART:20260601T090000
+            SUMMARY:Dup
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val events = IcsParser.parse(ics, windowStart, windowEnd)
+        assertEquals(2, events.size)
+        assertEquals(2, events.map { it.id }.toSet().size, "ids must be distinct")
+    }
+
+    @Test
+    fun exdateIsIgnored_knownLimitation() {
+        // Documents a deliberate limitation: EXDATE is NOT honored, so a date
+        // the source cancelled still appears as an occurrence. If we ever add
+        // EXDATE support this test should flip to assert the exclusion.
+        val ics = """
+            BEGIN:VCALENDAR
+            BEGIN:VEVENT
+            UID:daily@example.com
+            DTSTART:20260601T090000
+            DTEND:20260601T093000
+            SUMMARY:Daily
+            RRULE:FREQ=DAILY;COUNT=3
+            EXDATE:20260602T090000
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val events = IcsParser.parse(ics, windowStart, windowEnd)
+        // All 3 occurrences present — the EXDATE'd 06-02 is NOT removed.
+        assertEquals(3, events.size)
+        assertTrue(events.any { it.startDate == LocalDate(2026, 6, 2) })
+    }
 }

@@ -176,25 +176,9 @@ class IcsCalendarProvider(
     }
 
 
-    private fun normalizeUrl(raw: String): String {
-        // Most "subscribe to calendar" links Apple/Google hand out are
-        // `webcal://...` — same payload, just a different scheme used to
-        // hint native calendar apps to register the feed. ktor doesn't
-        // resolve webcal, so we swap it for https.
-        return when {
-            raw.startsWith("webcal://", ignoreCase = true) -> "https://" + raw.substring(9)
-            raw.startsWith("webcals://", ignoreCase = true) -> "https://" + raw.substring(10)
-            else -> raw
-        }
-    }
+    private fun normalizeUrl(raw: String): String = normalizeIcsUrl(raw)
 
-    private fun isAllowedUrl(raw: String): Boolean {
-        val lower = raw.trim().lowercase()
-        return lower.startsWith("https://") ||
-            lower.startsWith("http://") ||
-            lower.startsWith("webcal://") ||
-            lower.startsWith("webcals://")
-    }
+    private fun isAllowedUrl(raw: String): Boolean = isAllowedIcsUrl(raw)
 
     companion object {
         const val ID: String = "ics"
@@ -209,6 +193,26 @@ class IcsCalendarProvider(
 
 private fun LocalDate.minusDays(n: Int): LocalDate {
     return this.plus(-n, DateTimeUnit.DAY)
+}
+
+/**
+ * Most "subscribe to calendar" links Apple/Google hand out are `webcal://` —
+ * same payload, just a scheme that hints native calendar apps to register
+ * the feed. ktor doesn't resolve webcal, so we swap it for https.
+ */
+internal fun normalizeIcsUrl(raw: String): String = when {
+    raw.startsWith("webcal://", ignoreCase = true) -> "https://" + raw.substring(9)
+    raw.startsWith("webcals://", ignoreCase = true) -> "https://" + raw.substring(10)
+    else -> raw
+}
+
+/** Only HTTP(S)/webcal feeds are fetchable; everything else (file:, jar:, …) is rejected. */
+internal fun isAllowedIcsUrl(raw: String): Boolean {
+    val lower = raw.trim().lowercase()
+    return lower.startsWith("https://") ||
+        lower.startsWith("http://") ||
+        lower.startsWith("webcal://") ||
+        lower.startsWith("webcals://")
 }
 
 /**
