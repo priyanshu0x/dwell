@@ -81,6 +81,59 @@ class CalendarMathTest {
     }
 
     @Test
+    fun busyMinutesUnionsOverlappingMeetings() {
+        val day = LocalDate(2026, 6, 10)
+        val events = listOf(
+            timed("a", day, 9, 0, 10, 0),    // 9:00-10:00
+            timed("b", day, 9, 30, 10, 30),  // 9:30-10:30, overlaps a by 30 min
+        )
+
+        val busy = CalendarMath.busyMinutesByDay(events, year = 2026, monthNumber = 6)
+
+        // Union [9:00, 10:30) = 90 minutes wall-clock, not 60+60=120.
+        assertEquals(90, busy[day])
+    }
+
+    @Test
+    fun busyMinutesCountsTangentMeetingsAsContinuous() {
+        val day = LocalDate(2026, 6, 10)
+        val events = listOf(
+            timed("a", day, 9, 0, 10, 0),
+            timed("b", day, 10, 0, 11, 0),
+        )
+
+        val busy = CalendarMath.busyMinutesByDay(events, year = 2026, monthNumber = 6)
+
+        // 9-10 and 10-11 touch but don't overlap; we treat them as a single
+        // 120-min block so back-to-back meetings register as continuous busy.
+        assertEquals(120, busy[day])
+    }
+
+    @Test
+    fun busyMinutesSlicesMultiDayTimedEventAcrossDays() {
+        // A conference Fri 17:00 → Sun 11:00 should attribute the real
+        // wall-clock minutes to each day it covers, not just the start day.
+        val friday = LocalDate(2026, 6, 5)
+        val saturday = LocalDate(2026, 6, 6)
+        val sunday = LocalDate(2026, 6, 7)
+        val event = CalendarEvent(
+            id = "conf",
+            title = "Offsite",
+            startDate = friday,
+            endDate = sunday,
+            start = LocalDateTime(friday, LocalTime(17, 0)),
+            end = LocalDateTime(sunday, LocalTime(11, 0)),
+            allDay = false,
+        )
+
+        val busy = CalendarMath.busyMinutesByDay(listOf(event), year = 2026, monthNumber = 6)
+
+        assertEquals(7 * 60, busy[friday])     // 17:00 → midnight
+        assertEquals(24 * 60, busy[saturday])  // whole day
+        assertEquals(11 * 60, busy[sunday])    // midnight → 11:00
+    }
+
+    @Test
     fun heatAlphaRampsToCap() {
         assertEquals(0f, CalendarMath.heatAlpha(0))
         // Half a workday → half the cap.

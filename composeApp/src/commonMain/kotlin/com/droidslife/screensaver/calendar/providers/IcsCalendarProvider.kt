@@ -11,12 +11,13 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -54,9 +55,20 @@ class IcsCalendarProvider(
     private val sync = MutableStateFlow<CalendarSyncStatus>(CalendarSyncStatus.Healthy)
     private var pollJob: Job? = null
 
+    // Conflated so repeated taps collapse into a single pending refresh; the
+    // poll loop waits on this OR the interval, whichever comes first.
+    private val refreshSignal = Channel<Unit>(Channel.CONFLATED)
+
     override fun watch(): Flow<List<CalendarEvent>> {
         if (url.isBlank()) {
             sync.value = CalendarSyncStatus.Unconfigured("Paste an ICS URL in widget settings")
+            return state.asStateFlow()
+        }
+        // Reject anything that isn't an HTTP(S)/webcal feed before we hand it to
+        // ktor — a pasted `file://` URL would otherwise read local files on
+        // shared installs and cache the result as if it were ICS.
+        if (!isAllowedUrl(url)) {
+            sync.value = CalendarSyncStatus.Unconfigured("URL scheme not supported — use https:// or webcal://")
             return state.asStateFlow()
         }
         if (pollJob?.isActive != true) {
@@ -64,7 +76,12 @@ class IcsCalendarProvider(
                 loadCache()
                 while (isActive) {
                     refreshSafely()
-                    delay(refreshIntervalMs.coerceAtLeast(MIN_REFRESH_MS))
+                    // Sleep until the interval elapses or a manual refresh is
+                    // requested, whichever is first. withTimeoutOrNull returns
+                    // null on timeout (normal tick) or Unit on an early signal.
+                    withTimeoutOrNull(refreshIntervalMs.coerceAtLeast(MIN_REFRESH_MS)) {
+                        refreshSignal.receive()
+                    }
                 }
             }
         }
@@ -73,8 +90,21 @@ class IcsCalendarProvider(
 
     override fun syncStatus(): Flow<CalendarSyncStatus> = sync.asStateFlow()
 
+    override fun refresh() {
+        // No-op until watch() has started the loop; trySend never blocks and
+        // the conflated channel coalesces bursts into one pending wake-up.
+        refreshSignal.trySend(Unit)
+    }
+
     private suspend fun loadCache() {
-        val cached = runCatching { storage.read(cacheKey(), String::class.java) }.getOrNull() ?: return
+        // Only trust the cached body if it was fetched from the URL we're
+        // currently configured for — otherwise on a URL change the user
+        // briefly sees events from the old calendar before the first refresh
+        // overwrites them.
+        val cachedUrl = suspendingRunCatching { storage.read(CACHE_URL_KEY, String::class.java) }.getOrNull()
+        if (cachedUrl != url) return
+        val cached = suspendingRunCatching { storage.read(CACHE_BODY_KEY, String::class.java) }
+            .getOrNull() ?: return
         val today = now()
         val parsed = runCatching {
             IcsParser.parse(
@@ -90,7 +120,28 @@ class IcsCalendarProvider(
         val target = normalizeUrl(url)
         try {
             val response = http.get(target)
+            // Guard memory: even busy enterprise calendars rarely exceed a few
+            // hundred KB. A 5MB cap rejects both runaway feeds and pathological
+            // payloads aimed at exhausting the widget's process.
+            val declared = response.headers["Content-Length"]?.toLongOrNull()
+            if (declared != null && declared > MAX_BODY_BYTES) {
+                sync.value = CalendarSyncStatus.Offline(
+                    "Feed is ${declared / 1024 / 1024}MB — refusing to load (cap is ${MAX_BODY_BYTES / 1024 / 1024}MB)"
+                )
+                return
+            }
+            // NOTE: if a server omits Content-Length and streams a huge body,
+            // bodyAsText() still slurps it before we can reject — we'd want a
+            // streaming reader (bodyAsChannel + readRemaining) to be strict.
+            // The post-read check below still keeps the parser and the cache
+            // from ever touching a body that exceeds the cap.
             val body = response.bodyAsText()
+            if (body.length > MAX_BODY_BYTES) {
+                sync.value = CalendarSyncStatus.Offline(
+                    "Feed body exceeded ${MAX_BODY_BYTES / 1024 / 1024}MB — refusing to parse"
+                )
+                return
+            }
             if (!body.contains("BEGIN:VCALENDAR", ignoreCase = true)) {
                 sync.value = CalendarSyncStatus.Offline("Feed didn't look like ICS — check the URL")
                 return
@@ -103,7 +154,13 @@ class IcsCalendarProvider(
             )
             state.value = parsed
             sync.value = CalendarSyncStatus.Healthy
-            runCatching { storage.write(cacheKey(), body) }
+            // Write body first, URL stamp second. A torn write between the two
+            // leaves a fresh body with the previous URL stamp — loadCache
+            // rejects on mismatch (fail-safe). The reverse order could leave
+            // the stamp pointing at this URL while the body is still the old
+            // calendar's, which would silently serve stale events.
+            suspendingRunCatching { storage.write(CACHE_BODY_KEY, body) }
+            suspendingRunCatching { storage.write(CACHE_URL_KEY, url) }
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
@@ -118,33 +175,56 @@ class IcsCalendarProvider(
         }
     }
 
-    private fun cacheKey(): String {
-        // Multiple ICS URLs shouldn't collide if a future user reuses storage
-        // across widget instances of the same type.
-        val safe = url.hashCode().toString().replace('-', '_')
-        return "ics-cache-$safe.txt"
-    }
 
-    private fun normalizeUrl(raw: String): String {
-        // Most "subscribe to calendar" links Apple/Google hand out are
-        // `webcal://...` — same payload, just a different scheme used to
-        // hint native calendar apps to register the feed. ktor doesn't
-        // resolve webcal, so we swap it for https.
-        return when {
-            raw.startsWith("webcal://", ignoreCase = true) -> "https://" + raw.substring(9)
-            raw.startsWith("webcals://", ignoreCase = true) -> "https://" + raw.substring(10)
-            else -> raw
-        }
-    }
+    private fun normalizeUrl(raw: String): String = normalizeIcsUrl(raw)
+
+    private fun isAllowedUrl(raw: String): Boolean = isAllowedIcsUrl(raw)
 
     companion object {
         const val ID: String = "ics"
         private const val PAST_WINDOW_DAYS = 30
         private const val FUTURE_WINDOW_DAYS = 365
         private const val MIN_REFRESH_MS = 60_000L
+        private const val MAX_BODY_BYTES = 5L * 1024 * 1024
+        private const val CACHE_BODY_KEY = "ics-cache-body.txt"
+        private const val CACHE_URL_KEY = "ics-cache-url.txt"
     }
 }
 
 private fun LocalDate.minusDays(n: Int): LocalDate {
     return this.plus(-n, DateTimeUnit.DAY)
+}
+
+/**
+ * Most "subscribe to calendar" links Apple/Google hand out are `webcal://` —
+ * same payload, just a scheme that hints native calendar apps to register
+ * the feed. ktor doesn't resolve webcal, so we swap it for https.
+ */
+internal fun normalizeIcsUrl(raw: String): String = when {
+    raw.startsWith("webcal://", ignoreCase = true) -> "https://" + raw.substring(9)
+    raw.startsWith("webcals://", ignoreCase = true) -> "https://" + raw.substring(10)
+    else -> raw
+}
+
+/** Only HTTP(S)/webcal feeds are fetchable; everything else (file:, jar:, …) is rejected. */
+internal fun isAllowedIcsUrl(raw: String): Boolean {
+    val lower = raw.trim().lowercase()
+    return lower.startsWith("https://") ||
+        lower.startsWith("http://") ||
+        lower.startsWith("webcal://") ||
+        lower.startsWith("webcals://")
+}
+
+/**
+ * Cancellation-safe variant of stdlib's [runCatching]. Plain `runCatching`
+ * catches [Throwable], which includes [CancellationException] — that swallows
+ * coroutine cancellation and lets the loop keep running past a host-cancelled
+ * scope. We rethrow cancellation so the surrounding coroutine actually stops.
+ */
+private inline fun <T> suspendingRunCatching(block: () -> T): Result<T> = try {
+    Result.success(block())
+} catch (ce: CancellationException) {
+    throw ce
+} catch (t: Throwable) {
+    Result.failure(t)
 }

@@ -60,8 +60,13 @@ interface CalendarProvider {
 
     /**
      * Live snapshot of every known event, across recent history through the
-     * provider's forward window. Sorted by start; recurring series are pre-
-     * expanded to one entry per occurrence.
+     * provider's forward window. Recurring series are pre-expanded to one
+     * entry per occurrence.
+     *
+     * Ordering is not part of the contract — the consumer (the widget)
+     * sorts before rendering. Providers may emit in any order, which keeps
+     * adapters for new sources (Google Cal OAuth, manual lists, …) from
+     * having to remember an undocumented sort step.
      */
     fun watch(): Flow<List<CalendarEvent>>
 
@@ -71,6 +76,14 @@ interface CalendarProvider {
      * healthy for purely local providers.
      */
     fun syncStatus(): Flow<CalendarSyncStatus> = flowOf(CalendarSyncStatus.Healthy)
+
+    /**
+     * Request an out-of-band refresh now, instead of waiting for the next
+     * poll tick. Fire-and-forget: the new snapshot arrives through [watch].
+     * Default no-op for providers that have nothing to re-fetch (e.g. a
+     * purely local list).
+     */
+    fun refresh() {}
 }
 
 /**
