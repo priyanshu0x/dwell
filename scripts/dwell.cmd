@@ -22,9 +22,14 @@ if /I "%CMD%"=="--debug" (
     set "DWELL_DEBUG=1"
     set "CMD=%~2"
 )
+if /I "%CMD%"=="--hidden" (
+    set "DWELL_HIDDEN=1"
+    set "CMD=%~2"
+)
 if "%CMD%"=="" set "CMD=help"
 if /I "%~2"=="--debug" set "DWELL_DEBUG=1"
 if /I "%~2"=="-v" set "DWELL_DEBUG=1"
+if /I "%~2"=="--hidden" set "DWELL_HIDDEN=1"
 set "DWELL_EXIT=0"
 
 if /I "%CMD%"=="help" goto :usage
@@ -53,6 +58,13 @@ if /I "%CMD%"=="version" (
 if /I "%CMD%"=="status" (
     call :status
     goto :end
+)
+
+if defined DWELL_HIDDEN if not defined DWELL_DETACHED (
+    if /I "%CMD%"=="show" goto :detach
+    if /I "%CMD%"=="daemon" goto :detach
+    if /I "%CMD%"=="config" goto :detach
+    if /I "%CMD%"=="dev" goto :detach
 )
 
 call :bootstrap_java || goto :end
@@ -161,6 +173,24 @@ if not exist "!DWELL_LOG_DIR!\." (
     if not exist "!DWELL_LOG_DIR!" mkdir "!DWELL_LOG_DIR!" >nul 2>nul
 )
 set "DWELL_LOG=!DWELL_LOG_DIR!\launcher.log"
+
+:detach
+call :detach_hidden %*
+goto :end
+
+:detach_hidden
+rem Relaunch this script with no console window. Output already goes to
+rem the launcher log in quiet mode, so nothing is lost. The child inherits
+rem DWELL_DETACHED and runs normally.
+if not defined DWELL_ROOT set "DWELL_ROOT=%ROOT%"
+set "DWELL_SCRIPT=%~f0"
+set "DWELL_ARGS=%*"
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "$env:DWELL_DETACHED='1'; Start-Process -FilePath 'cmd.exe' -ArgumentList '/D','/C',('\"' + $env:DWELL_SCRIPT + '\" ' + $env:DWELL_ARGS) -WindowStyle Hidden -WorkingDirectory $env:DWELL_ROOT"
+if errorlevel 1 (
+    echo ERROR: Hidden launch failed.
+    set "DWELL_EXIT=1"
+)
+goto :eof
 goto :eof
 
 :run_gradle
@@ -208,27 +238,39 @@ call :resolve_startup_dir || (
     set "DWELL_EXIT=1"
     goto :eof
 )
-if not exist "!STARTUP!" mkdir "!STARTUP!"
+rem ver clears a stale errorlevel when mkdir is skipped.
+if not exist "!STARTUP!" ( mkdir "!STARTUP!" ) else ( ver >nul )
 if errorlevel 1 (
     echo ERROR: Failed to create Startup folder: !STARTUP!
     set "DWELL_EXIT=1"
     goto :eof
 )
+call :bootstrap_java || goto :end
+call :first_build_hint
+echo Dwell - building and installing the app.
+call :run_gradle --no-daemon --no-configuration-cache :composeApp:createDistributable
+if not "!DWELL_EXIT!"=="0" goto :eof
+call :resolve_app_dir
+if not "!DWELL_EXIT!"=="0" goto :eof
+call :sync_app_image
+if not "!DWELL_EXIT!"=="0" goto :eof
+echo OK: Installed: !DWELL_APP_DIR!
 set "DWELL_STARTUP=!STARTUP!"
-set "DWELL_TARGET=%HERE%dwell.cmd"
-set "DWELL_ROOT=%ROOT%"
-set "DWELL_ICON=%ROOT%\composeApp\desktopAppIcons\WindowsIcon.ico"
+set "DWELL_TARGET=!DWELL_APP_DIR!\Screen Saver App.exe"
+set "DWELL_WORKDIR=!DWELL_APP_DIR!"
+set "DWELL_ICON=!DWELL_APP_DIR!\Screen Saver App.exe,0"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$startup=$env:DWELL_STARTUP;" ^
     "$target=$env:DWELL_TARGET;" ^
-    "$root=$env:DWELL_ROOT;" ^
+    "$workdir=$env:DWELL_WORKDIR;" ^
     "$icon=$env:DWELL_ICON;" ^
     "$path=Join-Path $startup 'Dwell.lnk';" ^
     "$shell=New-Object -ComObject WScript.Shell;" ^
     "$s=$shell.CreateShortcut($path);" ^
     "$s.TargetPath=$target;" ^
     "$s.Arguments='daemon';" ^
-    "$s.WorkingDirectory=$root;" ^
+    "$s.WorkingDirectory=$workdir;" ^
+    "$s.WindowStyle=1;" ^
     "$s.IconLocation=$icon;" ^
     "$s.Save();"
 if errorlevel 1 (
@@ -237,6 +279,7 @@ if errorlevel 1 (
     goto :eof
 )
 echo OK: Wrote Startup shortcut: !STARTUP!\Dwell.lnk
+echo   It takes effect at next login. To start now: scripts\dwell.cmd daemon --hidden
 echo   To stop and remove later, run: scripts\dwell.cmd unregister
 goto :eof
 
@@ -245,6 +288,8 @@ call :resolve_startup_dir || (
     set "DWELL_EXIT=1"
     goto :eof
 )
+call :remove_app_image
+if not "!DWELL_EXIT!"=="0" goto :eof
 if exist "!STARTUP!\Dwell.lnk" (
     del "!STARTUP!\Dwell.lnk"
     if errorlevel 1 (
@@ -286,7 +331,8 @@ call :resolve_bin_dir || (
     set "DWELL_EXIT=1"
     goto :eof
 )
-if not exist "!DWELL_BIN_DIR!" mkdir "!DWELL_BIN_DIR!"
+rem ver clears a stale errorlevel when mkdir is skipped.
+if not exist "!DWELL_BIN_DIR!" ( mkdir "!DWELL_BIN_DIR!" ) else ( ver >nul )
 if errorlevel 1 (
     echo ERROR: Failed to create install directory: !DWELL_BIN_DIR!
     set "DWELL_EXIT=1"
@@ -345,8 +391,8 @@ echo   show       Open the dashboard; Esc hides it to the tray.
 echo   daemon     Run as a tray daemon ^(dashboard appears after idle timeout^).
 echo   config     Open the dashboard with Settings pre-opened.
 echo   dev        Run with Compose Hot Reload ^(for development^).
-echo   register   Register Dwell to run at login ^(Startup folder shortcut^).
-echo   unregister Remove the Startup shortcut.
+echo   register   Install the app and run it at login ^(no console window^).
+echo   unregister Remove the Startup shortcut and the installed app.
 echo   install    Drop a `dwell.cmd` shim into %%USERPROFILE%%\bin.
 echo   uninstall  Remove the shim ^(settings stay^).
 echo   status     Show whether Dwell is running + which JDK / settings is in use.
@@ -354,9 +400,62 @@ echo   help       Show this help.
 echo.
 echo First run will auto-install JDK 21 to %%USERPROFILE%%\jdks\.
 echo Add --debug or set DWELL_DEBUG=1 to show Gradle and Kotlin output.
+echo Add --hidden to run show/daemon/config/dev with no console window.
 goto :end
 
 :end
 popd 2>nul
 set "EXIT_CODE=%DWELL_EXIT%"
 endlocal & exit /b %EXIT_CODE%
+
+:resolve_app_dir
+if defined DWELL_APP_DIR goto :eof
+if defined LOCALAPPDATA (
+    set "DWELL_APP_DIR=%LOCALAPPDATA%\Dwell\app"
+    goto :eof
+)
+echo ERROR: LOCALAPPDATA is not set. Set DWELL_APP_DIR and retry.
+set "DWELL_EXIT=1"
+goto :eof
+
+:sync_app_image
+rem Mirror the packaged app image into the per-user install dir, stopping
+rem the installed copy first so the locked exe can be replaced.
+set "DWELL_IMAGE="
+for /d %%I in ("%ROOT%\composeApp\build\compose\binaries\main\app\*") do set "DWELL_IMAGE=%%I"
+if not defined DWELL_IMAGE (
+    echo ERROR: App image not found. The build above may have failed.
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+echo   Stopping installed copy, if running...
+taskkill /F /IM "Screen Saver App.exe" >nul 2>nul
+rem ver clears a stale errorlevel when mkdir is skipped.
+if not exist "!DWELL_APP_DIR!" ( mkdir "!DWELL_APP_DIR!" ) else ( ver >nul )
+if errorlevel 1 (
+    echo ERROR: Failed to create install dir: !DWELL_APP_DIR!
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+echo   Copying app image to !DWELL_APP_DIR! ...
+robocopy "!DWELL_IMAGE!" "!DWELL_APP_DIR!" /MIR /NFL /NDL /NJH /NJS /R:2 /W:1 >nul
+if errorlevel 8 (
+    echo ERROR: Copy failed. Close the app and retry.
+    set "DWELL_EXIT=1"
+    goto :eof
+)
+goto :eof
+
+:remove_app_image
+rem Stop the installed copy and remove the per-user install, if present.
+call :resolve_app_dir
+if not "!DWELL_EXIT!"=="0" goto :eof
+taskkill /F /IM "Screen Saver App.exe" >nul 2>nul
+if not exist "!DWELL_APP_DIR!\" goto :eof
+echo   Removing installed app: !DWELL_APP_DIR!
+rmdir /S /Q "!DWELL_APP_DIR!"
+if errorlevel 1 (
+    echo ERROR: Failed to remove !DWELL_APP_DIR! - is the app still running?
+    set "DWELL_EXIT=1"
+)
+goto :eof
