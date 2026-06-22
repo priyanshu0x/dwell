@@ -1,22 +1,22 @@
 [versions]
 
-kotlin = "2.3.21"
-compose = "1.11.0"
+kotlin = "2.4.20"
+compose = "1.12.0"
 compose-material3 = "1.9.0"
 compose-material-icons = "1.7.3"
-kermit = "2.0.5"
+kermit = "2.2.0"
 kotlinx-coroutines = "1.11.0"
-ktor = "3.5.0"
+ktor = "3.5.2"
 kotlinx-serialization = "1.11.0"
-coil = "3.4.0"
+coil = "3.6.2"
 kotlinx-datetime = "0.8.0"
-kstore = "1.0.0"
-hot-reload = "1.1.1"
-koin = "4.2.1"
-androidx-lifecycle = "2.9.6"
+kstore = "1.1.0"
+hot-reload = "1.2.0"
+koin = "4.2.2"
+androidx-lifecycle = "2.11.0"
 charleskorn-kaml = "0.104.0"
-jna = "5.18.1"
-slf4j = "2.0.18"
+jna = "5.19.1"
+slf4j = "2.0.19"
 
 
 [libraries]
