@@ -22,7 +22,7 @@ The app uses Gradle configuration cache and parallel builds for normal builds (s
 - Use `./scripts/dwell dev` for fast UI iteration. It runs `DevMainKt` with Compose Hot Reload and `--no-configuration-cache`, opens a decorated/resizable window, remembers its last size and position, stays on top while visible, and intentionally skips daemon, tray, idle-monitor, and startup plumbing.
 - Use `./scripts/dwell show` as the production-path smoke test from source. It must build and launch the current checkout, not ask an already-running daemon to show its existing window.
 - Do not add app-side IPC or daemon reuse to implement `dwell show`. If a registered daemon is running, the launcher owns the pause/restore lifecycle so the developer build does not race with the background daemon or show two dashboards.
-- On Windows, `register` installs the packaged app image per-user (`%LOCALAPPDATA%\Dwell\app`) and points the login shortcut at its console-less exe with `daemon` args. Never run source Gradle builds at login.
+- On Windows, `register` installs the packaged app image per-user (`%LOCALAPPDATA%\Dwell\app`) and points the login shortcut at its console-less exe with `daemon` args. Never run source Gradle builds at login. Linux register mirrors this via ~/.local/share/dwell/app + the systemd unit.
 
 ### Desktop window notes
 
