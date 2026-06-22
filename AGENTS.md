@@ -84,6 +84,10 @@ Custom fonts (Orbitron, Seven-Segment, Technology, IndieFlower) and SVG icons li
 
 Use industry-standard comments: explain **why** (not what), skip the obvious, keep them short. If removing it wouldn't confuse a future reader, don't write it.
 
+## Commits
+
+Follow Conventional Commits: `<type>(<scope>): <imperative summary>` (e.g. `fix(deps): update Compose to 1.12.0`). Types: feat, fix, chore, docs, refactor, test. Keep the subject under 72 chars, explain the why in the body, one logical change per commit.
+
 ## Form UX
 
 Do not disable form submit/action buttons for validation failures. Keep the action clickable, then show the error and the concrete fix after the user presses it. Put that feedback near the related fields or in the dialog/footer, whichever is clearer for the specific form.
