@@ -14,11 +14,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -80,8 +78,6 @@ private const val VARIANT_DEVELOPER_LEGACY = "developer"
 private const val VARIANT_CLOCK_ONLY = "clock"
 private const val VARIANT_WEATHER_ONLY = "weather"
 
-private val MockPanel = Color(0xFF101014)
-private val MockStroke = Color(0xFF315F74)
 private val MockMint = Color(0xFFA9DFAD)
 
 class ClockWidgetFactory(
@@ -211,7 +207,6 @@ private class ClockWeatherWidget(
 
         BoxWithConstraints(modifier = modifier.fillMaxSize()) {
             val compact = maxWidth < 500.dp || maxHeight < 240.dp
-            val showMetrics = maxWidth >= 360.dp && maxHeight >= 260.dp
             val showForecast = maxWidth >= 360.dp && maxHeight >= 320.dp && forecastDays.isNotEmpty()
             val showLocations = locations.size > 1 && maxWidth >= 420.dp && maxHeight >= 300.dp
             // ≤3-row widgets go horizontal (weather right of clock); ≥4-row
@@ -228,10 +223,13 @@ private class ClockWeatherWidget(
                     dateText = dateText,
                     weather = weather,
                     forecastDays = if (showForecast) forecastDays else emptyList(),
+                    syncStatus = syncStatus,
                     showLocations = showLocations,
                     compact = compact,
                     sideBySide = sideBySide,
                     modifier = Modifier.fillMaxSize(),
+                    onRetry = { weatherViewModel.loadWeatherDataForCity(primary.city, forceRefresh = true) },
+                    onSettings = { settingsViewModel.openWidgetConfig(CLOCK_WIDGET_ID) },
                 )
                 VARIANT_CLOCK_ONLY -> ClockOnlyVariant(
                     primary = primary,
@@ -264,9 +262,9 @@ private class ClockWeatherWidget(
                     weather = weather,
                     forecastDays = if (showForecast) forecastDays else emptyList(),
                     syncStatus = syncStatus,
-                    showMetrics = showMetrics,
                     showLocations = showLocations,
                     compact = compact,
+                    sideBySide = sideBySide,
                     modifier = Modifier.fillMaxSize(),
                     onRetry = { weatherViewModel.loadWeatherDataForCity(primary.city, forceRefresh = true) },
                     onSettings = { settingsViewModel.openWidgetConfig(CLOCK_WIDGET_ID) },
@@ -287,74 +285,30 @@ private fun SidecarVariant(
     weather: WeatherSnapshot,
     forecastDays: List<DayForecast>,
     syncStatus: WeatherSyncStatus,
-    showMetrics: Boolean,
     showLocations: Boolean,
     compact: Boolean,
+    sideBySide: Boolean,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    MockFrame(modifier = modifier, accent = MockStroke) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
-        ) {
-            WidgetHeader(
-                label = headerLabel("TIME + WEATHER", primary.label),
-                settingsId = CLOCK_WIDGET_ID,
-            )
-
-            if (compact) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    MockTimeBlock(
-                        timeText = timeText,
-                        dateText = dateText,
-                        quiet = weather.quietLine,
-                        showDate = showDate,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    WeatherCard(
-                        weather = weather,
-                        compact = true,
-                        onRetry = onRetry,
-                        onSettings = onSettings,
-                    )
-                }
-            } else {
-                // Top-aligned + Row sizes by content; CenterVertically was leaving a
-                // dead gap above the metrics row because the Row had weight(1f).
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    MockTimeBlock(
-                        timeText = timeText,
-                        dateText = dateText,
-                        quiet = weather.quietLine,
-                        showDate = showDate,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                    WeatherCard(
-                        weather = weather,
-                        compact = false,
-                        onRetry = onRetry,
-                        onSettings = onSettings,
-                        modifier = Modifier.widthIn(min = 156.dp, max = 184.dp),
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-            }
-
-            if (showMetrics) WeatherMetrics(weather = weather, modifier = Modifier.fillMaxWidth())
-            if (showLocations) LocationRail(locations.drop(1), instant, Modifier.fillMaxWidth())
-            if (forecastDays.isNotEmpty()) ForecastStrip(forecastDays, dense = compact, modifier = Modifier.fillMaxWidth())
-            WeatherDegradedLine(syncStatus, weather.state)
-        }
-    }
+    ClockWeatherLayout(
+        primary = primary,
+        locations = locations,
+        instant = instant,
+        timeText = timeText,
+        dateText = if (showDate) dateText else "",
+        weather = weather,
+        forecastDays = forecastDays,
+        syncStatus = syncStatus,
+        showLocations = showLocations,
+        compact = compact,
+        sideBySide = sideBySide,
+        style = ClockWeatherStyle.Sidecar,
+        modifier = modifier,
+        onRetry = onRetry,
+        onSettings = onSettings,
+    )
 }
 
 @Composable
@@ -366,19 +320,67 @@ private fun ConsoleVariant(
     dateText: String,
     weather: WeatherSnapshot,
     forecastDays: List<DayForecast>,
+    syncStatus: WeatherSyncStatus,
     showLocations: Boolean,
     compact: Boolean,
     sideBySide: Boolean,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit,
+    onSettings: () -> Unit,
 ) {
-    val accent = LocalConsoleAccent.current.primary
-    MockFrame(modifier = modifier, accent = accent, variant = MockVariant.Console) {
+    ClockWeatherLayout(
+        primary = primary,
+        locations = locations,
+        instant = instant,
+        timeText = timeText,
+        dateText = dateText,
+        weather = weather,
+        forecastDays = forecastDays,
+        syncStatus = syncStatus,
+        showLocations = showLocations,
+        compact = compact,
+        sideBySide = sideBySide,
+        style = ClockWeatherStyle.Console,
+        modifier = modifier,
+        onRetry = onRetry,
+        onSettings = onSettings,
+    )
+}
+
+@Composable
+private fun ClockWeatherLayout(
+    primary: ClockLocation,
+    locations: List<ClockLocation>,
+    instant: Instant,
+    timeText: String,
+    dateText: String,
+    weather: WeatherSnapshot,
+    forecastDays: List<DayForecast>,
+    syncStatus: WeatherSyncStatus,
+    showLocations: Boolean,
+    compact: Boolean,
+    sideBySide: Boolean,
+    style: ClockWeatherStyle,
+    modifier: Modifier = Modifier,
+    onRetry: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val consoleAccent = LocalConsoleAccent.current.primary
+    val accent = when (style) {
+        ClockWeatherStyle.Console -> consoleAccent
+        ClockWeatherStyle.Sidecar -> MockMint
+    }
+    val header = when (style) {
+        ClockWeatherStyle.Console -> headerLabel("SYSTEM VIEW", "${primary.label} · ${timeZoneLabel(primary.timeZone)}")
+        ClockWeatherStyle.Sidecar -> headerLabel("TIME + WEATHER", primary.label)
+    }
+    MockFrame(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
         ) {
             WidgetHeader(
-                label = headerLabel("SYSTEM VIEW", "${primary.label} · ${timeZoneLabel(primary.timeZone)}"),
+                label = header,
                 settingsId = CLOCK_WIDGET_ID,
             )
             Box(
@@ -388,24 +390,36 @@ private fun ConsoleVariant(
                     .background(accent.copy(alpha = 0.16f)),
             )
 
-            // Inner console-screen takes all the slack between the header and the
-            // forecast row. In compact mode the weather card inside gets weight(1f)
-            // so it grows to fill that slack instead of leaving a dead gap.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = 0.025f))
-                    .border(1.dp, accent.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+                    .background(
+                        when (style) {
+                            ClockWeatherStyle.Console -> Color.White.copy(alpha = 0.025f)
+                            ClockWeatherStyle.Sidecar -> MockMint.copy(alpha = 0.04f)
+                        },
+                    )
+                    .border(
+                        1.dp,
+                        when (style) {
+                            ClockWeatherStyle.Console -> accent.copy(alpha = 0.16f)
+                            ClockWeatherStyle.Sidecar -> MockMint.copy(alpha = 0.16f)
+                        },
+                        RoundedCornerShape(14.dp),
+                    )
                     .padding(if (compact) 12.dp else 18.dp),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
             ) {
-                val syncSubLine = when (weather.state) {
-                    WeatherSnapshotState.Live -> if (weather.isLive) "synced just now" else "showing cached"
-                    WeatherSnapshotState.Loading -> "syncing…"
-                    WeatherSnapshotState.Unconfigured -> "not configured"
-                    WeatherSnapshotState.Error -> "weather offline"
+                val syncSubLine = when (style) {
+                    ClockWeatherStyle.Sidecar -> weather.quietLine.orEmpty()
+                    ClockWeatherStyle.Console -> when (weather.state) {
+                        WeatherSnapshotState.Live -> if (weather.isLive) "synced just now" else "showing cached"
+                        WeatherSnapshotState.Loading -> "syncing…"
+                        WeatherSnapshotState.Unconfigured -> "not configured"
+                        WeatherSnapshotState.Error -> "weather offline"
+                    }
                 }
                 if (sideBySide) {
                     // Short widgets: time left, weather card right. Time takes
@@ -418,42 +432,47 @@ private fun ConsoleVariant(
                             timeText = timeText,
                             dateText = dateText,
                             syncSubLine = syncSubLine,
+                            style = style,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
                         ConsoleWeatherReadout(
                             weather = weather,
+                            style = style,
+                            onRetry = onRetry,
+                            onSettings = onSettings,
                             modifier = Modifier.width(170.dp).fillMaxHeight(),
                         )
                     }
                 } else {
-                    // Tall widgets: clock fills full width, weather card stacks below.
                     ConsoleTimeReadout(
                         timeText = timeText,
                         dateText = dateText,
                         syncSubLine = syncSubLine,
+                        style = style,
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                     ConsoleWeatherReadout(
                         weather = weather,
+                        style = style,
+                        onRetry = onRetry,
+                        onSettings = onSettings,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
 
-            // Pack content tight — pinning the forecast to the bottom left a big
-            // dead band the user called out. Any extra vertical room lives below
-            // the forecast instead.
             if (showLocations) LocationRail(locations.drop(1), instant, Modifier.fillMaxWidth())
             if (forecastDays.isNotEmpty()) {
                 ForecastStrip(
                     days = forecastDays,
                     dense = compact,
                     accent = accent,
-                    showIcon = false,
+                    showIcon = style == ClockWeatherStyle.Sidecar,
                     stackHighLow = compact,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            WeatherDegradedLine(syncStatus, weather.state)
         }
     }
 }
@@ -470,7 +489,7 @@ private fun ClockOnlyVariant(
     compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    MockFrame(modifier = modifier, accent = MockStroke) {
+    MockFrame(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             WidgetHeader(
                 label = "TIME · ${primary.label.uppercase()}",
@@ -501,7 +520,7 @@ private fun WeatherOnlyVariant(
     onRetry: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    MockFrame(modifier = modifier, accent = MockStroke) {
+    MockFrame(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
@@ -562,8 +581,6 @@ private fun WeatherOnlyVariant(
 @Composable
 private fun MockFrame(
     modifier: Modifier = Modifier,
-    @Suppress("UNUSED_PARAMETER") accent: Color = MockStroke,
-    @Suppress("UNUSED_PARAMETER") variant: MockVariant = MockVariant.Sidecar,
     content: @Composable () -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -571,31 +588,12 @@ private fun MockFrame(
     }
 }
 
+private enum class ClockWeatherStyle { Sidecar, Console }
+
 // Combine an eyebrow and a place into one canonical label, matching the way
 // main's Clock and Weather widgets format their headers (e.g. "TIME · REWARI").
 private fun headerLabel(eyebrow: String, place: String?): String =
     if (place.isNullOrBlank()) eyebrow else "$eyebrow · ${place.uppercase()}"
-
-@Composable
-private fun MockTimeBlock(
-    timeText: String,
-    dateText: String,
-    quiet: String?,
-    showDate: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.Top) {
-        // BasicText.autoSize needs a bounded Box to size into — weight(1f)
-        // here gives the clock all the height left after the date row below.
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            MockDisplayTime(timeText = timeText)
-        }
-        if (showDate) {
-            Spacer(Modifier.height(8.dp))
-            DateRow(dateText = dateText, quiet = quiet)
-        }
-    }
-}
 
 // Shared auto-sized clock used by every variant. Wrap in a bounded Box (weight
 // or fixed size) so BasicText/autoSize has both axes to fit into. Variants
@@ -661,43 +659,6 @@ private fun DateRow(dateText: String, quiet: String?) {
 }
 
 @Composable
-private fun WeatherCard(
-    weather: WeatherSnapshot,
-    compact: Boolean,
-    modifier: Modifier = Modifier,
-    onRetry: () -> Unit,
-    onSettings: () -> Unit,
-) {
-    Column(
-        modifier = modifier
-            .heightIn(min = if (compact) 128.dp else 178.dp)
-            .clip(RoundedCornerShape(15.dp))
-            .background(MockMint.copy(alpha = 0.08f))
-            .border(1.dp, MockMint.copy(alpha = 0.22f), RoundedCornerShape(15.dp))
-            .padding(if (compact) 14.dp else 18.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        WeatherGlyph(
-            code = weather.conditionCode,
-            fontSize = if (compact) 30.sp else 40.sp,
-            alpha = if (weather.isLive) 1f else 0.5f,
-        )
-        Column {
-            WeatherTemperature(weather, fontSize = if (compact) 54.sp else 70.sp)
-            Text(
-                text = weather.condition,
-                color = DwellColors.TextMid,
-                fontFamily = DwellFonts.interTight(),
-                fontSize = if (compact) 13.sp else 16.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            WeatherAction(weather, onRetry, onSettings)
-        }
-    }
-}
-
-@Composable
 private fun WeatherTemperature(
     weather: WeatherSnapshot,
     fontSize: TextUnit,
@@ -743,108 +704,57 @@ private fun InlineAction(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WeatherMetrics(weather: WeatherSnapshot, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MetricCell("Feels", weather.feelsLike ?: "—", Modifier.weight(1f))
-        MetricCell("Humidity", weather.humidity ?: "—", Modifier.weight(1f))
-        MetricCell("Source", weather.source, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun ConsoleMetrics(weather: WeatherSnapshot, modifier: Modifier = Modifier) {
-    // Feels-like + Live status already appear in the weather readout above this
-    // row, so the 4 telemetry cells stick to facts the readout doesn't cover.
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MetricCell("Humidity", weather.humidity ?: "—", Modifier.weight(1f))
-        MetricCell("Feels", weather.feelsLike ?: "—", Modifier.weight(1f))
-        MetricCell("Condition", weather.condition, Modifier.weight(1f))
-        MetricCell("Source", weather.source, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun MetricCell(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    accent: Color = MockMint,
-) {
-    Column(
-        modifier = modifier
-            .heightIn(min = 62.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.018f))
-            .border(1.dp, DwellColors.TextLow.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = label.uppercase(),
-            color = DwellColors.TextFaint,
-            fontFamily = DwellFonts.jetBrainsMono(),
-            fontSize = 9.sp,
-            letterSpacing = 2.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        // Numeric values (28°, 48%, 6km/h) want bold display sizing; text values
-        // (WeatherAPI, Mist) need a smaller size to fit without ellipsis.
-        val isNumeric = value.firstOrNull()?.isDigit() == true || value == "—"
-        Text(
-            text = value,
-            color = if (value == "Live") accent else DwellColors.TextHigh,
-            fontFamily = DwellFonts.interTight(),
-            fontWeight = if (isNumeric) FontWeight.SemiBold else FontWeight.Medium,
-            fontSize = if (isNumeric) 17.sp else 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
 private fun ConsoleTimeReadout(
     timeText: String,
     dateText: String,
     syncSubLine: String,
+    style: ClockWeatherStyle,
     modifier: Modifier = Modifier,
 ) {
+    val supportingText = buildString {
+        if (dateText.isNotBlank()) append(dateText.toLowerCasePretty())
+        if (syncSubLine.isNotBlank()) {
+            if (isNotEmpty()) append(" · ")
+            append(syncSubLine)
+        }
+    }
     Column(modifier = modifier, verticalArrangement = Arrangement.Top) {
-        // (LOCAL TIME label hidden per user request.)
-        // The Box gets the leftover vertical space inside the inner Column
-        // (after the date line, and the size-to-content weather card), and
-        // BasicText/autoSize picks the largest font that fits both axes.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             contentAlignment = Alignment.CenterStart,
         ) {
-            // Same shared autoSize clock used by Sidecar / Clock-only — Console
-            // just swaps the font family + weight for its terminal-mono look.
             MockDisplayTime(
                 timeText = timeText,
-                fontFamily = DwellFonts.jetBrainsMono(),
-                fontWeight = FontWeight.Bold,
-                letterSpacingEm = -0.06f,
+                fontFamily = when (style) {
+                    ClockWeatherStyle.Console -> DwellFonts.jetBrainsMono()
+                    ClockWeatherStyle.Sidecar -> DwellFonts.interTight()
+                },
+                fontWeight = when (style) {
+                    ClockWeatherStyle.Console -> FontWeight.Bold
+                    ClockWeatherStyle.Sidecar -> FontWeight.Black
+                },
+                letterSpacingEm = when (style) {
+                    ClockWeatherStyle.Console -> -0.06f
+                    ClockWeatherStyle.Sidecar -> -0.04f
+                },
             )
         }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = buildString {
-                append(dateText.toLowerCasePretty())
-                if (syncSubLine.isNotBlank()) {
-                    append(" · ")
-                    append(syncSubLine)
-                }
-            },
-            color = DwellColors.TextMid,
-            fontFamily = DwellFonts.jetBrainsMono(),
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (supportingText.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = supportingText,
+                color = DwellColors.TextMid,
+                fontFamily = when (style) {
+                    ClockWeatherStyle.Console -> DwellFonts.jetBrainsMono()
+                    ClockWeatherStyle.Sidecar -> DwellFonts.interTight()
+                },
+                fontSize = if (style == ClockWeatherStyle.Console) 12.sp else 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -858,18 +768,37 @@ private fun String.toLowerCasePretty(): String =
 @Composable
 private fun ConsoleWeatherReadout(
     weather: WeatherSnapshot,
+    style: ClockWeatherStyle,
+    onRetry: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = LocalConsoleAccent.current.primary
+    val accent = when (style) {
+        ClockWeatherStyle.Console -> LocalConsoleAccent.current.primary
+        ClockWeatherStyle.Sidecar -> MockMint
+    }
     Column(
         modifier = modifier
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ConsoleLabel("Weather")
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (style == ClockWeatherStyle.Sidecar) {
+                WeatherGlyph(
+                    code = weather.conditionCode,
+                    fontSize = 24.sp,
+                    alpha = if (weather.isLive) 1f else 0.5f,
+                )
+            }
+            ConsoleLabel("Weather", style)
+        }
         val extras = buildList {
             weather.wind?.let { add("wind $it") }
             weather.visibility?.let { add("vis $it") }
+            if (weather.source.isNotBlank()) add("src ${weather.source}")
         }
         // Pick layout from the card's actual width:
         //   • wide (≥ 320dp): temp · pill · meta column inline (one tall row)
@@ -882,7 +811,7 @@ private fun ConsoleWeatherReadout(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     WeatherTemperature(weather, fontSize = 46.sp, accent = accent)
-                    StatusPill(weather.condition, dotIsLive = weather.isLive, accent = accent)
+                    StatusPill(weather.condition, dotIsLive = weather.isLive, accent = accent, style = style)
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -890,7 +819,7 @@ private fun ConsoleWeatherReadout(
                         Text(
                             text = weather.subtitleDetails,
                             color = DwellColors.TextMid,
-                            fontFamily = DwellFonts.jetBrainsMono(),
+                            fontFamily = weatherReadoutFont(style),
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -899,7 +828,7 @@ private fun ConsoleWeatherReadout(
                             Text(
                                 text = extras.joinToString(" · "),
                                 color = DwellColors.TextFaint,
-                                fontFamily = DwellFonts.jetBrainsMono(),
+                                fontFamily = weatherReadoutFont(style),
                                 fontSize = 11.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -914,12 +843,12 @@ private fun ConsoleWeatherReadout(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         WeatherTemperature(weather, fontSize = 42.sp, accent = accent)
-                        StatusPill(weather.condition, dotIsLive = weather.isLive, accent = accent)
+                        StatusPill(weather.condition, dotIsLive = weather.isLive, accent = accent, style = style)
                     }
                     Text(
                         text = weather.subtitleDetails,
                         color = DwellColors.TextMid,
-                        fontFamily = DwellFonts.jetBrainsMono(),
+                        fontFamily = weatherReadoutFont(style),
                         fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -928,7 +857,7 @@ private fun ConsoleWeatherReadout(
                         Text(
                             text = extras.joinToString(" · "),
                             color = DwellColors.TextFaint,
-                            fontFamily = DwellFonts.jetBrainsMono(),
+                            fontFamily = weatherReadoutFont(style),
                             fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -937,15 +866,16 @@ private fun ConsoleWeatherReadout(
                 }
             }
         }
+        WeatherAction(weather, onRetry, onSettings)
     }
 }
 
 @Composable
-private fun ConsoleLabel(text: String) {
+private fun ConsoleLabel(text: String, style: ClockWeatherStyle) {
     Text(
         text = text.uppercase(),
         color = DwellColors.TextFaint,
-        fontFamily = DwellFonts.jetBrainsMono(),
+        fontFamily = weatherReadoutFont(style),
         fontSize = 10.sp,
         letterSpacing = 1.5.sp,
         maxLines = 1,
@@ -953,10 +883,17 @@ private fun ConsoleLabel(text: String) {
 }
 
 @Composable
+private fun weatherReadoutFont(style: ClockWeatherStyle) = when (style) {
+    ClockWeatherStyle.Console -> DwellFonts.jetBrainsMono()
+    ClockWeatherStyle.Sidecar -> DwellFonts.interTight()
+}
+
+@Composable
 private fun StatusPill(
     label: String,
     dotIsLive: Boolean = true,
     accent: Color = MockMint,
+    style: ClockWeatherStyle,
 ) {
     Row(
         modifier = Modifier
@@ -976,7 +913,7 @@ private fun StatusPill(
         Text(
             text = label,
             color = DwellColors.TextHigh,
-            fontFamily = DwellFonts.jetBrainsMono(),
+            fontFamily = weatherReadoutFont(style),
             fontWeight = FontWeight.SemiBold,
             fontSize = 11.sp,
             maxLines = 1,
@@ -1181,7 +1118,6 @@ private fun WeatherDegradedLine(syncStatus: WeatherSyncStatus, state: WeatherSna
     )
 }
 
-private enum class MockVariant { Sidecar, Console }
 
 private data class ClockLocation(
     val label: String,
