@@ -116,4 +116,12 @@ data class SettingsModel(
 
     /** Flipped after the first-run welcome toast is shown so we don't repeat it. */
     val welcomeShown: Boolean = false,
+
+    /**
+     * When true, idle-triggered auto-show is suppressed while a fullscreen
+     * window is active or a screensaver inhibit is held (e.g. video playback,
+     * presentation, screen sharing). Manual `dwell show` still works.
+     * Default on — avoids interrupting movies/games/presentations.
+     */
+    val suppressWhenFullscreen: Boolean = true,
 )

@@ -319,6 +319,10 @@ class SettingsViewModel(
         if (!locked) consoleEditMode = false
     }
 
+    fun setSuppressWhenFullscreen(enabled: Boolean) {
+        updateProfileControlledSettings(settings.copy(suppressWhenFullscreen = enabled))
+    }
+
     /** Mark the first-run welcome toast as shown so it doesn't repeat. */
     fun markWelcomeShown() {
         if (!settings.welcomeShown) {

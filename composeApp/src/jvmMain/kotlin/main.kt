@@ -24,6 +24,7 @@ import com.droidslife.screensaver.Args
 import com.droidslife.screensaver.LaunchMode
 import com.droidslife.screensaver.components.ShortcutToast
 import com.droidslife.screensaver.components.rememberWindowEventHandlers
+import com.droidslife.screensaver.daemon.FullscreenDetector
 import com.droidslife.screensaver.daemon.TrayDaemon
 import com.droidslife.screensaver.daemon.IdleState
 import com.droidslife.screensaver.daemon.createIdleMonitor
@@ -206,13 +207,18 @@ private fun ApplicationScope.runDwellContent(
         }
     }
 
-    LaunchedEffect(keepRunningInTray, settings.idleTimeoutSeconds) {
+    LaunchedEffect(keepRunningInTray, settings.idleTimeoutSeconds, settings.suppressWhenFullscreen) {
         if (!keepRunningInTray) return@LaunchedEffect
         val idleMonitor = createIdleMonitor()
         val thresholdMillis = settings.idleTimeoutSeconds * 1_000L
 
         idleMonitor.watch(thresholdMillis, IDLE_MONITOR_POLL_MS).collect { state ->
             if (state == IdleState.Idle) {
+                if (settings.suppressWhenFullscreen && FullscreenDetector.shouldSuppressAutoShow()) {
+                    // Avoid interrupting fullscreen video / games / presentations.
+                    // Keep polling; will show once fullscreen ends and idle threshold still holds.
+                    return@collect
+                }
                 dashboardVisible = true
                 exitRequested = false
                 dashboardActivationRequest += 1
